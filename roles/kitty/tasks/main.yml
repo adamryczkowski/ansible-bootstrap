@@ -64,7 +64,7 @@
 
     - name: Kitty | Download JetBrains Mono Nerd Font
       ansible.builtin.unarchive:
-        src: "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.1.1/JetBrainsMono.zip"
+        src: "https://github.com/ryanoasis/nerd-fonts/releases/download/{{ kitty_nerd_fonts_version }}/JetBrainsMono.zip"
         dest: "/home/{{ kitty_username }}/.local/share/fonts/"
         remote_src: true
         owner: "{{ kitty_username }}"

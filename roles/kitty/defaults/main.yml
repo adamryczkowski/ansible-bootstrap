@@ -11,6 +11,9 @@ kitty_set_default_gnome: true
 # Install Nerd Fonts for icons
 kitty_install_nerd_fonts: true
 
+# Nerd Fonts version
+kitty_nerd_fonts_version: "v3.3.0"
+
 # Kitty configuration
 kitty_font_family: "JetBrainsMono Nerd Font"
 kitty_font_size: 11

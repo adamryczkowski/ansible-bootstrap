@@ -38,9 +38,13 @@
       become: true
 
     - name: LXD | Apply preseed configuration
-      ansible.builtin.shell: cat /tmp/lxd-preseed.yaml | lxd init --preseed
+      ansible.builtin.shell: lxd init --preseed < /tmp/lxd-preseed.yaml
+      args:
+        executable: /bin/bash
       become: true
       changed_when: true
+      register: lxd_preseed_result
+      failed_when: lxd_preseed_result.rc != 0
 
     - name: LXD | Remove preseed file
       ansible.builtin.file:

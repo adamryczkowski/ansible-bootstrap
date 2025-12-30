@@ -72,7 +72,9 @@
   become_user: "{{ rust_username }}"
   register: rust_binstall_result
   changed_when: "'Installed' in rust_binstall_result.stdout"
-  failed_when: false
+  failed_when:
+    - rust_binstall_result.rc != 0
+    - "'already installed' not in rust_binstall_result.stderr"
   environment:
     HOME: "/home/{{ rust_username }}"
     PATH: "/home/{{ rust_username }}/.cargo/bin:{{ ansible_env.PATH }}"
