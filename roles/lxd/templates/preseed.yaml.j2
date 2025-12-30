@@ -1,0 +1,34 @@
+# LXD preseed configuration
+# Managed by Ansible
+
+config: {}
+networks:
+  - config:
+      ipv4.address: {{ lxd_network_ipv4 }}
+      ipv4.nat: "true"
+      ipv6.address: none
+    description: ""
+    name: {{ lxd_network_name }}
+    type: bridge
+storage_pools:
+  - config:
+{% if lxd_storage_driver == 'dir' %}
+      source: {{ lxd_storage_path }}
+{% endif %}
+    description: ""
+    name: {{ lxd_storage_pool_name }}
+    driver: {{ lxd_storage_driver }}
+profiles:
+  - config: {}
+    description: Default LXD profile
+    devices:
+      eth0:
+        name: eth0
+        network: {{ lxd_network_name }}
+        type: nic
+      root:
+        path: /
+        pool: {{ lxd_storage_pool_name }}
+        type: disk
+    name: default
+cluster: null

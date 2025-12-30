@@ -1,0 +1,55 @@
+---
+# Thunderbird role - Install and configure Thunderbird email client
+
+- name: Thunderbird | Install Thunderbird
+  ansible.builtin.apt:
+    name: thunderbird
+    state: present
+  become: true
+  when: thunderbird_install_method == "apt"
+
+- name: Thunderbird | Install Thunderbird via Snap
+  community.general.snap:
+    name: thunderbird
+    state: present
+  become: true
+  when: thunderbird_install_method == "snap"
+
+- name: Thunderbird | Create Thunderbird profile directory
+  ansible.builtin.file:
+    path: "/home/{{ thunderbird_username }}/.thunderbird"
+    state: directory
+    mode: "0755"
+    owner: "{{ thunderbird_username }}"
+    group: "{{ thunderbird_username }}"
+  become: true
+
+- name: Thunderbird | Check if default profile exists
+  ansible.builtin.find:
+    paths: "/home/{{ thunderbird_username }}/.thunderbird"
+    patterns: "*.default*"
+    file_type: directory
+  register: thunderbird_profiles
+  become: true
+
+- name: Thunderbird | Create user.js for preferences
+  ansible.builtin.copy:
+    content: |
+      // Thunderbird user preferences - Managed by Ansible
+      {% for pref in thunderbird_preferences %}
+      user_pref("{{ pref.name }}", {{ pref.value | to_json }});
+      {% endfor %}
+    dest: "/home/{{ thunderbird_username }}/.thunderbird/{{ item.path | basename }}/user.js"
+    mode: "0644"
+    owner: "{{ thunderbird_username }}"
+    group: "{{ thunderbird_username }}"
+  become: true
+  loop: "{{ thunderbird_profiles.files }}"
+  when: thunderbird_profiles.files | length > 0 and thunderbird_preferences | length > 0
+
+- name: Thunderbird | Install Lightning calendar extension
+  ansible.builtin.apt:
+    name: xul-ext-lightning
+    state: present
+  become: true
+  when: thunderbird_install_lightning | bool and thunderbird_install_method == "apt"

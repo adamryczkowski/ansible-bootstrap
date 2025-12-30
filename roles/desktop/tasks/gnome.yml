@@ -1,0 +1,69 @@
+---
+# Desktop GNOME settings tasks
+
+- name: Desktop GNOME | Install GNOME tools
+  ansible.builtin.apt:
+    name:
+      - dconf-editor
+      - gnome-tweaks
+    state: present
+  become: true
+
+- name: Desktop GNOME | Configure screensaver settings
+  community.general.dconf:
+    key: "{{ item.key }}"
+    value: "{{ item.value }}"
+    state: present
+  become: true
+  become_user: "{{ desktop_username }}"
+  loop:
+    - key: "/org/gnome/desktop/screensaver/lock-enabled"
+      value: "false"
+    - key: "/org/gnome/desktop/screensaver/ubuntu-lock-on-suspend"
+      value: "false"
+
+- name: Desktop GNOME | Configure touchpad settings
+  community.general.dconf:
+    key: "{{ item.key }}"
+    value: "{{ item.value }}"
+    state: present
+  become: true
+  become_user: "{{ desktop_username }}"
+  loop:
+    - key: "/org/gnome/desktop/peripherals/touchpad/scroll-method"
+      value: "'edge-scrolling'"
+    - key: "/org/gnome/desktop/peripherals/touchpad/tap-to-click"
+      value: "true"
+    - key: "/org/gnome/desktop/peripherals/touchpad/natural-scroll"
+      value: "false"
+  when: desktop_tweak_laptop | bool
+
+- name: Desktop GNOME | Configure workspace settings
+  community.general.dconf:
+    key: "{{ item.key }}"
+    value: "{{ item.value }}"
+    state: present
+  become: true
+  become_user: "{{ desktop_username }}"
+  loop:
+    - key: "/org/gnome/desktop/wm/preferences/num-workspaces"
+      value: "{{ desktop_num_workspaces }}"
+    - key: "/org/gnome/mutter/dynamic-workspaces"
+      value: "false"
+
+- name: Desktop GNOME | Configure input sources
+  community.general.dconf:
+    key: "/org/gnome/desktop/input-sources/show-all-sources"
+    value: "true"
+    state: present
+  become: true
+  become_user: "{{ desktop_username }}"
+
+- name: Desktop GNOME | Configure keyboard layout
+  community.general.dconf:
+    key: "/org/gnome/desktop/input-sources/sources"
+    value: "{{ desktop_keyboard_layouts }}"
+    state: present
+  become: true
+  become_user: "{{ desktop_username }}"
+  when: desktop_keyboard_layouts is defined

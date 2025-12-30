@@ -1,0 +1,14 @@
+/* Rofi configuration - Managed by Ansible */
+
+configuration {
+    modi: "drun,run,window";
+    show-icons: true;
+    terminal: "{{ i3wm_terminal }}";
+    drun-display-format: "{icon} {name}";
+    location: 0;
+    disable-history: false;
+    hide-scrollbar: true;
+    sidebar-mode: true;
+}
+
+@theme "dracula"

@@ -1,0 +1,23 @@
+---
+# Molecule converge playbook
+# This playbook runs the roles being tested
+
+- name: Converge
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    target_user: testuser
+
+  pre_tasks:
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+  roles:
+    - role: common
+    - role: packages
+    - role: user_setup
+    - role: bashrc

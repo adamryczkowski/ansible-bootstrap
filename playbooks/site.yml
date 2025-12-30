@@ -1,0 +1,84 @@
+---
+# Site playbook - Main entry point for all configurations
+# This playbook orchestrates all roles based on host groups
+
+- name: Configure all hosts
+  hosts: all
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+  roles:
+    - role: common
+      tags: [common, base]
+
+    - role: packages
+      tags: [packages, base]
+
+- name: Configure workstations
+  hosts: workstations
+  become: true
+  gather_facts: true
+
+  roles:
+    - role: user_setup
+      tags: [user, base]
+
+    - role: bashrc
+      tags: [bashrc, shell]
+
+    - role: rust
+      tags: [rust, development]
+      when: install_rust | default(true)
+
+    - role: cli_tools
+      tags: [cli_tools, tools]
+      when: install_cli_tools | default(true)
+
+- name: Configure desktop systems
+  hosts: desktops
+  become: true
+  gather_facts: true
+
+  roles:
+    - role: desktop
+      tags: [desktop]
+
+    - role: kitty
+      tags: [kitty, terminal]
+      when: install_kitty | default(true)
+
+    - role: i3wm
+      tags: [i3wm, wm]
+      when: install_i3wm | default(false)
+
+    - role: firefox
+      tags: [firefox, browser]
+      when: install_firefox | default(true)
+
+    - role: thunderbird
+      tags: [thunderbird, email]
+      when: install_thunderbird | default(false)
+
+- name: Configure R development nodes
+  hosts: r_nodes
+  become: true
+  gather_facts: true
+
+  roles:
+    - role: r_node
+      tags: [r_node, development]
+
+- name: Configure LXD hosts
+  hosts: lxd_hosts
+  become: true
+  gather_facts: true
+
+  roles:
+    - role: lxd
+      tags: [lxd, containers]

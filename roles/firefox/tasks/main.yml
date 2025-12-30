@@ -1,0 +1,69 @@
+---
+# Firefox role - Install and configure Firefox browser
+
+- name: Firefox | Install Firefox
+  ansible.builtin.apt:
+    name: firefox
+    state: present
+  become: true
+  when: firefox_install_method == "apt"
+
+- name: Firefox | Install Firefox via Snap
+  community.general.snap:
+    name: firefox
+    state: present
+  become: true
+  when: firefox_install_method == "snap"
+
+- name: Firefox | Create Firefox profile directory
+  ansible.builtin.file:
+    path: "/home/{{ firefox_username }}/.mozilla/firefox"
+    state: directory
+    mode: "0755"
+    owner: "{{ firefox_username }}"
+    group: "{{ firefox_username }}"
+  become: true
+
+- name: Firefox | Check if default profile exists
+  ansible.builtin.find:
+    paths: "/home/{{ firefox_username }}/.mozilla/firefox"
+    patterns: "*.default*"
+    file_type: directory
+  register: firefox_profiles
+  become: true
+
+- name: Firefox | Create user.js for preferences
+  ansible.builtin.copy:
+    content: |
+      // Firefox user preferences - Managed by Ansible
+      {% for pref in firefox_preferences %}
+      user_pref("{{ pref.name }}", {{ pref.value | to_json }});
+      {% endfor %}
+    dest: "/home/{{ firefox_username }}/.mozilla/firefox/{{ item.path | basename }}/user.js"
+    mode: "0644"
+    owner: "{{ firefox_username }}"
+    group: "{{ firefox_username }}"
+  become: true
+  loop: "{{ firefox_profiles.files }}"
+  when: firefox_profiles.files | length > 0 and firefox_preferences | length > 0
+
+- name: Firefox | Install Firefox extensions
+  when: firefox_extensions | length > 0
+  block:
+    - name: Firefox | Create extensions directory
+      ansible.builtin.file:
+        path: "/home/{{ firefox_username }}/.mozilla/firefox/{{ item.path | basename }}/extensions"
+        state: directory
+        mode: "0755"
+        owner: "{{ firefox_username }}"
+        group: "{{ firefox_username }}"
+      become: true
+      loop: "{{ firefox_profiles.files }}"
+      when: firefox_profiles.files | length > 0
+
+    - name: Firefox | Note about extensions
+      ansible.builtin.debug:
+        msg: >
+          Firefox extensions need to be installed manually or via policies.
+          Consider using Firefox policies for enterprise deployment.
+          Extensions to install: {{ firefox_extensions | join(', ') }}

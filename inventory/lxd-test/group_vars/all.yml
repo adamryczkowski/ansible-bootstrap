@@ -1,0 +1,49 @@
+---
+# LXD E2E Test - All hosts configuration
+# This mimics prepare-ubuntu.sh with --cli-improved flag
+
+# Target user for configuration (will be created if not exists)
+target_user: testuser
+
+# Enable all CLI tools (--cli-improved equivalent)
+cli_tools_enabled: true
+
+# Individual CLI tools configuration
+cli_install_bat: true
+cli_install_eza: true
+cli_install_fzf: true
+cli_install_htop: true
+cli_install_btop: true
+cli_install_fd: true
+cli_install_ripgrep: true
+cli_install_delta: true
+cli_install_zoxide: true
+cli_install_mise: true
+cli_install_liquidprompt: true
+cli_install_aliases: true
+
+# Rust is required for some CLI tools
+rust_enabled: true
+
+# Package configuration
+packages_update_cache: true
+packages_upgrade: false  # Don't upgrade all packages in test
+
+# Common packages to install
+common_packages:
+  - curl
+  - wget
+  - git
+  - vim
+  - tmux
+  - unzip
+
+# Bashrc configuration
+bashrc_enabled: true
+
+# Central repository of facts - Authorized operators
+# These operators will have SSH access to all managed hosts
+# Keys are stored in files/ssh_keys/<operator>.pub
+authorized_operators:
+  - adam@legion9
+  - adam@potwor

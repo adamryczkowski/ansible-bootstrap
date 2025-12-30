@@ -1,0 +1,90 @@
+---
+# i3wm role defaults
+
+# Username for i3 configuration
+i3wm_username: "{{ ansible_user | default('adam') }}"
+
+# Packages to install
+i3wm_packages:
+  - i3
+  - i3lock
+  - i3status
+  - dmenu
+  - feh
+  - xss-lock
+  - dunst
+  - libnotify-bin
+  - xclip
+  - xdotool
+  - arandr
+  - lxappearance
+  - network-manager-gnome
+  - pavucontrol
+  - pulseaudio-utils
+
+# Optional components
+i3wm_install_i3status: true
+i3wm_install_rofi: true
+i3wm_install_picom: true
+
+# i3 configuration
+i3wm_mod_key: Mod4  # Super/Windows key
+i3wm_terminal: kitty
+i3wm_font: "pango:DejaVu Sans Mono 10"
+
+# Workspaces
+i3wm_workspaces:
+  - name: "1"
+    key: "1"
+  - name: "2"
+    key: "2"
+  - name: "3"
+    key: "3"
+  - name: "4"
+    key: "4"
+  - name: "5"
+    key: "5"
+  - name: "6"
+    key: "6"
+  - name: "7"
+    key: "7"
+  - name: "8"
+    key: "8"
+  - name: "9"
+    key: "9"
+  - name: "10"
+    key: "0"
+
+# Startup applications
+i3wm_startup_apps:
+  - command: "nm-applet"
+    no_startup_id: true
+  - command: "dunst"
+    no_startup_id: true
+
+# Colors (Dracula theme)
+i3wm_colors:
+  focused:
+    border: "#6272A4"
+    background: "#6272A4"
+    text: "#F8F8F2"
+    indicator: "#6272A4"
+    child_border: "#6272A4"
+  focused_inactive:
+    border: "#44475A"
+    background: "#44475A"
+    text: "#F8F8F2"
+    indicator: "#44475A"
+    child_border: "#44475A"
+  unfocused:
+    border: "#282A36"
+    background: "#282A36"
+    text: "#BFBFBF"
+    indicator: "#282A36"
+    child_border: "#282A36"
+  urgent:
+    border: "#44475A"
+    background: "#FF5555"
+    text: "#F8F8F2"
+    indicator: "#FF5555"
+    child_border: "#FF5555"

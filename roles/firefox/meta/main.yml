@@ -1,0 +1,16 @@
+---
+# Firefox role metadata
+
+galaxy_info:
+  author: Adam
+  description: Install and configure Firefox browser
+  company: ""
+  license: MIT
+  min_ansible_version: "2.14"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+        - noble
+
+dependencies: []

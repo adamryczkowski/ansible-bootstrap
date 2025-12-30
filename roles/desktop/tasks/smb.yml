@@ -1,0 +1,43 @@
+---
+# Desktop SMB shares tasks
+
+- name: Desktop SMB | Install SMB client packages
+  ansible.builtin.apt:
+    name:
+      - cifs-utils
+      - smbclient
+    state: present
+  become: true
+
+- name: Desktop SMB | Create mount points
+  ansible.builtin.file:
+    path: "{{ item.mount_point }}"
+    state: directory
+    mode: "0755"
+    owner: "{{ desktop_username }}"
+    group: "{{ desktop_username }}"
+  become: true
+  loop: "{{ desktop_smb_shares }}"
+  when: desktop_smb_shares | length > 0
+
+- name: Desktop SMB | Create credentials file
+  ansible.builtin.template:
+    src: smb_credentials.j2
+    dest: "/home/{{ desktop_username }}/.smbcredentials"
+    mode: "0600"
+    owner: "{{ desktop_username }}"
+    group: "{{ desktop_username }}"
+  become: true
+  when: desktop_smb_username is defined and desktop_smb_password is defined
+  no_log: true
+
+- name: Desktop SMB | Add SMB mounts to fstab
+  ansible.posix.mount:
+    path: "{{ item.mount_point }}"
+    src: "//{{ item.server }}/{{ item.share }}"
+    fstype: cifs
+    opts: "credentials=/home/{{ desktop_username }}/.smbcredentials,uid={{ desktop_username }},gid={{ desktop_username }},iocharset=utf8,nofail,_netdev"
+    state: present
+  become: true
+  loop: "{{ desktop_smb_shares }}"
+  when: desktop_smb_shares | length > 0

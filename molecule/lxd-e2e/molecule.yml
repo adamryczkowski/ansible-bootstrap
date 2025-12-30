@@ -1,0 +1,76 @@
+---
+# Molecule LXD E2E test configuration
+# Mimics make-lxd-node.sh with prepare-ubuntu.sh --cli-improved
+#
+# This scenario uses the default driver with custom create/destroy
+# playbooks to manage LXD containers.
+
+dependency:
+  name: galaxy
+  options:
+    requirements-file: requirements.yml
+
+driver:
+  name: default
+
+platforms:
+  - name: ansible-test-noble
+    groups:
+      - lxd_test
+
+provisioner:
+  name: ansible
+  env:
+    ANSIBLE_ROLES_PATH: ${MOLECULE_PROJECT_DIRECTORY}/roles
+    ANSIBLE_COLLECTIONS_PATH: ${MOLECULE_PROJECT_DIRECTORY}/collections
+  config_options:
+    defaults:
+      interpreter_python: auto_silent
+      callbacks_enabled: profile_tasks
+    connection:
+      pipelining: true
+  connection_options:
+    ansible_connection: community.general.lxd
+  inventory:
+    host_vars:
+      ansible-test-noble:
+        target_user: testuser
+        ansible_user: root
+        # Enable CLI tools (--cli-improved equivalent)
+        install_cli_tools: true
+        install_rust: true
+        # CLI tools configuration
+        cli_tools_install_mise: true
+        cli_tools_install_fzf: true
+        cli_tools_install_starship: true
+        cli_tools_install_bat: true
+        cli_tools_install_eza: true
+        cli_tools_install_fd: true
+        cli_tools_install_ripgrep: true
+        cli_tools_install_delta: true
+        cli_tools_install_zoxide: true
+        cli_tools_install_btop: true
+  playbooks:
+    create: create.yml
+    destroy: destroy.yml
+    converge: converge.yml
+    verify: verify.yml
+    prepare: prepare.yml
+
+verifier:
+  name: ansible
+
+scenario:
+  name: lxd-e2e
+  test_sequence:
+    - dependency
+    - cleanup
+    - destroy
+    - syntax
+    - create
+    - prepare
+    - converge
+    - idempotence
+    - verify
+    - cleanup
+    - destroy

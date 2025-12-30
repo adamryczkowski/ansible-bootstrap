@@ -1,0 +1,58 @@
+---
+# Default variables for packages role
+
+# APT proxy configuration (empty = no proxy)
+packages_apt_proxy: ""
+
+# Whether to update apt cache
+packages_update_cache: true
+
+# Cache valid time in seconds
+packages_cache_valid_time: 3600
+
+# Whether to upgrade all packages
+packages_upgrade: false
+
+# Base packages to install
+packages_base:
+  - apt-transport-https
+  - ca-certificates
+  - curl
+  - gnupg
+  - lsb-release
+  - software-properties-common
+  - git
+  - vim
+  - htop
+  - tmux
+  - wget
+  - unzip
+  - jq
+  - build-essential
+
+# Additional packages to install
+packages_additional: []
+
+# PPAs to add (format: "owner/ppa-name")
+packages_ppas: []
+
+# APT signing keys to add
+# Format:
+#   - name: key-name
+#     key_url: https://example.com/key.asc
+packages_apt_keys: []
+
+# APT repositories to add
+# Format:
+#   - name: repo-name
+#     repo: "deb [signed-by=/etc/apt/keyrings/repo-name.asc] https://example.com/repo stable main"
+packages_apt_repositories: []
+
+# .deb files to install
+# Format:
+#   - name: package-name
+#     url: https://example.com/package.deb
+packages_deb_files: []
+
+# Packages to purge
+packages_purge: []

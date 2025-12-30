@@ -1,0 +1,82 @@
+---
+# User setup role - User creation and SSH configuration
+
+- name: User Setup | Create user
+  ansible.builtin.user:
+    name: "{{ user_setup_username }}"
+    shell: "{{ user_setup_shell }}"
+    groups: "{{ user_setup_groups }}"
+    append: true
+    create_home: true
+    state: present
+  become: true
+
+- name: User Setup | Create .ssh directory
+  ansible.builtin.file:
+    path: "/home/{{ user_setup_username }}/.ssh"
+    state: directory
+    mode: "0700"
+    owner: "{{ user_setup_username }}"
+    group: "{{ user_setup_username }}"
+  become: true
+
+- name: User Setup | Generate SSH key if not exists
+  community.crypto.openssh_keypair:
+    path: "/home/{{ user_setup_username }}/.ssh/{{ user_setup_ssh_key_name }}"
+    type: "{{ user_setup_ssh_key_type }}"
+    owner: "{{ user_setup_username }}"
+    group: "{{ user_setup_username }}"
+    mode: "0600"
+  become: true
+  when: user_setup_generate_ssh_key | bool
+
+- name: User Setup | Add authorized keys (direct)
+  ansible.posix.authorized_key:
+    user: "{{ user_setup_username }}"
+    key: "{{ item }}"
+    state: present
+  loop: "{{ user_setup_authorized_keys }}"
+  become: true
+  when: user_setup_authorized_keys | length > 0
+
+- name: User Setup | Deploy operator keys from central repository
+  ansible.posix.authorized_key:
+    user: "{{ user_setup_username }}"
+    key: "{{ lookup('file', 'ssh_keys/' + item + '.pub') }}"
+    state: present
+  loop: "{{ authorized_operators }}"
+  become: true
+  when:
+    - user_setup_deploy_operator_keys | bool
+    - authorized_operators | length > 0
+
+- name: User Setup | Create common directories
+  ansible.builtin.file:
+    path: "/home/{{ user_setup_username }}/{{ item }}"
+    state: directory
+    mode: "0755"
+    owner: "{{ user_setup_username }}"
+    group: "{{ user_setup_username }}"
+  loop: "{{ user_setup_directories }}"
+  become: true
+  when: user_setup_directories | length > 0
+
+- name: User Setup | Configure sudo access
+  ansible.builtin.lineinfile:
+    path: "/etc/sudoers.d/{{ user_setup_username }}"
+    line: "{{ user_setup_username }} ALL=(ALL) NOPASSWD: ALL"
+    create: true
+    mode: "0440"
+    validate: "visudo -cf %s"
+  become: true
+  when: user_setup_sudo_nopasswd | bool
+
+- name: User Setup | Clone update-all repository
+  ansible.builtin.git:
+    repo: "{{ user_setup_update_all_repo }}"
+    dest: "/home/{{ user_setup_username }}/tmp/update-all"
+    depth: 1
+    update: true
+  become: true
+  become_user: "{{ user_setup_username }}"
+  when: user_setup_clone_update_all | bool

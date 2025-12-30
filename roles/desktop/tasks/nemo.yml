@@ -1,0 +1,39 @@
+---
+# Desktop Nemo file manager tasks
+
+- name: Desktop Nemo | Install Nemo file manager
+  ansible.builtin.apt:
+    name:
+      - nemo
+      - nemo-fileroller
+    state: present
+  become: true
+
+- name: Desktop Nemo | Set Nemo as default file manager
+  ansible.builtin.command: xdg-mime default nemo.desktop inode/directory application/x-gnome-saved-search
+  become: true
+  become_user: "{{ desktop_username }}"
+  changed_when: true
+
+- name: Desktop Nemo | Configure Nemo settings
+  community.general.dconf:
+    key: "{{ item.key }}"
+    value: "{{ item.value }}"
+    state: present
+  become: true
+  become_user: "{{ desktop_username }}"
+  loop:
+    - key: "/org/nemo/preferences/show-open-in-terminal-toolbar"
+      value: "true"
+    - key: "/org/nemo/preferences/default-folder-viewer"
+      value: "'list-view'"
+    - key: "/org/nemo/preferences/show-hidden-files"
+      value: "false"
+
+- name: Desktop Nemo | Disable GNOME desktop icons (use Nemo instead)
+  community.general.dconf:
+    key: "/org/gnome/desktop/background/show-desktop-icons"
+    value: "false"
+    state: present
+  become: true
+  become_user: "{{ desktop_username }}"

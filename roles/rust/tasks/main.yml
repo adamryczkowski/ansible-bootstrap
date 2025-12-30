@@ -1,0 +1,93 @@
+---
+# Rust role - Rust toolchain installation
+# Replaces librust.sh
+
+- name: Rust | Check if rustup is installed
+  ansible.builtin.stat:
+    path: "/home/{{ rust_username }}/.cargo/bin/rustup"
+  register: rust_rustup_installed
+
+- name: Rust | Download rustup installer
+  ansible.builtin.get_url:
+    url: https://sh.rustup.rs
+    dest: /tmp/rustup-init.sh
+    mode: "0755"
+  when: not rust_rustup_installed.stat.exists
+
+- name: Rust | Install Rust
+  ansible.builtin.command: /tmp/rustup-init.sh -y --no-modify-path
+  become: true
+  become_user: "{{ rust_username }}"
+  when: not rust_rustup_installed.stat.exists
+  environment:
+    HOME: "/home/{{ rust_username }}"
+  changed_when: true
+
+- name: Rust | Clean up rustup installer
+  ansible.builtin.file:
+    path: /tmp/rustup-init.sh
+    state: absent
+  when: not rust_rustup_installed.stat.exists
+
+- name: Rust | Add cargo to PATH in bashrc.d
+  ansible.builtin.copy:
+    content: |
+      # Rust/Cargo PATH
+      export PATH="$HOME/.cargo/bin:$PATH"
+    dest: "/home/{{ rust_username }}/.bashrc.d/05_cargo.sh"
+    mode: "0644"
+    owner: "{{ rust_username }}"
+    group: "{{ rust_username }}"
+  become: true
+
+- name: Rust | Check if cargo-binstall is installed
+  ansible.builtin.stat:
+    path: "/home/{{ rust_username }}/.cargo/bin/cargo-binstall"
+  register: rust_binstall_installed
+
+- name: Rust | Download cargo-binstall installer
+  ansible.builtin.get_url:
+    url: https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh
+    dest: /tmp/cargo-binstall-install.sh
+    mode: "0755"
+  when: rust_install_binstall | bool and not rust_binstall_installed.stat.exists
+
+- name: Rust | Install cargo-binstall
+  ansible.builtin.shell: /tmp/cargo-binstall-install.sh
+  args:
+    executable: /bin/bash
+  become: true
+  become_user: "{{ rust_username }}"
+  when: rust_install_binstall | bool and not rust_binstall_installed.stat.exists
+  environment:
+    HOME: "/home/{{ rust_username }}"
+    CARGO_HOME: "/home/{{ rust_username }}/.cargo"
+  changed_when: true
+
+- name: Rust | Install Rust packages via binstall
+  ansible.builtin.command: >
+    /home/{{ rust_username }}/.cargo/bin/cargo binstall --no-confirm {{ item }}
+  loop: "{{ rust_packages }}"
+  become: true
+  become_user: "{{ rust_username }}"
+  register: rust_binstall_result
+  changed_when: "'Installed' in rust_binstall_result.stdout"
+  failed_when: false
+  environment:
+    HOME: "/home/{{ rust_username }}"
+    PATH: "/home/{{ rust_username }}/.cargo/bin:{{ ansible_env.PATH }}"
+  when: rust_packages | length > 0 and rust_install_binstall | bool
+
+- name: Rust | Install Rust packages via cargo install (fallback)
+  ansible.builtin.command: >
+    /home/{{ rust_username }}/.cargo/bin/cargo install {{ item }}
+  loop: "{{ rust_packages }}"
+  become: true
+  become_user: "{{ rust_username }}"
+  register: rust_install_result
+  changed_when: "'Installing' in rust_install_result.stderr"
+  failed_when: false
+  environment:
+    HOME: "/home/{{ rust_username }}"
+    PATH: "/home/{{ rust_username }}/.cargo/bin:{{ ansible_env.PATH }}"
+  when: rust_packages | length > 0 and not rust_install_binstall | bool

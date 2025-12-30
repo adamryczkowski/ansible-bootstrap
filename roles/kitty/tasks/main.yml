@@ -1,0 +1,80 @@
+---
+# Kitty terminal role - Install and configure Kitty terminal emulator
+
+- name: Kitty | Install Kitty terminal
+  ansible.builtin.apt:
+    name: kitty
+    state: present
+  become: true
+
+- name: Kitty | Create config directory
+  ansible.builtin.file:
+    path: "/home/{{ kitty_username }}/.config/kitty"
+    state: directory
+    mode: "0755"
+    owner: "{{ kitty_username }}"
+    group: "{{ kitty_username }}"
+  become: true
+
+- name: Kitty | Deploy Kitty configuration
+  ansible.builtin.template:
+    src: kitty.conf.j2
+    dest: "/home/{{ kitty_username }}/.config/kitty/kitty.conf"
+    mode: "0644"
+    owner: "{{ kitty_username }}"
+    group: "{{ kitty_username }}"
+  become: true
+
+- name: Kitty | Set Kitty as default terminal in Nemo
+  community.general.dconf:
+    key: "/org/cinnamon/desktop/default-applications/terminal/exec"
+    value: "'kitty'"
+    state: present
+  become: true
+  become_user: "{{ kitty_username }}"
+  when: kitty_set_default_nemo | bool
+  failed_when: false
+
+- name: Kitty | Set Kitty as default terminal in GNOME
+  community.general.dconf:
+    key: "/org/gnome/desktop/default-applications/terminal/exec"
+    value: "'kitty'"
+    state: present
+  become: true
+  become_user: "{{ kitty_username }}"
+  when: kitty_set_default_gnome | bool
+  failed_when: false
+
+- name: Kitty | Install Nerd Fonts for icons
+  when: kitty_install_nerd_fonts | bool
+  block:
+    - name: Kitty | Create fonts directory
+      ansible.builtin.file:
+        path: "/home/{{ kitty_username }}/.local/share/fonts"
+        state: directory
+        mode: "0755"
+        owner: "{{ kitty_username }}"
+        group: "{{ kitty_username }}"
+      become: true
+
+    - name: Kitty | Check if JetBrains Mono Nerd Font is installed
+      ansible.builtin.stat:
+        path: "/home/{{ kitty_username }}/.local/share/fonts/JetBrainsMonoNerdFont-Regular.ttf"
+      register: kitty_nerd_font_installed
+
+    - name: Kitty | Download JetBrains Mono Nerd Font
+      ansible.builtin.unarchive:
+        src: "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.1.1/JetBrainsMono.zip"
+        dest: "/home/{{ kitty_username }}/.local/share/fonts/"
+        remote_src: true
+        owner: "{{ kitty_username }}"
+        group: "{{ kitty_username }}"
+      become: true
+      when: not kitty_nerd_font_installed.stat.exists
+
+    - name: Kitty | Update font cache
+      ansible.builtin.command: fc-cache -fv
+      become: true
+      become_user: "{{ kitty_username }}"
+      when: not kitty_nerd_font_installed.stat.exists
+      changed_when: true

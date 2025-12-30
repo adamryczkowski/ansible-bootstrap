@@ -1,0 +1,47 @@
+---
+# CLI Tools role defaults
+
+# Username for tool installation
+# Uses target_user if defined (from inventory), otherwise falls back to ansible_user
+cli_tools_username: "{{ target_user | default(ansible_user) | default('adam') }}"
+
+# APT-based CLI tools to install
+# Note: ripgrep, fd-find, bat, eza are installed via cargo-binstall in rust role
+# Note: exa was renamed to eza in Ubuntu 24.04+
+cli_tools_apt:
+  - jq
+  - htop
+  - btop
+  - ncdu
+  - tree
+  - tmux
+  - neovim
+  - curl
+  - wget
+  - unzip
+  - zip
+  - git
+  - git-lfs
+  - make
+  - build-essential
+  - prettyping
+  - liquidprompt
+
+# Whether to install mise (formerly rtx) - polyglot runtime manager
+cli_tools_install_mise: true
+
+# Whether to install fzf - fuzzy finder
+cli_tools_install_fzf: true
+
+# Whether to configure liquidprompt (installed via APT)
+# This replaces starship for a more traditional prompt experience
+cli_tools_install_liquidprompt: true
+
+# Whether to configure zoxide (assumes installed via cargo-binstall)
+cli_tools_install_zoxide: true
+
+# Whether to configure atuin (assumes installed via cargo-binstall)
+cli_tools_install_atuin: true
+
+# Whether to add CLI improved aliases (cat=bat, ping=prettyping, du=ncdu, preview=fzf+bat)
+cli_tools_install_aliases: true

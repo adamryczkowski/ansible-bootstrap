@@ -1,0 +1,47 @@
+---
+# Default variables for user_setup role
+
+# Username to create/configure
+user_setup_username: "{{ target_user | default('adam') }}"
+
+# User shell
+user_setup_shell: /bin/bash
+
+# Groups to add user to
+user_setup_groups:
+  - sudo
+
+# Whether to generate SSH key
+user_setup_generate_ssh_key: true
+
+# SSH key type
+user_setup_ssh_key_type: ed25519
+
+# SSH key name
+user_setup_ssh_key_name: id_ed25519
+
+# Authorized keys to add (direct key strings)
+user_setup_authorized_keys: []
+
+# Authorized operators - list of operator identifiers (e.g., "adam@legion9")
+# Keys are loaded from files/ssh_keys/<operator>.pub
+# This is the central repository of facts for SSH access
+authorized_operators: []
+
+# Whether to deploy operator keys from the central repository
+user_setup_deploy_operator_keys: true
+
+# Directories to create in home
+user_setup_directories:
+  - bin
+  - tmp
+  - .config
+
+# Whether to configure passwordless sudo
+user_setup_sudo_nopasswd: true
+
+# Whether to clone update-all repository to ~/tmp/update-all
+user_setup_clone_update_all: true
+
+# URL for update-all repository
+user_setup_update_all_repo: https://github.com/adamryczkowski/update-all

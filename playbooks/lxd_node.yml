@@ -1,0 +1,87 @@
+---
+# LXD Node playbook - Configure LXD host and provision containers
+# Replaces make-lxd-node.sh
+
+- name: Configure LXD host
+  hosts: lxd_hosts
+  become: true
+  gather_facts: true
+
+  vars:
+    target_user: "{{ ansible_user | default('adam') }}"
+
+  roles:
+    - role: lxd
+      vars:
+        lxd_username: "{{ target_user }}"
+      tags: [lxd]
+
+  post_tasks:
+    - name: Display LXD configuration
+      ansible.builtin.debug:
+        msg: "LXD host configuration complete"
+
+- name: Provision LXD containers
+  hosts: lxd_hosts
+  become: true
+  gather_facts: true
+
+  vars:
+    lxd_containers: []
+    # Example:
+    # lxd_containers:
+    #   - name: dev-container
+    #     image: ubuntu:24.04
+    #     profiles:
+    #       - default
+    #     config:
+    #       limits.cpu: "2"
+    #       limits.memory: 4GB
+
+  tasks:
+    - name: Create LXD containers
+      community.general.lxd_container:
+        name: "{{ item.name }}"
+        state: started
+        source:
+          type: image
+          mode: pull
+          server: https://images.linuxcontainers.org
+          alias: "{{ item.image }}"
+        profiles: "{{ item.profiles | default(['default']) }}"
+        config: "{{ item.config | default({}) }}"
+        wait_for_ipv4_addresses: true
+        timeout: 600
+      loop: "{{ lxd_containers }}"
+      when: lxd_containers | length > 0
+
+    - name: Wait for containers to be ready
+      ansible.builtin.pause:
+        seconds: 10
+      when: lxd_containers | length > 0
+
+- name: Configure LXD containers
+  hosts: lxd_containers
+  connection: community.general.lxd
+  become: true
+  gather_facts: true
+
+  vars:
+    target_user: ubuntu
+
+  roles:
+    - role: common
+      tags: [common]
+
+    - role: packages
+      tags: [packages]
+
+    - role: user_setup
+      vars:
+        user_setup_username: "{{ target_user }}"
+      tags: [user]
+
+    - role: bashrc
+      vars:
+        bashrc_username: "{{ target_user }}"
+      tags: [bashrc]

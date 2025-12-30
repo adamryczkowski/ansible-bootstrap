@@ -1,0 +1,21 @@
+---
+# Default variables for common role
+
+# Hostname (empty = don't change)
+common_hostname: ""
+
+# Locale configuration
+common_locale: en_US.UTF-8
+
+# Timezone
+common_timezone: Europe/Warsaw
+
+# Users to add to sudoers with NOPASSWD
+common_sudoers_nopasswd: []
+
+# Sysctl settings
+common_sysctl_settings:
+  # Increase inotify watchers for IDEs
+  fs.inotify.max_user_watches: 524288
+  # Increase file descriptors
+  fs.file-max: 2097152

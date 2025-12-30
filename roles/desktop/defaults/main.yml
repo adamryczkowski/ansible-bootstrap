@@ -1,0 +1,67 @@
+---
+# Desktop role defaults
+
+# Username for desktop configuration
+desktop_username: "{{ ansible_user | default('adam') }}"
+
+# Tweak toggles
+desktop_tweak_base: true
+desktop_tweak_gnome: true
+desktop_tweak_nemo: true
+desktop_tweak_smb: false
+desktop_tweak_laptop: false
+desktop_tweak_applications: true
+
+# Base packages
+desktop_base_packages:
+  - git
+  - gdebi-core
+  - curl
+  - wget
+
+# GNOME settings
+desktop_num_workspaces: 9
+# desktop_keyboard_layouts: "[('xkb', 'us'), ('xkb', 'pl')]"
+
+# SMB shares configuration
+desktop_smb_shares: []
+# Example:
+# desktop_smb_shares:
+#   - server: "192.168.1.100"
+#     share: "media"
+#     mount_point: "/mnt/media"
+# desktop_smb_username: ""
+# desktop_smb_password: ""
+
+# Laptop settings
+desktop_install_redshift: true
+desktop_redshift_temp_day: 6500
+desktop_redshift_temp_night: 4500
+desktop_redshift_latitude: 52.2297
+desktop_redshift_longitude: 21.0122
+
+# Applications
+desktop_applications:
+  - meld
+  - gparted
+  - chromium-browser
+  - vlc
+  - gimp
+  - inkscape
+
+# Flatpak
+desktop_install_flatpak: true
+desktop_flatpak_apps: []
+# Example:
+# desktop_flatpak_apps:
+#   - org.signal.Signal
+#   - com.spotify.Client
+
+# Snap applications
+desktop_snap_apps: []
+# Example:
+# desktop_snap_apps:
+#   - name: code
+#     classic: true
+#   - name: slack
+#     classic: false

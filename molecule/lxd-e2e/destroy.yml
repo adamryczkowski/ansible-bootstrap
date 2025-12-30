@@ -1,0 +1,22 @@
+---
+# Molecule destroy playbook for LXD E2E test
+# Destroys the LXD container after testing
+
+- name: Destroy LXD container
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+    - name: Destroy LXD container
+      community.general.lxd_container:
+        name: ansible-test-noble
+        state: absent
+        force_stop: true
+      ignore_errors: true
+
+    - name: Remove instance config file
+      ansible.builtin.file:
+        path: "{{ molecule_instance_config }}"
+        state: absent
+      ignore_errors: true

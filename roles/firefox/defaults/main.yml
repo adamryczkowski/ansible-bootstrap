@@ -1,0 +1,35 @@
+---
+# Firefox role defaults
+
+# Username for Firefox configuration
+firefox_username: "{{ ansible_user | default('adam') }}"
+
+# Installation method: apt or snap
+firefox_install_method: apt
+
+# Firefox preferences (user.js)
+firefox_preferences:
+  - name: browser.startup.homepage
+    value: "about:home"
+  - name: browser.newtabpage.enabled
+    value: true
+  - name: privacy.trackingprotection.enabled
+    value: true
+  - name: privacy.trackingprotection.socialtracking.enabled
+    value: true
+  - name: dom.security.https_only_mode
+    value: true
+  - name: browser.contentblocking.category
+    value: "strict"
+  - name: browser.download.useDownloadDir
+    value: false
+  - name: browser.tabs.warnOnClose
+    value: false
+
+# Extensions to install (by name - manual installation required)
+firefox_extensions: []
+# Example:
+# firefox_extensions:
+#   - uBlock Origin
+#   - Bitwarden
+#   - Dark Reader

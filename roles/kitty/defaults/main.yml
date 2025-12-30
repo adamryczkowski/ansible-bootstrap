@@ -1,0 +1,57 @@
+---
+# Kitty terminal role defaults
+
+# Username for Kitty configuration
+kitty_username: "{{ ansible_user | default('adam') }}"
+
+# Set as default terminal
+kitty_set_default_nemo: true
+kitty_set_default_gnome: true
+
+# Install Nerd Fonts for icons
+kitty_install_nerd_fonts: true
+
+# Kitty configuration
+kitty_font_family: "JetBrainsMono Nerd Font"
+kitty_font_size: 11
+kitty_scrollback_lines: 10000
+kitty_enable_audio_bell: false
+kitty_window_padding_width: 4
+
+# Theme (Dracula)
+kitty_theme:
+  foreground: "#F8F8F2"
+  background: "#282A36"
+  selection_foreground: "#FFFFFF"
+  selection_background: "#44475A"
+  url_color: "#8BE9FD"
+  cursor: "#F8F8F2"
+  cursor_text_color: "#282A36"
+  # Black
+  color0: "#21222C"
+  color8: "#6272A4"
+  # Red
+  color1: "#FF5555"
+  color9: "#FF6E6E"
+  # Green
+  color2: "#50FA7B"
+  color10: "#69FF94"
+  # Yellow
+  color3: "#F1FA8C"
+  color11: "#FFFFA5"
+  # Blue
+  color4: "#BD93F9"
+  color12: "#D6ACFF"
+  # Magenta
+  color5: "#FF79C6"
+  color13: "#FF92DF"
+  # Cyan
+  color6: "#8BE9FD"
+  color14: "#A4FFFF"
+  # White
+  color7: "#F8F8F2"
+  color15: "#FFFFFF"
+
+# Tab bar
+kitty_tab_bar_style: powerline
+kitty_tab_powerline_style: slanted

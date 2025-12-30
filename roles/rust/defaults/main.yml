@@ -1,0 +1,18 @@
+---
+# Default variables for rust role
+
+# Username to install Rust for
+rust_username: "{{ target_user | default('adam') }}"
+
+# Whether to install cargo-binstall for faster package installation
+rust_install_binstall: true
+
+# Rust packages to install
+# Note: starship removed in favor of liquidprompt (APT package)
+rust_packages:
+  - atuin
+  - zoxide
+  - eza
+  - bat
+  - fd-find
+  - ripgrep

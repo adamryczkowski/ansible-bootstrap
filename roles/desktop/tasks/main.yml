@@ -1,0 +1,26 @@
+---
+# Desktop role - Configure desktop environment with various tweaks
+
+- name: Desktop | Include base tasks
+  ansible.builtin.include_tasks: base.yml
+  when: desktop_tweak_base | bool
+
+- name: Desktop | Include GNOME settings
+  ansible.builtin.include_tasks: gnome.yml
+  when: desktop_tweak_gnome | bool
+
+- name: Desktop | Include Nemo file manager
+  ansible.builtin.include_tasks: nemo.yml
+  when: desktop_tweak_nemo | bool
+
+- name: Desktop | Include SMB shares
+  ansible.builtin.include_tasks: smb.yml
+  when: desktop_tweak_smb | bool
+
+- name: Desktop | Include laptop tweaks
+  ansible.builtin.include_tasks: laptop.yml
+  when: desktop_tweak_laptop | bool
+
+- name: Desktop | Include applications
+  ansible.builtin.include_tasks: applications.yml
+  when: desktop_tweak_applications | bool

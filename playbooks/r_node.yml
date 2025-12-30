@@ -1,0 +1,26 @@
+---
+# R Node playbook - Configure R development environment
+# Replaces prepare_R-node.sh
+
+- name: Configure R development environment
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    target_user: "{{ ansible_user | default('adam') }}"
+    install_rstudio: true
+    install_rstudio_server: false
+
+  roles:
+    - role: r_node
+      vars:
+        r_node_username: "{{ target_user }}"
+        r_node_install_rstudio: "{{ install_rstudio }}"
+        r_node_install_rstudio_server: "{{ install_rstudio_server }}"
+      tags: [r_node]
+
+  post_tasks:
+    - name: Display completion message
+      ansible.builtin.debug:
+        msg: "R development environment configuration complete for {{ target_user }}"

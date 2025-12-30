@@ -1,0 +1,3 @@
+{{ ansible_managed | comment }}
+# APT proxy configuration
+Acquire::http::Proxy "{{ packages_apt_proxy }}";

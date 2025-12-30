@@ -1,0 +1,62 @@
+---
+# Ansible-lint configuration
+# https://ansible.readthedocs.io/projects/lint/configuring/
+
+# Profile to use (min, basic, moderate, safety, shared, production)
+profile: moderate
+
+# Exclude paths from linting
+exclude_paths:
+  - .cache/
+  - .git/
+  - .molecule/
+  - collections/
+  - molecule/
+
+# Enable specific rules
+enable_list:
+  - fqcn-builtins  # Use fully qualified collection names
+  - no-log-password  # Ensure passwords are not logged
+  - no-same-owner  # Avoid same owner issues
+
+# Skip specific rules
+skip_list:
+  - yaml[line-length]  # Allow longer lines in YAML
+
+# Warn on specific rules (don't fail)
+warn_list:
+  - experimental  # Warn on experimental rules
+  - role-name  # Warn on role naming conventions
+
+# Offline mode (don't download schemas)
+offline: false
+
+# Use default rules
+use_default_rules: true
+
+# Parseable output format
+parseable: true
+
+# Quiet mode
+quiet: false
+
+# Verbosity level
+verbosity: 1
+
+# Task naming rules
+task_name_prefix: "{stem} | "
+
+# Variable naming pattern
+var_naming_pattern: "^[a-z_][a-z0-9_]*$"
+
+# Loop variable prefix
+loop_var_prefix: "^(__|{role}_)"
+
+# Kinds configuration for file type detection
+kinds:
+  - playbook: "playbooks/*.yml"
+  - tasks: "roles/*/tasks/*.yml"
+  - handlers: "roles/*/handlers/*.yml"
+  - vars: "roles/*/vars/*.yml"
+  - defaults: "roles/*/defaults/*.yml"
+  - meta: "roles/*/meta/*.yml"

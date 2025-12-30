@@ -1,0 +1,59 @@
+---
+# Molecule prepare playbook for LXD E2E test
+# Prepares the LXD container with basic requirements
+
+- name: Prepare LXD container
+  hosts: all
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Wait for system to be ready
+      ansible.builtin.wait_for_connection:
+        timeout: 60
+
+    - name: Gather facts after connection
+      ansible.builtin.setup:
+
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install Python and essential packages
+      ansible.builtin.apt:
+        name:
+          - python3
+          - python3-apt
+          - sudo
+          - curl
+          - wget
+          - ca-certificates
+          - gnupg
+          - locales
+        state: present
+
+    - name: Generate locales
+      ansible.builtin.command: locale-gen en_US.UTF-8
+      changed_when: true
+
+    - name: Create test user
+      ansible.builtin.user:
+        name: testuser
+        shell: /bin/bash
+        create_home: true
+        state: present
+
+    - name: Add test user to sudo group
+      ansible.builtin.user:
+        name: testuser
+        groups: sudo
+        append: true
+
+    - name: Allow passwordless sudo for test user
+      ansible.builtin.lineinfile:
+        path: /etc/sudoers.d/testuser
+        line: "testuser ALL=(ALL) NOPASSWD: ALL"
+        create: true
+        mode: "0440"
+        validate: "visudo -cf %s"

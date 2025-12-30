@@ -1,0 +1,50 @@
+---
+# Default variables for bashrc role
+
+# Username to configure
+bashrc_username: "{{ target_user | default('adam') }}"
+
+# Bashrc snippets to copy from files/
+bashrc_snippets: []
+
+# Custom bashrc snippets to create
+# Format:
+#   - name: 50_aliases.sh
+#     content: |
+#       alias ll='ls -la'
+bashrc_custom_snippets:
+  - name: 00_path.sh
+    content: |
+      # Add local bin to PATH
+      export PATH="$HOME/bin:$HOME/.local/bin:$PATH"
+
+  - name: 01_histcontrol.sh
+    content: |
+      # History configuration
+      export HISTCONTROL=ignoreboth:erasedups
+      export HISTSIZE=10000
+      export HISTFILESIZE=20000
+      shopt -s histappend
+
+  - name: 02_checkwinsize.sh
+    content: |
+      # Check window size after each command
+      shopt -s checkwinsize
+
+  - name: 10_color_aliases.sh
+    content: |
+      # Color aliases
+      alias ls='ls --color=auto'
+      alias grep='grep --color=auto'
+      alias fgrep='fgrep --color=auto'
+      alias egrep='egrep --color=auto'
+
+  - name: 20_bash_aliases.sh
+    content: |
+      # Common aliases
+      alias ll='ls -alF'
+      alias la='ls -A'
+      alias l='ls -CF'
+
+# Whether to install bash-preexec (needed for atuin, etc.)
+bashrc_install_preexec: true

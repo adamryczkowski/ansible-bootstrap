@@ -1,0 +1,168 @@
+---
+# CLI Tools role - Install CLI tools from various sources
+
+- name: CLI Tools | Install APT-based CLI tools
+  ansible.builtin.apt:
+    name: "{{ cli_tools_apt }}"
+    state: present
+  become: true
+  when: cli_tools_apt | length > 0
+
+- name: CLI Tools | Install mise (formerly rtx)
+  when: cli_tools_install_mise | bool
+  block:
+    - name: CLI Tools | Check if mise is installed
+      ansible.builtin.stat:
+        path: "/home/{{ cli_tools_username }}/.local/bin/mise"
+      register: cli_tools_mise_installed
+
+    - name: CLI Tools | Download mise installer
+      ansible.builtin.get_url:
+        url: https://mise.run
+        dest: /tmp/mise-install.sh
+        mode: "0755"
+      when: not cli_tools_mise_installed.stat.exists
+
+    - name: CLI Tools | Install mise
+      ansible.builtin.shell: /tmp/mise-install.sh
+      args:
+        executable: /bin/bash
+      become: true
+      become_user: "{{ cli_tools_username }}"
+      when: not cli_tools_mise_installed.stat.exists
+      environment:
+        HOME: "/home/{{ cli_tools_username }}"
+      changed_when: true
+
+    - name: CLI Tools | Add mise to bashrc.d
+      ansible.builtin.copy:
+        content: |
+          # mise (formerly rtx) activation
+          if command -v mise &> /dev/null; then
+              eval "$(mise activate bash)"
+          fi
+        dest: "/home/{{ cli_tools_username }}/.bashrc.d/90_mise.sh"
+        mode: "0644"
+        owner: "{{ cli_tools_username }}"
+        group: "{{ cli_tools_username }}"
+      become: true
+
+- name: CLI Tools | Install fzf
+  when: cli_tools_install_fzf | bool
+  block:
+    - name: CLI Tools | Check if fzf is installed
+      ansible.builtin.stat:
+        path: "/home/{{ cli_tools_username }}/.fzf"
+      register: cli_tools_fzf_installed
+
+    - name: CLI Tools | Clone fzf repository
+      ansible.builtin.git:
+        repo: https://github.com/junegunn/fzf.git
+        dest: "/home/{{ cli_tools_username }}/.fzf"
+        depth: 1
+      become: true
+      become_user: "{{ cli_tools_username }}"
+      when: not cli_tools_fzf_installed.stat.exists
+
+    - name: CLI Tools | Install fzf
+      ansible.builtin.command: "/home/{{ cli_tools_username }}/.fzf/install --all --no-update-rc"
+      become: true
+      become_user: "{{ cli_tools_username }}"
+      when: not cli_tools_fzf_installed.stat.exists
+      changed_when: true
+
+    - name: CLI Tools | Add fzf to bashrc.d
+      ansible.builtin.copy:
+        content: |
+          # fzf configuration
+          [ -f ~/.fzf.bash ] && source ~/.fzf.bash
+        dest: "/home/{{ cli_tools_username }}/.bashrc.d/85_fzf.sh"
+        mode: "0644"
+        owner: "{{ cli_tools_username }}"
+        group: "{{ cli_tools_username }}"
+      become: true
+
+- name: CLI Tools | Configure liquidprompt
+  when: cli_tools_install_liquidprompt | bool
+  block:
+    - name: CLI Tools | Add liquidprompt to bashrc.d
+      ansible.builtin.copy:
+        content: |
+          # Liquidprompt - adaptive prompt
+          # Only load in interactive shells, not from a script or from scp
+          echo $- | grep -q i 2>/dev/null && . /usr/share/liquidprompt/liquidprompt
+        dest: "/home/{{ cli_tools_username }}/.bashrc.d/99_liquidprompt.sh"
+        mode: "0644"
+        owner: "{{ cli_tools_username }}"
+        group: "{{ cli_tools_username }}"
+      become: true
+
+    - name: CLI Tools | Remove old starship configuration (conflicts with liquidprompt)
+      ansible.builtin.file:
+        path: "/home/{{ cli_tools_username }}/.bashrc.d/99_starship.sh"
+        state: absent
+      become: true
+
+- name: CLI Tools | Configure zoxide
+  when: cli_tools_install_zoxide | bool
+  block:
+    - name: CLI Tools | Add zoxide to bashrc.d
+      ansible.builtin.copy:
+        content: |
+          # Zoxide (smarter cd) - replaces cd command
+          if command -v zoxide &> /dev/null; then
+              eval "$(zoxide init bash --cmd cd)"
+          fi
+        dest: "/home/{{ cli_tools_username }}/.bashrc.d/86_zoxide.sh"
+        mode: "0644"
+        owner: "{{ cli_tools_username }}"
+        group: "{{ cli_tools_username }}"
+      become: true
+
+- name: CLI Tools | Configure atuin
+  when: cli_tools_install_atuin | bool
+  block:
+    - name: CLI Tools | Add atuin to bashrc.d
+      ansible.builtin.copy:
+        content: |
+          # Atuin shell history (disable up-arrow to avoid conflicts)
+          if command -v atuin &> /dev/null; then
+              eval "$(atuin init bash --disable-up-arrow)"
+          fi
+        dest: "/home/{{ cli_tools_username }}/.bashrc.d/87_atuin.sh"
+        mode: "0644"
+        owner: "{{ cli_tools_username }}"
+        group: "{{ cli_tools_username }}"
+      become: true
+
+- name: CLI Tools | Configure CLI improved aliases
+  when: cli_tools_install_aliases | bool
+  block:
+    - name: CLI Tools | Add CLI improved aliases to bashrc.d
+      ansible.builtin.copy:
+        content: |
+          # CLI improved aliases
+          # bat replaces cat with syntax highlighting
+          if command -v bat &> /dev/null; then
+              alias cat="bat"
+          fi
+
+          # prettyping replaces ping with better visualization
+          if command -v prettyping &> /dev/null; then
+              alias ping="prettyping --nolegend"
+          fi
+
+          # ncdu replaces du with interactive disk usage
+          if command -v ncdu &> /dev/null; then
+              alias du="ncdu --color dark -rr -x --exclude .git --exclude node_modules"
+          fi
+
+          # fzf preview with bat
+          if command -v fzf &> /dev/null && command -v bat &> /dev/null; then
+              alias preview="fzf --preview 'bat --color \"always\" {}'"
+          fi
+        dest: "/home/{{ cli_tools_username }}/.bashrc.d/21_cli_aliases.sh"
+        mode: "0644"
+        owner: "{{ cli_tools_username }}"
+        group: "{{ cli_tools_username }}"
+      become: true

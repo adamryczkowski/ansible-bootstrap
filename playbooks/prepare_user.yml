@@ -1,0 +1,43 @@
+---
+# Prepare User playbook - User-specific configuration
+# Replaces prepare_ubuntu_user.sh
+
+- name: Prepare user environment
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    # target_user should be set in inventory group_vars
+    # Falls back to ansible_user or 'adam' if not defined
+    _target_user: "{{ target_user | default(ansible_user) | default('adam') }}"
+    install_rust: true
+    install_cli_tools: true
+
+  roles:
+    - role: user_setup
+      vars:
+        user_setup_username: "{{ _target_user }}"
+      tags: [user]
+
+    - role: bashrc
+      vars:
+        bashrc_username: "{{ _target_user }}"
+      tags: [bashrc]
+
+    - role: rust
+      vars:
+        rust_username: "{{ _target_user }}"
+      tags: [rust]
+      when: install_rust | bool
+
+    - role: cli_tools
+      vars:
+        cli_tools_username: "{{ _target_user }}"
+      tags: [cli_tools]
+      when: install_cli_tools | bool
+
+  post_tasks:
+    - name: Display completion message
+      ansible.builtin.debug:
+        msg: "User environment preparation complete for {{ _target_user }}"

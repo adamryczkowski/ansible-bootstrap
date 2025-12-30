@@ -1,0 +1,43 @@
+---
+# Variables for workstation hosts
+# These override the defaults in all.yml for workstations
+
+# Enable desktop installation for workstations
+install_desktop: true
+
+# Additional packages for workstations
+workstation_packages:
+  - chromium-browser
+  - firefox
+  - thunderbird
+  - libreoffice
+  - gimp
+  - inkscape
+  - vlc
+  - keepassxc
+  - flameshot
+
+# Desktop environment settings
+desktop_theme: Adwaita-dark
+desktop_icon_theme: Adwaita
+desktop_cursor_theme: Adwaita
+
+# GNOME settings
+gnome_settings:
+  - key: "/org/gnome/desktop/screensaver/lock-enabled"
+    value: "false"
+  - key: "/org/gnome/desktop/wm/preferences/num-workspaces"
+    value: "9"
+  - key: "/org/gnome/desktop/interface/gtk-theme"
+    value: "'Adwaita-dark'"
+  - key: "/org/gnome/desktop/interface/color-scheme"
+    value: "'prefer-dark'"
+
+# i3wm configuration
+install_i3wm: false
+i3_config_template: i3/config.j2
+
+# Kitty terminal configuration
+install_kitty: true
+kitty_font_family: "JetBrains Mono"
+kitty_font_size: 12

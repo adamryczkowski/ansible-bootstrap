@@ -1,0 +1,18 @@
+# Python dependencies for Ansible project
+# Install with: pip install -r requirements.txt
+
+# Ansible and core dependencies (if not using pipx)
+# ansible>=13.0.0
+
+# Linting and testing
+ansible-lint>=25.0.0
+yamllint>=1.35.0
+molecule>=25.0.0
+molecule-plugins[docker]>=23.0.0
+pytest>=8.0.0
+pytest-ansible>=25.0.0
+
+# Additional utilities
+jmespath>=1.0.0  # For json_query filter
+netaddr>=1.0.0   # For network address manipulation
+passlib>=1.7.4   # For password hashing

@@ -1,0 +1,41 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# Ansible
+*.retry
+.ansible/
+collections/ansible_collections/
+
+# Molecule
+.molecule/
+.cache/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Secrets (should use Ansible Vault instead)
+*.vault
+secrets.yml
+vault.yml
+
+# Temporary files
+tmp/
+temp/

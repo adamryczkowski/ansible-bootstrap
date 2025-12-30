@@ -1,0 +1,17 @@
+---
+# CLI Tools role metadata
+
+galaxy_info:
+  author: Adam
+  description: Install and configure CLI tools from various sources
+  company: ""
+  license: MIT
+  min_ansible_version: "2.14"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+        - noble
+
+dependencies:
+  - role: bashrc

@@ -1,0 +1,70 @@
+---
+# Desktop laptop-specific tasks
+
+- name: Desktop Laptop | Install laptop-specific packages
+  ansible.builtin.apt:
+    name:
+      - tlp
+      - tlp-rdw
+      - powertop
+      - acpi
+    state: present
+  become: true
+
+- name: Desktop Laptop | Enable TLP service
+  ansible.builtin.systemd:
+    name: tlp
+    enabled: true
+    state: started
+  become: true
+
+- name: Desktop Laptop | Configure power settings
+  community.general.dconf:
+    key: "{{ item.key }}"
+    value: "{{ item.value }}"
+    state: present
+  become: true
+  become_user: "{{ desktop_username }}"
+  loop:
+    - key: "/org/gnome/settings-daemon/plugins/power/sleep-inactive-ac-type"
+      value: "'nothing'"
+    - key: "/org/gnome/settings-daemon/plugins/power/sleep-inactive-battery-type"
+      value: "'suspend'"
+    - key: "/org/gnome/settings-daemon/plugins/power/sleep-inactive-battery-timeout"
+      value: "1800"
+
+- name: Desktop Laptop | Install redshift for screen color temperature
+  ansible.builtin.apt:
+    name: redshift-gtk
+    state: present
+  become: true
+  when: desktop_install_redshift | bool
+
+- name: Desktop Laptop | Create redshift configuration directory
+  ansible.builtin.file:
+    path: "/home/{{ desktop_username }}/.config"
+    state: directory
+    mode: "0755"
+    owner: "{{ desktop_username }}"
+    group: "{{ desktop_username }}"
+  become: true
+  when: desktop_install_redshift | bool
+
+- name: Desktop Laptop | Configure redshift
+  ansible.builtin.copy:
+    content: |
+      [redshift]
+      temp-day={{ desktop_redshift_temp_day }}
+      temp-night={{ desktop_redshift_temp_night }}
+      transition=1
+      location-provider=manual
+
+      [manual]
+      lat={{ desktop_redshift_latitude }}
+      lon={{ desktop_redshift_longitude }}
+    dest: "/home/{{ desktop_username }}/.config/redshift.conf"
+    mode: "0644"
+    owner: "{{ desktop_username }}"
+    group: "{{ desktop_username }}"
+  become: true
+  when: desktop_install_redshift | bool

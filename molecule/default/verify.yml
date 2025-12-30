@@ -1,0 +1,64 @@
+---
+# Molecule verify playbook
+# This playbook verifies the roles were applied correctly
+
+- name: Verify
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    target_user: testuser
+
+  tasks:
+    - name: Check user exists
+      ansible.builtin.getent:
+        database: passwd
+        key: "{{ target_user }}"
+      register: user_check
+
+    - name: Assert user was created
+      ansible.builtin.assert:
+        that:
+          - user_check is not failed
+        fail_msg: "User {{ target_user }} was not created"
+        success_msg: "User {{ target_user }} exists"
+
+    - name: Check .bashrc.d directory exists
+      ansible.builtin.stat:
+        path: "/home/{{ target_user }}/.bashrc.d"
+      register: bashrc_dir
+
+    - name: Assert .bashrc.d exists
+      ansible.builtin.assert:
+        that:
+          - bashrc_dir.stat.exists
+          - bashrc_dir.stat.isdir
+        fail_msg: ".bashrc.d directory does not exist"
+        success_msg: ".bashrc.d directory exists"
+
+    - name: Check .ssh directory exists
+      ansible.builtin.stat:
+        path: "/home/{{ target_user }}/.ssh"
+      register: ssh_dir
+
+    - name: Assert .ssh directory exists
+      ansible.builtin.assert:
+        that:
+          - ssh_dir.stat.exists
+          - ssh_dir.stat.isdir
+          - ssh_dir.stat.mode == "0700"
+        fail_msg: ".ssh directory does not exist or has wrong permissions"
+        success_msg: ".ssh directory exists with correct permissions"
+
+    - name: Check locale is configured
+      ansible.builtin.command: locale
+      register: locale_output
+      changed_when: false
+
+    - name: Assert locale is set
+      ansible.builtin.assert:
+        that:
+          - "'en_US.UTF-8' in locale_output.stdout or 'C.UTF-8' in locale_output.stdout"
+        fail_msg: "Locale is not properly configured"
+        success_msg: "Locale is configured correctly"

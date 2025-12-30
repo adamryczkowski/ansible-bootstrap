@@ -1,0 +1,40 @@
+---
+# Prepare Ubuntu playbook - Base system configuration
+# Replaces prepare_ubuntu.sh
+
+- name: Prepare Ubuntu system
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    # Override these in inventory or command line
+    target_user: "{{ ansible_user | default('adam') }}"
+
+  pre_tasks:
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+  roles:
+    - role: common
+      tags: [common]
+
+    - role: packages
+      tags: [packages]
+
+    - role: user_setup
+      vars:
+        user_setup_username: "{{ target_user }}"
+      tags: [user]
+
+    - role: bashrc
+      vars:
+        bashrc_username: "{{ target_user }}"
+      tags: [bashrc]
+
+  post_tasks:
+    - name: Display completion message
+      ansible.builtin.debug:
+        msg: "Ubuntu system preparation complete for user {{ target_user }}"

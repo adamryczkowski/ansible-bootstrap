@@ -1,0 +1,119 @@
+---
+# LXD role - Install and configure LXD container management
+
+- name: LXD | Install LXD via snap
+  community.general.snap:
+    name: lxd
+    state: present
+  become: true
+
+- name: LXD | Add user to lxd group
+  ansible.builtin.user:
+    name: "{{ lxd_username }}"
+    groups: lxd
+    append: true
+  become: true
+
+- name: LXD | Check if LXD is initialized
+  ansible.builtin.command: lxc profile show default
+  register: lxd_init_check
+  failed_when: false
+  changed_when: false
+  become: true
+
+- name: LXD | Initialize LXD
+  ansible.builtin.command: lxd init --auto
+  become: true
+  when: lxd_init_check.rc != 0
+  changed_when: true
+
+- name: LXD | Configure LXD with preseed
+  when: lxd_use_preseed | bool and lxd_init_check.rc != 0
+  block:
+    - name: LXD | Create preseed file
+      ansible.builtin.template:
+        src: preseed.yaml.j2
+        dest: /tmp/lxd-preseed.yaml
+        mode: "0600"
+      become: true
+
+    - name: LXD | Apply preseed configuration
+      ansible.builtin.shell: cat /tmp/lxd-preseed.yaml | lxd init --preseed
+      become: true
+      changed_when: true
+
+    - name: LXD | Remove preseed file
+      ansible.builtin.file:
+        path: /tmp/lxd-preseed.yaml
+        state: absent
+      become: true
+
+- name: LXD | Create storage pool
+  ansible.builtin.command: >
+    lxc storage create {{ lxd_storage_pool_name }}
+    {{ lxd_storage_driver }}
+    {% if lxd_storage_driver == 'dir' %}
+    source={{ lxd_storage_path }}
+    {% endif %}
+  become: true
+  register: lxd_storage_create
+  failed_when: false
+  changed_when: lxd_storage_create.rc == 0
+  when: lxd_create_storage_pool | bool
+
+- name: LXD | Create network bridge
+  ansible.builtin.command: >
+    lxc network create {{ lxd_network_name }}
+    ipv4.address={{ lxd_network_ipv4 }}
+    ipv4.nat=true
+    ipv6.address=none
+  become: true
+  register: lxd_network_create
+  failed_when: false
+  changed_when: lxd_network_create.rc == 0
+  when: lxd_create_network | bool
+
+- name: LXD | Create default profile
+  when: lxd_configure_default_profile | bool
+  block:
+    - name: LXD | Set default profile storage
+      ansible.builtin.command: >
+        lxc profile device add default root disk
+        path=/ pool={{ lxd_storage_pool_name }}
+      become: true
+      register: lxd_profile_storage
+      failed_when: false
+      changed_when: lxd_profile_storage.rc == 0
+
+    - name: LXD | Set default profile network
+      ansible.builtin.command: >
+        lxc profile device add default eth0 nic
+        name=eth0 network={{ lxd_network_name }}
+      become: true
+      register: lxd_profile_network
+      failed_when: false
+      changed_when: lxd_profile_network.rc == 0
+
+- name: LXD | Configure remote access
+  when: lxd_enable_remote | bool
+  block:
+    - name: LXD | Set core.https_address
+      ansible.builtin.command: lxc config set core.https_address {{ lxd_remote_address }}
+      become: true
+      changed_when: true
+
+    - name: LXD | Set trust password
+      ansible.builtin.command: lxc config set core.trust_password {{ lxd_trust_password }}
+      become: true
+      changed_when: true
+      no_log: true
+      when: lxd_trust_password is defined
+
+- name: LXD | Download Ubuntu images
+  ansible.builtin.command: "lxc image copy {{ item }} local: --alias {{ item | regex_replace(':', '-') }}"
+  become: true
+  loop: "{{ lxd_preload_images }}"
+  register: lxd_image_copy
+  failed_when: false
+  changed_when: lxd_image_copy.rc == 0
+  when: lxd_preload_images | length > 0

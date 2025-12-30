@@ -1,0 +1,80 @@
+# Kitty terminal configuration
+# Managed by Ansible - do not edit manually
+
+# Font configuration
+font_family      {{ kitty_font_family }}
+bold_font        auto
+italic_font      auto
+bold_italic_font auto
+font_size        {{ kitty_font_size }}
+
+# Scrollback
+scrollback_lines {{ kitty_scrollback_lines }}
+
+# Bell
+enable_audio_bell {{ 'yes' if kitty_enable_audio_bell else 'no' }}
+
+# Window
+window_padding_width {{ kitty_window_padding_width }}
+confirm_os_window_close 0
+
+# Tab bar
+tab_bar_style {{ kitty_tab_bar_style }}
+tab_powerline_style {{ kitty_tab_powerline_style }}
+
+# Colors - Dracula theme
+foreground            {{ kitty_theme.foreground }}
+background            {{ kitty_theme.background }}
+selection_foreground  {{ kitty_theme.selection_foreground }}
+selection_background  {{ kitty_theme.selection_background }}
+url_color             {{ kitty_theme.url_color }}
+cursor                {{ kitty_theme.cursor }}
+cursor_text_color     {{ kitty_theme.cursor_text_color }}
+
+# Black
+color0  {{ kitty_theme.color0 }}
+color8  {{ kitty_theme.color8 }}
+
+# Red
+color1  {{ kitty_theme.color1 }}
+color9  {{ kitty_theme.color9 }}
+
+# Green
+color2  {{ kitty_theme.color2 }}
+color10 {{ kitty_theme.color10 }}
+
+# Yellow
+color3  {{ kitty_theme.color3 }}
+color11 {{ kitty_theme.color11 }}
+
+# Blue
+color4  {{ kitty_theme.color4 }}
+color12 {{ kitty_theme.color12 }}
+
+# Magenta
+color5  {{ kitty_theme.color5 }}
+color13 {{ kitty_theme.color13 }}
+
+# Cyan
+color6  {{ kitty_theme.color6 }}
+color14 {{ kitty_theme.color14 }}
+
+# White
+color7  {{ kitty_theme.color7 }}
+color15 {{ kitty_theme.color15 }}
+
+# Keyboard shortcuts
+map ctrl+shift+c copy_to_clipboard
+map ctrl+shift+v paste_from_clipboard
+map ctrl+shift+t new_tab
+map ctrl+shift+q close_tab
+map ctrl+shift+right next_tab
+map ctrl+shift+left previous_tab
+map ctrl+shift+enter new_window
+map ctrl+shift+w close_window
+map ctrl+shift+] next_window
+map ctrl+shift+[ previous_window
+map ctrl+shift+f toggle_fullscreen
+map ctrl+shift+equal change_font_size all +1.0
+map ctrl+shift+minus change_font_size all -1.0
+map ctrl+shift+backspace change_font_size all 0

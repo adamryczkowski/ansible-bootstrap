@@ -1,0 +1,42 @@
+---
+# Desktop applications tasks
+
+- name: Desktop Apps | Install common desktop applications
+  ansible.builtin.apt:
+    name: "{{ desktop_applications }}"
+    state: present
+  become: true
+
+- name: Desktop Apps | Install Flatpak
+  ansible.builtin.apt:
+    name:
+      - flatpak
+      - gnome-software-plugin-flatpak
+    state: present
+  become: true
+  when: desktop_install_flatpak | bool
+
+- name: Desktop Apps | Add Flathub repository
+  community.general.flatpak_remote:
+    name: flathub
+    flatpakrepo_url: https://dl.flathub.org/repo/flathub.flatpakrepo
+    state: present
+  become: true
+  when: desktop_install_flatpak | bool
+
+- name: Desktop Apps | Install Flatpak applications
+  community.general.flatpak:
+    name: "{{ item }}"
+    state: present
+  become: true
+  loop: "{{ desktop_flatpak_apps }}"
+  when: desktop_install_flatpak | bool and desktop_flatpak_apps | length > 0
+
+- name: Desktop Apps | Install Snap applications
+  community.general.snap:
+    name: "{{ item.name }}"
+    classic: "{{ item.classic | default(false) }}"
+    state: present
+  become: true
+  loop: "{{ desktop_snap_apps }}"
+  when: desktop_snap_apps | length > 0

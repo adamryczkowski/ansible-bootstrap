@@ -1,0 +1,152 @@
+# i3 config file (v4)
+# Managed by Ansible - do not edit manually
+
+# Set mod key
+set $mod {{ i3wm_mod_key }}
+
+# Font for window titles
+font {{ i3wm_font }}
+
+# Use Mouse+$mod to drag floating windows
+floating_modifier $mod
+
+# Start a terminal
+bindsym $mod+Return exec {{ i3wm_terminal }}
+
+# Kill focused window
+bindsym $mod+Shift+q kill
+
+# Start application launcher
+{% if i3wm_install_rofi %}
+bindsym $mod+d exec --no-startup-id rofi -show drun
+bindsym $mod+Tab exec --no-startup-id rofi -show window
+{% else %}
+bindsym $mod+d exec --no-startup-id dmenu_run
+{% endif %}
+
+# Change focus
+bindsym $mod+j focus left
+bindsym $mod+k focus down
+bindsym $mod+l focus up
+bindsym $mod+semicolon focus right
+
+# Alternatively, use cursor keys
+bindsym $mod+Left focus left
+bindsym $mod+Down focus down
+bindsym $mod+Up focus up
+bindsym $mod+Right focus right
+
+# Move focused window
+bindsym $mod+Shift+j move left
+bindsym $mod+Shift+k move down
+bindsym $mod+Shift+l move up
+bindsym $mod+Shift+semicolon move right
+
+# Alternatively, use cursor keys
+bindsym $mod+Shift+Left move left
+bindsym $mod+Shift+Down move down
+bindsym $mod+Shift+Up move up
+bindsym $mod+Shift+Right move right
+
+# Split in horizontal orientation
+bindsym $mod+h split h
+
+# Split in vertical orientation
+bindsym $mod+v split v
+
+# Enter fullscreen mode
+bindsym $mod+f fullscreen toggle
+
+# Change container layout
+bindsym $mod+s layout stacking
+bindsym $mod+w layout tabbed
+bindsym $mod+e layout toggle split
+
+# Toggle tiling / floating
+bindsym $mod+Shift+space floating toggle
+
+# Change focus between tiling / floating windows
+bindsym $mod+space focus mode_toggle
+
+# Focus the parent container
+bindsym $mod+a focus parent
+
+# Define workspaces
+{% for ws in i3wm_workspaces %}
+set $ws{{ loop.index }} "{{ ws.name }}"
+{% endfor %}
+
+# Switch to workspace
+{% for ws in i3wm_workspaces %}
+bindsym $mod+{{ ws.key }} workspace number $ws{{ loop.index }}
+{% endfor %}
+
+# Move focused container to workspace
+{% for ws in i3wm_workspaces %}
+bindsym $mod+Shift+{{ ws.key }} move container to workspace number $ws{{ loop.index }}
+{% endfor %}
+
+# Reload the configuration file
+bindsym $mod+Shift+c reload
+
+# Restart i3 inplace
+bindsym $mod+Shift+r restart
+
+# Exit i3
+bindsym $mod+Shift+e exec "i3-nagbar -t warning -m 'Exit i3?' -B 'Yes' 'i3-msg exit'"
+
+# Resize mode
+mode "resize" {
+    bindsym j resize shrink width 10 px or 10 ppt
+    bindsym k resize grow height 10 px or 10 ppt
+    bindsym l resize shrink height 10 px or 10 ppt
+    bindsym semicolon resize grow width 10 px or 10 ppt
+
+    bindsym Left resize shrink width 10 px or 10 ppt
+    bindsym Down resize grow height 10 px or 10 ppt
+    bindsym Up resize shrink height 10 px or 10 ppt
+    bindsym Right resize grow width 10 px or 10 ppt
+
+    bindsym Return mode "default"
+    bindsym Escape mode "default"
+    bindsym $mod+r mode "default"
+}
+
+bindsym $mod+r mode "resize"
+
+# Colors
+client.focused          {{ i3wm_colors.focused.border }} {{ i3wm_colors.focused.background }} {{ i3wm_colors.focused.text }} {{ i3wm_colors.focused.indicator }} {{ i3wm_colors.focused.child_border }}
+client.focused_inactive {{ i3wm_colors.focused_inactive.border }} {{ i3wm_colors.focused_inactive.background }} {{ i3wm_colors.focused_inactive.text }} {{ i3wm_colors.focused_inactive.indicator }} {{ i3wm_colors.focused_inactive.child_border }}
+client.unfocused        {{ i3wm_colors.unfocused.border }} {{ i3wm_colors.unfocused.background }} {{ i3wm_colors.unfocused.text }} {{ i3wm_colors.unfocused.indicator }} {{ i3wm_colors.unfocused.child_border }}
+client.urgent           {{ i3wm_colors.urgent.border }} {{ i3wm_colors.urgent.background }} {{ i3wm_colors.urgent.text }} {{ i3wm_colors.urgent.indicator }} {{ i3wm_colors.urgent.child_border }}
+
+# Status bar
+bar {
+    status_command i3status
+    position top
+}
+
+# Lock screen
+bindsym $mod+Shift+x exec i3lock -c 282A36
+
+# Screenshot
+bindsym Print exec --no-startup-id scrot ~/Pictures/screenshot_%Y%m%d_%H%M%S.png
+bindsym Shift+Print exec --no-startup-id scrot -s ~/Pictures/screenshot_%Y%m%d_%H%M%S.png
+
+# Audio controls
+bindsym XF86AudioRaiseVolume exec --no-startup-id pactl set-sink-volume @DEFAULT_SINK@ +5%
+bindsym XF86AudioLowerVolume exec --no-startup-id pactl set-sink-volume @DEFAULT_SINK@ -5%
+bindsym XF86AudioMute exec --no-startup-id pactl set-sink-mute @DEFAULT_SINK@ toggle
+bindsym XF86AudioMicMute exec --no-startup-id pactl set-source-mute @DEFAULT_SOURCE@ toggle
+
+# Brightness controls
+bindsym XF86MonBrightnessUp exec --no-startup-id brightnessctl set +10%
+bindsym XF86MonBrightnessDown exec --no-startup-id brightnessctl set 10%-
+
+# Startup applications
+{% for app in i3wm_startup_apps %}
+exec{% if app.no_startup_id | default(false) %} --no-startup-id{% endif %} {{ app.command }}
+{% endfor %}
+
+# Screen lock on suspend
+exec --no-startup-id xss-lock --transfer-sleep-lock -- i3lock -c 282A36 --nofork

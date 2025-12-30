@@ -1,0 +1,32 @@
+---
+# LXD role defaults
+
+# Username for LXD configuration
+lxd_username: "{{ ansible_user | default('adam') }}"
+
+# Whether to use preseed for initialization
+lxd_use_preseed: false
+
+# Storage configuration
+lxd_create_storage_pool: true
+lxd_storage_pool_name: default
+lxd_storage_driver: dir  # Options: dir, btrfs, lvm, zfs
+lxd_storage_path: /var/lib/lxd/storage-pools/default
+
+# Network configuration
+lxd_create_network: true
+lxd_network_name: lxdbr0
+lxd_network_ipv4: "10.10.10.1/24"
+
+# Default profile configuration
+lxd_configure_default_profile: true
+
+# Remote access configuration
+lxd_enable_remote: false
+lxd_remote_address: "[::]"
+# lxd_trust_password: ""  # Set this securely via vault
+
+# Images to preload
+lxd_preload_images:
+  - ubuntu:22.04
+  - ubuntu:24.04

@@ -1,0 +1,17 @@
+---
+# R Node role metadata
+
+galaxy_info:
+  author: Adam
+  description: Install R, RStudio, and related packages
+  company: ""
+  license: MIT
+  min_ansible_version: "2.14"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+        - noble
+
+dependencies:
+  - role: packages

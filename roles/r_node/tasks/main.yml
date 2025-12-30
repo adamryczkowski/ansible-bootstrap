@@ -1,0 +1,130 @@
+---
+# R Node role - Install R, RStudio, and related packages
+
+- name: R Node | Add CRAN repository key
+  ansible.builtin.get_url:
+    url: https://cloud.r-project.org/bin/linux/ubuntu/marutter_pubkey.asc
+    dest: /etc/apt/trusted.gpg.d/cran_ubuntu_key.asc
+    mode: "0644"
+  become: true
+
+- name: R Node | Add CRAN repository
+  ansible.builtin.apt_repository:
+    repo: "deb https://cloud.r-project.org/bin/linux/ubuntu {{ ansible_distribution_release }}-cran40/"
+    filename: r-cran
+    state: present
+  become: true
+
+- name: R Node | Install R and dependencies
+  ansible.builtin.apt:
+    name: "{{ r_node_packages }}"
+    state: present
+    update_cache: true
+  become: true
+
+- name: R Node | Configure Java for R
+  ansible.builtin.command: R CMD javareconf
+  become: true
+  changed_when: true
+
+- name: R Node | Install RStudio Desktop
+  when: r_node_install_rstudio | bool
+  block:
+    - name: R Node | Check if RStudio is installed
+      ansible.builtin.command: dpkg -s rstudio
+      register: r_node_rstudio_check
+      failed_when: false
+      changed_when: false
+
+    - name: R Node | Get latest RStudio version
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/rstudio/rstudio/releases/latest
+        return_content: true
+      register: r_node_rstudio_release
+      when: r_node_rstudio_check.rc != 0
+
+    - name: R Node | Set RStudio version
+      ansible.builtin.set_fact:
+        r_node_rstudio_version: "{{ r_node_rstudio_release.json.tag_name | regex_replace('^v', '') | regex_replace('\\+', '-') }}"
+      when: r_node_rstudio_check.rc != 0
+
+    - name: R Node | Download RStudio
+      ansible.builtin.get_url:
+        url: "https://download1.rstudio.org/electron/{{ ansible_distribution_release }}/amd64/rstudio-{{ r_node_rstudio_version }}-amd64.deb"
+        dest: "/tmp/rstudio-{{ r_node_rstudio_version }}-amd64.deb"
+        mode: "0644"
+      when: r_node_rstudio_check.rc != 0
+
+    - name: R Node | Install RStudio
+      ansible.builtin.apt:
+        deb: "/tmp/rstudio-{{ r_node_rstudio_version }}-amd64.deb"
+        state: present
+      become: true
+      when: r_node_rstudio_check.rc != 0
+
+- name: R Node | Install RStudio Server
+  when: r_node_install_rstudio_server | bool
+  block:
+    - name: R Node | Check if RStudio Server is installed
+      ansible.builtin.command: dpkg -s rstudio-server
+      register: r_node_rstudio_server_check
+      failed_when: false
+      changed_when: false
+
+    - name: R Node | Get latest RStudio Server version
+      ansible.builtin.uri:
+        url: https://s3.amazonaws.com/rstudio-server/current.ver
+        return_content: true
+      register: r_node_rstudio_server_version_raw
+      when: r_node_rstudio_server_check.rc != 0
+
+    - name: R Node | Parse RStudio Server version
+      ansible.builtin.set_fact:
+        r_node_rstudio_server_version: "{{ r_node_rstudio_server_version_raw.content | regex_search('^([0-9]+\\.[0-9]+\\.[0-9]+)') }}"
+      when: r_node_rstudio_server_check.rc != 0
+
+    - name: R Node | Download RStudio Server
+      ansible.builtin.get_url:
+        url: "https://download2.rstudio.org/server/{{ ansible_distribution_release }}/amd64/rstudio-server-{{ r_node_rstudio_server_version }}-amd64.deb"
+        dest: "/tmp/rstudio-server-{{ r_node_rstudio_server_version }}-amd64.deb"
+        mode: "0644"
+      when: r_node_rstudio_server_check.rc != 0
+
+    - name: R Node | Install RStudio Server
+      ansible.builtin.apt:
+        deb: "/tmp/rstudio-server-{{ r_node_rstudio_server_version }}-amd64.deb"
+        state: present
+      become: true
+      when: r_node_rstudio_server_check.rc != 0
+
+- name: R Node | Install Fira Code font
+  ansible.builtin.apt:
+    name: fonts-firacode
+    state: present
+  become: true
+  when: r_node_install_firacode | bool
+
+- name: R Node | Create R user library directory
+  ansible.builtin.file:
+    path: "/home/{{ r_node_username }}/R/{{ ansible_architecture }}-pc-linux-gnu-library/{{ r_node_r_version }}"
+    state: directory
+    mode: "0755"
+    owner: "{{ r_node_username }}"
+    group: "{{ r_node_username }}"
+  become: true
+
+- name: R Node | Install base R packages
+  ansible.builtin.template:
+    src: install_packages.R.j2
+    dest: /tmp/install_r_packages.R
+    mode: "0644"
+  become: true
+
+- name: R Node | Run R package installation script
+  ansible.builtin.command: Rscript /tmp/install_r_packages.R
+  become: true
+  become_user: "{{ r_node_username }}"
+  environment:
+    HOME: "/home/{{ r_node_username }}"
+  changed_when: true
+  when: r_node_install_base_packages | bool

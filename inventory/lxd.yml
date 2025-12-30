@@ -1,0 +1,21 @@
+---
+# LXD dynamic inventory configuration
+# This file configures the community.general.lxd inventory plugin
+
+plugin: community.general.lxd
+url: unix:/var/snap/lxd/common/lxd/unix.socket
+
+# Filter containers by state
+state: running
+
+# Group containers by various attributes
+groups:
+  ubuntu_jammy: "'ubuntu' in config.get('image.os', '') and '22.04' in config.get('image.release', '')"
+  ubuntu_noble: "'ubuntu' in config.get('image.os', '') and '24.04' in config.get('image.release', '')"
+
+# Compose host variables
+compose:
+  ansible_host: "{{ devices.eth0.get('ipv4.address', '').split('/')[0] if devices.eth0 is defined else '' }}"
+  ansible_user: ubuntu
+  ansible_connection: community.general.lxd
+  ansible_lxd_remote: local

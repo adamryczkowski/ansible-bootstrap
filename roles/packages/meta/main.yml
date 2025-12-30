@@ -1,0 +1,23 @@
+---
+# Role metadata
+
+galaxy_info:
+  author: Adam
+  description: APT package management role
+  company: ""
+  license: MIT
+  min_ansible_version: "2.15"
+
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+        - noble
+
+  galaxy_tags:
+    - apt
+    - packages
+    - ubuntu
+    - system
+
+dependencies: []

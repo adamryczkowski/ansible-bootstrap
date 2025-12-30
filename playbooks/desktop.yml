@@ -1,0 +1,51 @@
+---
+# Desktop playbook - Configure desktop environment
+# Replaces desktop-prepare.sh
+
+- name: Configure desktop environment
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    target_user: "{{ ansible_user | default('adam') }}"
+    # Tweak toggles - enable/disable as needed
+    install_i3wm: false
+    install_kitty: true
+    install_firefox: true
+    install_thunderbird: false
+
+  roles:
+    - role: desktop
+      vars:
+        desktop_username: "{{ target_user }}"
+      tags: [desktop]
+
+    - role: kitty
+      vars:
+        kitty_username: "{{ target_user }}"
+      tags: [kitty]
+      when: install_kitty | bool
+
+    - role: i3wm
+      vars:
+        i3wm_username: "{{ target_user }}"
+      tags: [i3wm]
+      when: install_i3wm | bool
+
+    - role: firefox
+      vars:
+        firefox_username: "{{ target_user }}"
+      tags: [firefox]
+      when: install_firefox | bool
+
+    - role: thunderbird
+      vars:
+        thunderbird_username: "{{ target_user }}"
+      tags: [thunderbird]
+      when: install_thunderbird | bool
+
+  post_tasks:
+    - name: Display completion message
+      ansible.builtin.debug:
+        msg: "Desktop environment configuration complete for {{ target_user }}"

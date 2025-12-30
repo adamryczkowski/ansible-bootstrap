@@ -1,0 +1,24 @@
+---
+# Thunderbird role defaults
+
+# Username for Thunderbird configuration
+thunderbird_username: "{{ ansible_user | default('adam') }}"
+
+# Installation method: apt or snap
+thunderbird_install_method: apt
+
+# Install Lightning calendar extension
+thunderbird_install_lightning: true
+
+# Thunderbird preferences (user.js)
+thunderbird_preferences:
+  - name: mail.shell.checkDefaultClient
+    value: false
+  - name: mail.startup.enabledMailCheckOnce
+    value: true
+  - name: mailnews.start_page.enabled
+    value: false
+  - name: mail.rights.version
+    value: 1
+  - name: mail.ui.show.migration.on.upgrade
+    value: false

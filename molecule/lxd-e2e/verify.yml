@@ -1,0 +1,216 @@
+---
+# Molecule verify playbook for LXD E2E test
+# Verifies that the configuration matches make-lxd-node.sh + --cli-improved
+
+- name: Verify LXD E2E configuration
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    target_user: testuser
+
+  tasks:
+    # ============================================
+    # Base System Verification (prepare_ubuntu.sh)
+    # ============================================
+
+    - name: Verify | Check locale is set
+      ansible.builtin.command: locale
+      register: locale_result
+      changed_when: false
+      failed_when: "'UTF-8' not in locale_result.stdout"
+
+    - name: Verify | Check timezone is set
+      ansible.builtin.stat:
+        path: /etc/localtime
+      register: timezone_stat
+      failed_when: not timezone_stat.stat.exists
+
+    # ============================================
+    # User Verification
+    # ============================================
+
+    - name: Verify | Check test user exists
+      ansible.builtin.getent:
+        database: passwd
+        key: "{{ target_user }}"
+      register: user_check
+
+    - name: Verify | Check user home directory exists
+      ansible.builtin.stat:
+        path: "/home/{{ target_user }}"
+      register: home_stat
+      failed_when: not home_stat.stat.exists or not home_stat.stat.isdir
+
+    - name: Verify | Check bashrc.d directory exists
+      ansible.builtin.stat:
+        path: "/home/{{ target_user }}/.bashrc.d"
+      register: bashrc_d_stat
+      failed_when: not bashrc_d_stat.stat.exists or not bashrc_d_stat.stat.isdir
+
+    # ============================================
+    # Rust Verification
+    # ============================================
+
+    - name: Verify | Check rustup is installed
+      ansible.builtin.stat:
+        path: "/home/{{ target_user }}/.cargo/bin/rustup"
+      register: rustup_stat
+      failed_when: not rustup_stat.stat.exists
+
+    - name: Verify | Check cargo is installed
+      ansible.builtin.stat:
+        path: "/home/{{ target_user }}/.cargo/bin/cargo"
+      register: cargo_stat
+      failed_when: not cargo_stat.stat.exists
+
+    - name: Verify | Check cargo-binstall is installed
+      ansible.builtin.stat:
+        path: "/home/{{ target_user }}/.cargo/bin/cargo-binstall"
+      register: binstall_stat
+      failed_when: not binstall_stat.stat.exists
+
+    # ============================================
+    # CLI Tools Verification (--cli-improved)
+    # ============================================
+
+    - name: Verify | Check mise is installed
+      ansible.builtin.stat:
+        path: "/home/{{ target_user }}/.local/bin/mise"
+      register: mise_stat
+      failed_when: not mise_stat.stat.exists
+
+    - name: Verify | Check fzf is installed
+      ansible.builtin.command: which fzf
+      become: true
+      become_user: "{{ target_user }}"
+      environment:
+        PATH: "/home/{{ target_user }}/.local/bin:/home/{{ target_user }}/.cargo/bin:{{ ansible_env.PATH }}"
+      register: fzf_check
+      changed_when: false
+      failed_when: fzf_check.rc != 0
+
+    - name: Verify | Check bat is installed (or batcat on Ubuntu)
+      ansible.builtin.shell: |
+        which bat || which batcat
+      become: true
+      become_user: "{{ target_user }}"
+      environment:
+        PATH: "/home/{{ target_user }}/.local/bin:/home/{{ target_user }}/.cargo/bin:{{ ansible_env.PATH }}"
+      register: bat_check
+      changed_when: false
+      failed_when: bat_check.rc != 0
+
+    - name: Verify | Check eza is installed
+      ansible.builtin.command: which eza
+      become: true
+      become_user: "{{ target_user }}"
+      environment:
+        PATH: "/home/{{ target_user }}/.local/bin:/home/{{ target_user }}/.cargo/bin:{{ ansible_env.PATH }}"
+      register: eza_check
+      changed_when: false
+      failed_when: eza_check.rc != 0
+
+    - name: Verify | Check fd is installed (or fdfind on Ubuntu)
+      ansible.builtin.shell: |
+        which fd || which fdfind
+      become: true
+      become_user: "{{ target_user }}"
+      environment:
+        PATH: "/home/{{ target_user }}/.local/bin:/home/{{ target_user }}/.cargo/bin:{{ ansible_env.PATH }}"
+      register: fd_check
+      changed_when: false
+      failed_when: fd_check.rc != 0
+
+    - name: Verify | Check ripgrep is installed
+      ansible.builtin.command: which rg
+      become: true
+      become_user: "{{ target_user }}"
+      environment:
+        PATH: "/home/{{ target_user }}/.local/bin:/home/{{ target_user }}/.cargo/bin:{{ ansible_env.PATH }}"
+      register: rg_check
+      changed_when: false
+      failed_when: rg_check.rc != 0
+
+    - name: Verify | Check delta is installed
+      ansible.builtin.command: which delta
+      become: true
+      become_user: "{{ target_user }}"
+      environment:
+        PATH: "/home/{{ target_user }}/.local/bin:/home/{{ target_user }}/.cargo/bin:{{ ansible_env.PATH }}"
+      register: delta_check
+      changed_when: false
+      failed_when: delta_check.rc != 0
+
+    - name: Verify | Check zoxide is installed
+      ansible.builtin.command: which zoxide
+      become: true
+      become_user: "{{ target_user }}"
+      environment:
+        PATH: "/home/{{ target_user }}/.local/bin:/home/{{ target_user }}/.cargo/bin:{{ ansible_env.PATH }}"
+      register: zoxide_check
+      changed_when: false
+      failed_when: zoxide_check.rc != 0
+
+    - name: Verify | Check btop is installed
+      ansible.builtin.command: which btop
+      become: true
+      become_user: "{{ target_user }}"
+      environment:
+        PATH: "/home/{{ target_user }}/.local/bin:/home/{{ target_user }}/.cargo/bin:{{ ansible_env.PATH }}"
+      register: btop_check
+      changed_when: false
+      failed_when: btop_check.rc != 0
+
+    # ============================================
+    # Bashrc.d Scripts Verification
+    # ============================================
+
+    - name: Verify | Check cargo PATH script exists
+      ansible.builtin.stat:
+        path: "/home/{{ target_user }}/.bashrc.d/05_cargo.sh"
+      register: cargo_script_stat
+      failed_when: not cargo_script_stat.stat.exists
+
+    - name: Verify | Check mise activation script exists
+      ansible.builtin.stat:
+        path: "/home/{{ target_user }}/.bashrc.d/10_mise.sh"
+      register: mise_script_stat
+      failed_when: not mise_script_stat.stat.exists
+
+    # ============================================
+    # Summary
+    # ============================================
+
+    - name: Verify | Display verification summary
+      ansible.builtin.debug:
+        msg: |
+          ✅ LXD E2E Verification Complete!
+
+          Base System:
+          - Locale: UTF-8 configured
+          - Timezone: configured
+
+          User Setup:
+          - User {{ target_user }}: exists
+          - Home directory: exists
+          - bashrc.d: configured
+
+          Rust Toolchain:
+          - rustup: installed
+          - cargo: installed
+          - cargo-binstall: installed
+
+          CLI Tools (--cli-improved equivalent):
+          - mise: installed
+          - fzf: installed
+          - bat: installed
+          - eza: installed
+          - fd: installed
+          - ripgrep: installed
+          - delta: installed
+          - zoxide: installed
+          - btop: installed
+
+          All verifications passed!

@@ -1,0 +1,56 @@
+---
+# R Node role defaults
+
+# Username for R configuration
+r_node_username: "{{ ansible_user | default('adam') }}"
+
+# R version for library path
+r_node_r_version: "4.4"
+
+# CRAN mirror
+r_node_cran_mirror: "https://cloud.r-project.org"
+
+# Whether to install RStudio Desktop
+r_node_install_rstudio: true
+
+# Whether to install RStudio Server
+r_node_install_rstudio_server: false
+
+# Whether to install Fira Code font
+r_node_install_firacode: true
+
+# Whether to install base R packages
+r_node_install_base_packages: true
+
+# R packages to install
+r_node_packages:
+  - r-base-core
+  - r-base-dev
+  - libxml2-dev
+  - libssl-dev
+  - libcurl4-openssl-dev
+  - libssh2-1-dev
+  - openjdk-11-jdk
+  - pkg-config
+  - libnlopt-dev
+  - gdebi-core
+  - gfortran
+  - liblapack-dev
+  - libtiff-dev
+  - libfribidi-dev
+  - libharfbuzz-dev
+  - libfontconfig1-dev
+  - libfreetype6-dev
+  - libpng-dev
+  - libjpeg-dev
+
+# Base R packages to install
+r_node_r_packages:
+  - devtools
+  - tidyverse
+  - stringr
+  - data.table
+  - ggplot2
+  - shiny
+  - rmarkdown
+  - knitr

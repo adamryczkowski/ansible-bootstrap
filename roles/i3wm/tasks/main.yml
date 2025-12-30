@@ -1,0 +1,100 @@
+---
+# i3wm role - Install and configure i3 window manager
+
+- name: I3wm | Install i3 and related packages
+  ansible.builtin.apt:
+    name: "{{ i3wm_packages }}"
+    state: present
+  become: true
+
+- name: I3wm | Create i3 config directory
+  ansible.builtin.file:
+    path: "/home/{{ i3wm_username }}/.config/i3"
+    state: directory
+    mode: "0755"
+    owner: "{{ i3wm_username }}"
+    group: "{{ i3wm_username }}"
+  become: true
+
+- name: I3wm | Deploy i3 configuration
+  ansible.builtin.template:
+    src: config.j2
+    dest: "/home/{{ i3wm_username }}/.config/i3/config"
+    mode: "0644"
+    owner: "{{ i3wm_username }}"
+    group: "{{ i3wm_username }}"
+  become: true
+
+- name: I3wm | Create i3status config directory
+  ansible.builtin.file:
+    path: "/home/{{ i3wm_username }}/.config/i3status"
+    state: directory
+    mode: "0755"
+    owner: "{{ i3wm_username }}"
+    group: "{{ i3wm_username }}"
+  become: true
+  when: i3wm_install_i3status | bool
+
+- name: I3wm | Deploy i3status configuration
+  ansible.builtin.template:
+    src: i3status.conf.j2
+    dest: "/home/{{ i3wm_username }}/.config/i3status/config"
+    mode: "0644"
+    owner: "{{ i3wm_username }}"
+    group: "{{ i3wm_username }}"
+  become: true
+  when: i3wm_install_i3status | bool
+
+- name: I3wm | Install rofi (application launcher)
+  ansible.builtin.apt:
+    name: rofi
+    state: present
+  become: true
+  when: i3wm_install_rofi | bool
+
+- name: I3wm | Create rofi config directory
+  ansible.builtin.file:
+    path: "/home/{{ i3wm_username }}/.config/rofi"
+    state: directory
+    mode: "0755"
+    owner: "{{ i3wm_username }}"
+    group: "{{ i3wm_username }}"
+  become: true
+  when: i3wm_install_rofi | bool
+
+- name: I3wm | Deploy rofi configuration
+  ansible.builtin.template:
+    src: rofi.rasi.j2
+    dest: "/home/{{ i3wm_username }}/.config/rofi/config.rasi"
+    mode: "0644"
+    owner: "{{ i3wm_username }}"
+    group: "{{ i3wm_username }}"
+  become: true
+  when: i3wm_install_rofi | bool
+
+- name: I3wm | Install picom (compositor)
+  ansible.builtin.apt:
+    name: picom
+    state: present
+  become: true
+  when: i3wm_install_picom | bool
+
+- name: I3wm | Configure xdg-desktop-portal for i3
+  ansible.builtin.file:
+    path: "/home/{{ i3wm_username }}/.config/xdg-desktop-portal"
+    state: directory
+    mode: "0755"
+    owner: "{{ i3wm_username }}"
+    group: "{{ i3wm_username }}"
+  become: true
+
+- name: I3wm | Deploy xdg-desktop-portal configuration
+  ansible.builtin.copy:
+    content: |
+      [preferred]
+      default=gtk;wlr
+    dest: "/home/{{ i3wm_username }}/.config/xdg-desktop-portal/portals.conf"
+    mode: "0644"
+    owner: "{{ i3wm_username }}"
+    group: "{{ i3wm_username }}"
+  become: true

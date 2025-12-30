@@ -1,0 +1,124 @@
+---
+# Molecule converge playbook for LXD E2E test
+# Mimics make-lxd-node.sh with prepare-ubuntu.sh --cli-improved
+#
+# This applies the full configuration including:
+# - Base system configuration (common role)
+# - Package management (packages role)
+# - User setup (user_setup role)
+# - Shell configuration (bashrc role)
+# - Rust toolchain (rust role)
+# - CLI tools (cli_tools role) - equivalent to --cli-improved
+
+- name: Converge - Full LXD node configuration
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    target_user: testuser
+
+    # Enable all CLI tools (--cli-improved equivalent)
+    install_cli_tools: true
+    install_rust: true
+
+    # Packages role configuration
+    packages_apt_packages:
+      - build-essential
+      - git
+      - vim
+      - htop
+      - tmux
+      - tree
+      - jq
+      - unzip
+      - zip
+
+    # User setup configuration
+    user_setup_username: "{{ target_user }}"
+    user_setup_create_bashrc_d: true
+
+    # Bashrc configuration
+    bashrc_username: "{{ target_user }}"
+    bashrc_install_starship: true
+
+    # Rust configuration
+    rust_username: "{{ target_user }}"
+    rust_install_binstall: true
+    rust_packages: []
+
+    # CLI tools configuration (--cli-improved equivalent)
+    cli_tools_username: "{{ target_user }}"
+    cli_tools_install_mise: true
+    cli_tools_install_fzf: true
+    cli_tools_install_starship: true
+    cli_tools_install_bat: true
+    cli_tools_install_eza: true
+    cli_tools_install_fd: true
+    cli_tools_install_ripgrep: true
+    cli_tools_install_delta: true
+    cli_tools_install_zoxide: true
+    cli_tools_install_btop: true
+
+  pre_tasks:
+    - name: Display test configuration
+      ansible.builtin.debug:
+        msg: |
+          LXD E2E Test Configuration:
+          - Target user: {{ target_user }}
+          - Install CLI tools: {{ install_cli_tools }}
+          - Install Rust: {{ install_rust }}
+          - OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+  roles:
+    # Base system configuration (prepare_ubuntu.sh equivalent)
+    - role: common
+      tags: [common, base]
+
+    # Package management
+    - role: packages
+      tags: [packages, base]
+
+    # User setup
+    - role: user_setup
+      vars:
+        user_setup_username: "{{ target_user }}"
+      tags: [user, base]
+
+    # Shell configuration
+    - role: bashrc
+      vars:
+        bashrc_username: "{{ target_user }}"
+      tags: [bashrc, base]
+
+    # Rust toolchain
+    - role: rust
+      vars:
+        rust_username: "{{ target_user }}"
+      when: install_rust | default(true) | bool
+      tags: [rust, cli]
+
+    # CLI tools (--cli-improved equivalent)
+    - role: cli_tools
+      vars:
+        cli_tools_username: "{{ target_user }}"
+      when: install_cli_tools | default(true) | bool
+      tags: [cli_tools, cli]
+
+  post_tasks:
+    - name: Display completion message
+      ansible.builtin.debug:
+        msg: |
+          LXD E2E Test Converge Complete!
+          The following has been configured:
+          - Base system (locale, timezone, sysctl)
+          - APT packages
+          - User: {{ target_user }}
+          - Bash configuration with bashrc.d
+          - Rust toolchain with cargo-binstall
+          - CLI tools (bat, eza, fd, ripgrep, fzf, etc.)

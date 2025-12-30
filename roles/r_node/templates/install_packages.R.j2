@@ -1,0 +1,33 @@
+# R package installation script
+# Managed by Ansible - do not edit manually
+
+# Set CRAN mirror
+options(repos = c(CRAN = "{{ r_node_cran_mirror }}"))
+
+# Create user library directory if it doesn't exist
+dir.create(path = Sys.getenv("R_LIBS_USER"), showWarnings = FALSE, recursive = TRUE)
+
+# Install packages
+packages <- c(
+{% for pkg in r_node_r_packages %}
+  "{{ pkg }}"{{ "," if not loop.last else "" }}
+{% endfor %}
+)
+
+# Install missing packages
+installed <- installed.packages()[, "Package"]
+to_install <- packages[!packages %in% installed]
+
+if (length(to_install) > 0) {
+  install.packages(
+    to_install,
+    Ncpus = parallel::detectCores(),
+    lib = Sys.getenv("R_LIBS_USER")
+  )
+}
+
+# Update existing packages
+update.packages(
+  ask = FALSE,
+  lib = Sys.getenv("R_LIBS_USER")
+)

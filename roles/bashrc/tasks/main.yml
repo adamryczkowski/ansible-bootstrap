@@ -1,0 +1,74 @@
+---
+# Bashrc role - Shell configuration
+# Replaces libbashrc.sh
+
+- name: Bashrc | Create .bashrc.d directory
+  ansible.builtin.file:
+    path: "/home/{{ bashrc_username }}/.bashrc.d"
+    state: directory
+    mode: "0755"
+    owner: "{{ bashrc_username }}"
+    group: "{{ bashrc_username }}"
+  become: true
+
+- name: Bashrc | Add .bashrc.d sourcing to .bashrc
+  ansible.builtin.blockinfile:
+    path: "/home/{{ bashrc_username }}/.bashrc"
+    marker: "# {mark} ANSIBLE MANAGED - bashrc.d sourcing"
+    block: |
+      # Source all files in .bashrc.d
+      if [ -d ~/.bashrc.d ]; then
+          for file in ~/.bashrc.d/*.sh; do
+              [ -r "$file" ] && source "$file"
+          done
+          unset file
+      fi
+    create: true
+    mode: "0644"
+    owner: "{{ bashrc_username }}"
+    group: "{{ bashrc_username }}"
+  become: true
+
+- name: Bashrc | Copy bashrc.d snippets
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "/home/{{ bashrc_username }}/.bashrc.d/"
+    mode: "0644"
+    owner: "{{ bashrc_username }}"
+    group: "{{ bashrc_username }}"
+  loop: "{{ bashrc_snippets }}"
+  become: true
+  when: bashrc_snippets | length > 0
+
+- name: Bashrc | Create custom bashrc snippets
+  ansible.builtin.copy:
+    content: "{{ item.content }}"
+    dest: "/home/{{ bashrc_username }}/.bashrc.d/{{ item.name }}"
+    mode: "0644"
+    owner: "{{ bashrc_username }}"
+    group: "{{ bashrc_username }}"
+  loop: "{{ bashrc_custom_snippets }}"
+  become: true
+  when: bashrc_custom_snippets | length > 0
+
+- name: Bashrc | Download bash-preexec if enabled
+  ansible.builtin.get_url:
+    url: https://raw.githubusercontent.com/rcaloras/bash-preexec/master/bash-preexec.sh
+    dest: "/home/{{ bashrc_username }}/.bash-preexec.sh"
+    mode: "0644"
+    owner: "{{ bashrc_username }}"
+    group: "{{ bashrc_username }}"
+  become: true
+  when: bashrc_install_preexec | bool
+
+- name: Bashrc | Add bash-preexec sourcing
+  ansible.builtin.copy:
+    content: |
+      # Source bash-preexec for tools like atuin
+      [[ -f ~/.bash-preexec.sh ]] && source ~/.bash-preexec.sh
+    dest: "/home/{{ bashrc_username }}/.bashrc.d/70_preexec.sh"
+    mode: "0644"
+    owner: "{{ bashrc_username }}"
+    group: "{{ bashrc_username }}"
+  become: true
+  when: bashrc_install_preexec | bool

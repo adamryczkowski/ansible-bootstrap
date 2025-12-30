@@ -1,0 +1,26 @@
+---
+# Desktop base tasks - common setup for all desktop configurations
+
+- name: Desktop Base | Create scripts directory
+  ansible.builtin.file:
+    path: /usr/local/lib/adam/scripts
+    state: directory
+    mode: "0755"
+    owner: "{{ desktop_username }}"
+    group: "{{ desktop_username }}"
+  become: true
+
+- name: Desktop Base | Install base desktop packages
+  ansible.builtin.apt:
+    name: "{{ desktop_base_packages }}"
+    state: present
+  become: true
+
+- name: Desktop Base | Copy discover_session_bus_address script
+  ansible.builtin.copy:
+    src: discover_session_bus_address.sh
+    dest: /usr/local/lib/adam/scripts/discover_session_bus_address.sh
+    mode: "0755"
+    owner: root
+    group: root
+  become: true

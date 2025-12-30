@@ -1,0 +1,75 @@
+---
+# Variables for all hosts
+# These are the default values that apply to all hosts
+
+# Target user configuration
+target_user: adam
+target_user_groups:
+  - sudo
+  - docker
+  - lxd
+
+# Locale and timezone
+system_locale: en_US.UTF-8
+system_timezone: Europe/Warsaw
+
+# SSH configuration
+ssh_key_type: ed25519
+ssh_authorized_keys: []
+
+# APT configuration
+apt_proxy: ""  # Set to "http://proxy:3142" if using apt-cacher-ng
+apt_update_cache: true
+apt_cache_valid_time: 3600
+
+# Base packages to install on all systems
+base_packages:
+  - apt-transport-https
+  - ca-certificates
+  - curl
+  - gnupg
+  - lsb-release
+  - software-properties-common
+  - git
+  - vim
+  - htop
+  - tmux
+  - wget
+  - unzip
+  - jq
+
+# CLI tools configuration
+install_cli_tools: true
+cli_tools:
+  - bat
+  - eza
+  - ripgrep
+  - fd-find
+  - fzf
+  - zoxide
+  - htop
+  - btop
+
+# Rust configuration
+install_rust: true
+rust_packages:
+  - atuin
+  - starship
+  - zoxide
+  - eza
+  - bat
+  - fd-find
+  - ripgrep
+
+# Desktop configuration (only for workstations)
+install_desktop: false
+desktop_packages:
+  - meld
+  - gparted
+  - redshift-gtk
+  - dconf-editor
+
+# LXD configuration
+lxd_bridge_interface: lxdbr0
+lxd_default_profile: default
+lxd_ubuntu_release: noble

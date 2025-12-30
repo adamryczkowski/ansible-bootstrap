@@ -1,0 +1,17 @@
+---
+# Desktop role metadata
+
+galaxy_info:
+  author: Adam
+  description: Configure desktop environment with various tweaks
+  company: ""
+  license: MIT
+  min_ansible_version: "2.14"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+        - noble
+
+dependencies:
+  - role: packages

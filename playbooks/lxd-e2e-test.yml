@@ -1,0 +1,37 @@
+---
+# LXD E2E Test Playbook
+# Mimics prepare-ubuntu.sh <user> --cli-improved
+#
+# This playbook:
+# 1. Applies common configuration
+# 2. Installs packages
+# 3. Sets up user
+# 4. Configures bashrc
+# 5. Installs Rust (required for some CLI tools)
+# 6. Installs all CLI tools (--cli-improved equivalent)
+
+- name: LXD E2E Test - Bootstrap with CLI tools
+  hosts: workstations
+  become: true
+  gather_facts: true
+
+  roles:
+    - role: common
+      tags: [common]
+
+    - role: packages
+      tags: [packages]
+
+    - role: user_setup
+      tags: [user]
+
+    - role: bashrc
+      tags: [bashrc]
+
+    - role: rust
+      tags: [rust]
+      when: rust_enabled | default(false)
+
+    - role: cli_tools
+      tags: [cli_tools]
+      when: cli_tools_enabled | default(false)
