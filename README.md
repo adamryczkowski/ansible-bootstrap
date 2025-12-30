@@ -193,6 +193,133 @@ Each role has `defaults/main.yml` with configurable variables.
 | prepare_R-node.sh      | r_node.yml         |
 | make-lxd-node.sh       | lxd_node.yml       |
 
+## LXD E2E Testing
+
+The project includes an LXD-based end-to-end test scenario for testing against
+real Ubuntu containers instead of Docker.
+
+### LXD Prerequisites
+
+- LXD installed and initialized (`lxd init`)
+- User added to `lxd` group
+- Ubuntu 24.04 image available
+
+### Running LXD E2E Tests
+
+```bash
+# Run full LXD E2E test cycle
+just test-lxd-e2e
+
+# Or run individual steps
+just test-lxd-create    # Create test container
+just test-lxd-converge  # Run playbooks
+just test-lxd-verify    # Verify results
+just test-lxd-destroy   # Cleanup
+```
+
+### LXD vs Docker Testing
+
+| Feature | Docker (default) | LXD E2E |
+|---------|-----------------|---------|
+| Speed | Fast | Slower |
+| Systemd | Limited | Full support |
+| Realism | Container-like | VM-like |
+| Use case | CI/CD | Integration testing |
+
+## Troubleshooting
+
+### Pre-commit Hook Failures
+
+**ansible-lint fails with module not found:**
+
+```bash
+# Use local ansible-lint installation
+pipx install ansible-lint
+pre-commit run ansible-lint --all-files
+```
+
+**yamllint configuration errors:**
+
+```bash
+# Verify .yamllint exists and is valid
+yamllint -c .yamllint .
+```
+
+### Molecule Test Issues
+
+**Docker permission denied:**
+
+```bash
+# Add user to docker group
+sudo usermod -aG docker $USER
+newgrp docker
+```
+
+**Container fails to start:**
+
+```bash
+# Check Docker is running
+sudo systemctl status docker
+
+# Clean up old containers
+just test-destroy
+docker system prune -f
+```
+
+### Common Ansible Errors
+
+**SSH connection refused:**
+
+```bash
+# Verify SSH key is loaded
+ssh-add -l
+
+# Test connection manually
+ssh -v user@host
+```
+
+**Privilege escalation failed:**
+
+```bash
+# Ensure sudo is configured
+ansible all -m ping -i inventory/production/hosts.yml --become
+```
+
+**Galaxy collection not found:**
+
+```bash
+# Install required collections
+just galaxy
+# Or manually:
+ansible-galaxy collection install -r requirements.yml
+```
+
+### LXD Connectivity Issues
+
+**Cannot connect to LXD socket:**
+
+```bash
+# Verify LXD is running
+sudo systemctl status snap.lxd.daemon
+
+# Check user is in lxd group
+groups | grep lxd
+
+# Re-login or use newgrp
+newgrp lxd
+```
+
+**Container network issues:**
+
+```bash
+# Check LXD network
+lxc network list
+lxc network show lxdbr0
+
+# Verify container has IP
+lxc list
+```
+
 ## License
 
 MIT License
