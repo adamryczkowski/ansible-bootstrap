@@ -9,7 +9,7 @@ role execution.
 1. Get the operator's public key (usually `~/.ssh/id_ed25519.pub`)
 2. Save it to this directory with the naming convention: `user@hostname.pub`
 3. Add the operator identifier to the `authorized_operators` list in
-   `group_vars/all.yml` or the appropriate inventory group_vars
+  `group_vars/all.yml` or the appropriate inventory group_vars
 
 ## Example
 
