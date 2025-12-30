@@ -44,6 +44,6 @@ bashrc_enabled: true
 # Central repository of facts - Authorized operators
 # These operators will have SSH access to all managed hosts
 # Keys are stored in files/ssh_keys/<operator>.pub
-authorized_operators:
+user_setup_authorized_operators:
   - adam@legion9
   - adam@potwor

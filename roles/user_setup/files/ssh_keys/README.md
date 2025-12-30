@@ -8,7 +8,7 @@ role execution.
 
 1. Get the operator's public key (usually `~/.ssh/id_ed25519.pub`)
 2. Save it to this directory with the naming convention: `user@hostname.pub`
-3. Add the operator identifier to the `authorized_operators` list in
+3. Add the operator identifier to the `user_setup_authorized_operators` list in
   `group_vars/all.yml` or the appropriate inventory group_vars
 
 ## Example
@@ -22,7 +22,7 @@ cat ~/.ssh/id_ed25519.pub
 echo "ssh-ed25519 AAAAC3... user@hostname" > roles/user_setup/files/ssh_keys/user@hostname.pub
 
 # Update group_vars/all.yml (or inventory-specific group_vars)
-authorized_operators:
+user_setup_authorized_operators:
   - user@hostname
 ```
 

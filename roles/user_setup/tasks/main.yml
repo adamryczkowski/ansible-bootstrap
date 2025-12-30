@@ -44,11 +44,11 @@
     user: "{{ user_setup_username }}"
     key: "{{ lookup('file', 'ssh_keys/' + item + '.pub') }}"
     state: present
-  loop: "{{ authorized_operators }}"
+  loop: "{{ user_setup_authorized_operators }}"
   become: true
   when:
     - user_setup_deploy_operator_keys | bool
-    - authorized_operators | length > 0
+    - user_setup_authorized_operators | length > 0
 
 - name: User Setup | Create common directories
   ansible.builtin.file:

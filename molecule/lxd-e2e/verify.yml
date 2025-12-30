@@ -175,7 +175,7 @@
 
     - name: Verify | Check mise activation script exists
       ansible.builtin.stat:
-        path: "/home/{{ target_user }}/.bashrc.d/10_mise.sh"
+        path: "/home/{{ target_user }}/.bashrc.d/90_mise.sh"
       register: mise_script_stat
       failed_when: not mise_script_stat.stat.exists
 

@@ -26,7 +26,7 @@ user_setup_authorized_keys: []
 # Authorized operators - list of operator identifiers (e.g., "adam@legion9")
 # Keys are loaded from files/ssh_keys/<operator>.pub
 # This is the central repository of facts for SSH access
-authorized_operators: []
+user_setup_authorized_operators: []
 
 # Whether to deploy operator keys from the central repository
 user_setup_deploy_operator_keys: true
