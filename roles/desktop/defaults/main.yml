@@ -2,7 +2,7 @@
 # Desktop role defaults
 
 # Username for desktop configuration
-desktop_username: "{{ ansible_user | default('adam') }}"
+desktop_username: "{{ target_user | default(ansible_user) | default('adam') }}"
 
 # Tweak toggles
 desktop_tweak_base: true

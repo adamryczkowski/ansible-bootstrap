@@ -1,0 +1,16 @@
+---
+# User Setup role metadata
+
+galaxy_info:
+  author: Adam
+  description: Create and configure user accounts with SSH keys and sudo access
+  company: ""
+  license: MIT
+  min_ansible_version: "2.14"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+        - noble
+
+dependencies: []

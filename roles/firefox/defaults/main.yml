@@ -2,7 +2,7 @@
 # Firefox role defaults
 
 # Username for Firefox configuration
-firefox_username: "{{ ansible_user | default('adam') }}"
+firefox_username: "{{ target_user | default(ansible_user) | default('adam') }}"
 
 # Installation method: apt or snap
 firefox_install_method: apt

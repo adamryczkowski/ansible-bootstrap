@@ -2,7 +2,7 @@
 # LXD role defaults
 
 # Username for LXD configuration
-lxd_username: "{{ ansible_user | default('adam') }}"
+lxd_username: "{{ target_user | default(ansible_user) | default('adam') }}"
 
 # Whether to use preseed for initialization
 lxd_use_preseed: false

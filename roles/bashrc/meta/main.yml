@@ -1,0 +1,16 @@
+---
+# Bashrc role metadata
+
+galaxy_info:
+  author: Adam
+  description: Configure bashrc with modular snippets in .bashrc.d directory
+  company: ""
+  license: MIT
+  min_ansible_version: "2.14"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+        - noble
+
+dependencies: []

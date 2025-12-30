@@ -2,7 +2,7 @@
 # Default variables for bashrc role
 
 # Username to configure
-bashrc_username: "{{ target_user | default('adam') }}"
+bashrc_username: "{{ target_user | default(ansible_user) | default('adam') }}"
 
 # Bashrc snippets to copy from files/
 bashrc_snippets: []

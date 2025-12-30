@@ -2,7 +2,7 @@
 # i3wm role defaults
 
 # Username for i3 configuration
-i3wm_username: "{{ ansible_user | default('adam') }}"
+i3wm_username: "{{ target_user | default(ansible_user) | default('adam') }}"
 
 # Packages to install
 i3wm_packages:

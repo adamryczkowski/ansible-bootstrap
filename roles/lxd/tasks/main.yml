@@ -1,5 +1,28 @@
 ---
-# LXD role - Install and configure LXD container management
+# LXD Role - Install and configure LXD container management
+#
+# Purpose:
+#   Installs LXD via snap and configures it for container management.
+#   Supports preseed configuration, storage pools, network bridges, and remote access.
+#
+# Key Variables:
+#   - lxd_username: User to add to lxd group (default: target_user or ansible_user)
+#   - lxd_use_preseed: Use preseed file for initialization (default: false)
+#   - lxd_storage_driver: Storage backend (dir, btrfs, zfs, lvm) (default: dir)
+#   - lxd_create_storage_pool: Create a storage pool (default: true)
+#   - lxd_create_network: Create network bridge (default: true)
+#   - lxd_enable_remote: Enable remote access (default: false)
+#   - lxd_preload_images: List of images to pre-download (default: [])
+#
+# Dependencies:
+#   - community.general collection (for snap module)
+#
+# Example Usage:
+#   - role: lxd
+#     vars:
+#       lxd_storage_driver: btrfs
+#       lxd_preload_images:
+#         - ubuntu:24.04
 
 - name: LXD | Install LXD via snap
   community.general.snap:

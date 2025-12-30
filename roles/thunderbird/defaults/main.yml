@@ -2,7 +2,7 @@
 # Thunderbird role defaults
 
 # Username for Thunderbird configuration
-thunderbird_username: "{{ ansible_user | default('adam') }}"
+thunderbird_username: "{{ target_user | default(ansible_user) | default('adam') }}"
 
 # Installation method: apt or snap
 thunderbird_install_method: apt

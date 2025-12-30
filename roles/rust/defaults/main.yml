@@ -2,7 +2,7 @@
 # Default variables for rust role
 
 # Username to install Rust for
-rust_username: "{{ target_user | default('adam') }}"
+rust_username: "{{ target_user | default(ansible_user) | default('adam') }}"
 
 # Whether to install cargo-binstall for faster package installation
 rust_install_binstall: true

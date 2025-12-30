@@ -1,5 +1,31 @@
 ---
-# User setup role - User creation and SSH configuration
+# User Setup Role - User creation and SSH configuration
+#
+# Purpose:
+#   Creates user accounts, configures SSH access, sets up sudo permissions,
+#   and creates common directories. Supports deploying SSH keys from a central
+#   repository for authorized operators.
+#
+# Key Variables:
+#   - user_setup_username: Username to create (default: target_user or ansible_user)
+#   - user_setup_shell: User's shell (default: /bin/bash)
+#   - user_setup_groups: Groups to add user to (default: [sudo])
+#   - user_setup_generate_ssh_key: Generate SSH keypair (default: true)
+#   - user_setup_authorized_keys: List of SSH public keys to authorize
+#   - user_setup_authorized_operators: List of operator names (keys from files/ssh_keys/)
+#   - user_setup_sudo_nopasswd: Enable passwordless sudo (default: true)
+#   - user_setup_directories: Directories to create in home (default: [tmp, projects])
+#
+# Dependencies:
+#   - community.crypto collection (for openssh_keypair module)
+#   - ansible.posix collection (for authorized_key module)
+#
+# Example Usage:
+#   - role: user_setup
+#     vars:
+#       user_setup_username: developer
+#       user_setup_authorized_operators:
+#         - adam
 
 - name: User Setup | Create user
   ansible.builtin.user:

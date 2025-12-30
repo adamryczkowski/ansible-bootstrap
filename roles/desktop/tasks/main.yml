@@ -1,5 +1,31 @@
 ---
-# Desktop role - Configure desktop environment with various tweaks
+# Desktop Role - Configure desktop environment with various tweaks
+#
+# Purpose:
+#   Configures desktop environment settings including GNOME tweaks, Nemo file
+#   manager, SMB shares, laptop-specific settings, and application installations.
+#   Uses modular task files for each component.
+#
+# Key Variables:
+#   - desktop_username: User to configure desktop for (default: target_user or ansible_user)
+#   - desktop_tweak_base: Apply base desktop tweaks (default: true)
+#   - desktop_tweak_gnome: Apply GNOME settings (default: true)
+#   - desktop_tweak_nemo: Configure Nemo file manager (default: true)
+#   - desktop_tweak_smb: Configure SMB shares (default: false)
+#   - desktop_tweak_laptop: Apply laptop-specific tweaks (default: false)
+#   - desktop_tweak_applications: Install desktop applications (default: true)
+#
+# Dependencies:
+#   - community.general collection (for dconf module)
+#
+# Example Usage:
+#   - role: desktop
+#     vars:
+#       desktop_tweak_laptop: true
+#       desktop_smb_shares:
+#         - name: nas
+#           server: 192.168.1.100
+#           share: data
 
 - name: Desktop | Include base tasks
   ansible.builtin.include_tasks: base.yml

@@ -2,7 +2,7 @@
 # Default variables for user_setup role
 
 # Username to create/configure
-user_setup_username: "{{ target_user | default('adam') }}"
+user_setup_username: "{{ target_user | default(ansible_user) | default('adam') }}"
 
 # User shell
 user_setup_shell: /bin/bash

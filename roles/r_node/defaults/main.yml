@@ -2,7 +2,7 @@
 # R Node role defaults
 
 # Username for R configuration
-r_node_username: "{{ ansible_user | default('adam') }}"
+r_node_username: "{{ target_user | default(ansible_user) | default('adam') }}"
 
 # R version for library path
 r_node_r_version: "4.4"

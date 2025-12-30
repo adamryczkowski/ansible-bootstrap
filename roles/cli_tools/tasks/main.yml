@@ -1,5 +1,30 @@
 ---
-# CLI Tools role - Install CLI tools from various sources
+# CLI Tools Role - Install CLI tools from various sources
+#
+# Purpose:
+#   Installs and configures various CLI tools including APT packages, mise (polyglot
+#   runtime manager), fzf (fuzzy finder), liquidprompt, zoxide, atuin, and CLI aliases.
+#   Configures shell integration via .bashrc.d scripts.
+#
+# Key Variables:
+#   - cli_tools_username: User to configure tools for (default: target_user or ansible_user)
+#   - cli_tools_apt: List of APT packages to install (default: jq, htop, btop, etc.)
+#   - cli_tools_install_mise: Install mise runtime manager (default: true)
+#   - cli_tools_install_fzf: Install fzf fuzzy finder (default: true)
+#   - cli_tools_install_liquidprompt: Configure liquidprompt (default: true)
+#   - cli_tools_install_zoxide: Configure zoxide (default: true)
+#   - cli_tools_install_atuin: Configure atuin shell history (default: true)
+#   - cli_tools_install_aliases: Add improved CLI aliases (default: true)
+#
+# Dependencies:
+#   - bashrc role (for .bashrc.d directory)
+#   - rust role (for zoxide, atuin, bat, etc. installed via cargo-binstall)
+#
+# Example Usage:
+#   - role: cli_tools
+#     vars:
+#       cli_tools_install_mise: true
+#       cli_tools_install_aliases: true
 
 - name: CLI Tools | Install APT-based CLI tools
   ansible.builtin.apt:

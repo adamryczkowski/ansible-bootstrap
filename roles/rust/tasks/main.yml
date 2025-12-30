@@ -1,6 +1,26 @@
 ---
-# Rust role - Rust toolchain installation
-# Replaces librust.sh
+# Rust Role - Rust toolchain installation
+#
+# Purpose:
+#   Installs Rust via rustup and optionally installs cargo-binstall for faster
+#   package installation. Installs specified Rust CLI tools (atuin, zoxide, etc.).
+#   Replaces the legacy librust.sh script.
+#
+# Key Variables:
+#   - rust_username: User to install Rust for (default: target_user or ansible_user)
+#   - rust_install_binstall: Install cargo-binstall for faster installs (default: true)
+#   - rust_packages: List of Rust packages to install (default: atuin, zoxide, eza, bat, fd-find, ripgrep)
+#
+# Dependencies:
+#   - bashrc role (for .bashrc.d directory)
+#
+# Example Usage:
+#   - role: rust
+#     vars:
+#       rust_packages:
+#         - atuin
+#         - zoxide
+#         - starship
 
 - name: Rust | Check if rustup is installed
   ansible.builtin.stat:

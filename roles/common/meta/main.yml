@@ -1,0 +1,16 @@
+---
+# Common role metadata
+
+galaxy_info:
+  author: Adam
+  description: Base system configuration (locale, timezone, hostname, sysctl)
+  company: ""
+  license: MIT
+  min_ansible_version: "2.14"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+        - noble
+
+dependencies: []

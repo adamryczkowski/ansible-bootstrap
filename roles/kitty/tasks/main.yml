@@ -1,5 +1,27 @@
 ---
-# Kitty terminal role - Install and configure Kitty terminal emulator
+# Kitty Role - Install and configure Kitty terminal emulator
+#
+# Purpose:
+#   Installs Kitty terminal emulator via APT, configures it with a Dracula theme,
+#   installs Nerd Fonts for icon support, and sets it as the default terminal.
+#
+# Key Variables:
+#   - kitty_username: User to configure Kitty for (default: target_user or ansible_user)
+#   - kitty_set_default_nemo: Set as default terminal in Nemo (default: true)
+#   - kitty_set_default_gnome: Set as default terminal in GNOME (default: true)
+#   - kitty_install_nerd_fonts: Install JetBrains Mono Nerd Font (default: true)
+#   - kitty_nerd_fonts_version: Nerd Fonts release version (default: v3.3.0)
+#   - kitty_font_family: Font to use (default: JetBrainsMono Nerd Font)
+#   - kitty_theme: Color theme configuration (default: Dracula)
+#
+# Dependencies:
+#   - community.general collection (for dconf module)
+#
+# Example Usage:
+#   - role: kitty
+#     vars:
+#       kitty_font_size: 12
+#       kitty_install_nerd_fonts: true
 
 - name: Kitty | Install Kitty terminal
   ansible.builtin.apt:

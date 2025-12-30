@@ -2,7 +2,7 @@
 # Kitty terminal role defaults
 
 # Username for Kitty configuration
-kitty_username: "{{ ansible_user | default('adam') }}"
+kitty_username: "{{ target_user | default(ansible_user) | default('adam') }}"
 
 # Set as default terminal
 kitty_set_default_nemo: true
