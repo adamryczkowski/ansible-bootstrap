@@ -25,22 +25,37 @@ bootstrap:
 
 	echo "=== Bootstrap complete! ==="
 
+# Setup the development environment (alias for bootstrap)
+setup: bootstrap
+
 # Run all validation checks on ansible-bootstrap files
 validate:
 	#!/usr/bin/env bash
 	set -euo pipefail
 	echo "=== Running validation checks ==="
 
-	echo "--- yamllint ---"
-	yamllint -c .yamllint . || true
-
-	echo "--- ansible-lint ---"
-	ansible-lint -c .ansible-lint roles/ playbooks/ || true
-
-	echo "--- markdownlint ---"
-	markdownlint --fix --disable MD013 MD033 MD041 -- *.md || true
+	echo "--- Running pre-commit on all files ---"
+	pre-commit run --all-files
 
 	echo "=== Validation complete ==="
+
+# Format all files using available formatters
+format:
+	#!/usr/bin/env bash
+	set -euo pipefail
+	echo "=== Formatting files ==="
+
+	echo "--- Fixing Markdown files ---"
+	markdownlint --fix --disable MD013 MD033 MD041 -- *.md docs/*.md 2>/dev/null || true
+
+	echo "--- Fixing shell scripts with shfmt ---"
+	if command -v shfmt &> /dev/null; then
+		find . -name "*.sh" -not -path "./collections/*" -exec shfmt -w -i 2 {} \;
+	else
+		echo "shfmt not installed, skipping shell script formatting"
+	fi
+
+	echo "=== Formatting complete ==="
 
 # Run Molecule tests (default scenario with Docker)
 test:
@@ -81,6 +96,10 @@ lint:
 # Run yamllint on all YAML files
 lint-yaml:
 	yamllint .
+
+# Run shellcheck on all shell scripts
+lint-shell:
+	find . -name "*.sh" -not -path "./collections/*" -exec shellcheck {} \;
 
 # Check syntax of all playbooks
 syntax-check:
