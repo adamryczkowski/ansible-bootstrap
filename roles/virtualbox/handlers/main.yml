@@ -1,0 +1,16 @@
+---
+# VirtualBox role handlers
+
+- name: VirtualBox | Rebuild kernel modules
+  ansible.builtin.command: /sbin/rcvboxdrv setup
+  become: true
+  listen: VirtualBox | Rebuild kernel modules
+
+- name: VirtualBox | Reload udev rules
+  ansible.builtin.shell: |
+    udevadm control --reload-rules
+    udevadm trigger
+  args:
+    executable: /bin/bash
+  become: true
+  listen: VirtualBox | Reload udev rules

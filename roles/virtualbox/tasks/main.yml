@@ -1,0 +1,175 @@
+---
+# VirtualBox Role - Install and configure Oracle VirtualBox on Ubuntu 24.04 LTS
+#
+# Purpose:
+#   Installs VirtualBox from the official Oracle repository and configures it
+#   for USB device passthrough. Optionally installs the Extension Pack for
+#   advanced features like USB 2.0/3.0, VRDP, and disk encryption.
+#
+# Key Variables:
+#   - virtualbox_version: VirtualBox version to install (default: "7.2")
+#   - virtualbox_users: Users to add to vboxusers group (default: [])
+#   - virtualbox_install_extension_pack: Install Extension Pack (default: true)
+#   - virtualbox_enable_usb_passthrough: Configure USB passthrough (default: true)
+#
+# Dependencies:
+#   - None (uses apt modules)
+#
+# Example Usage:
+#   - role: virtualbox
+#     vars:
+#       virtualbox_users:
+#         - adam
+#       virtualbox_install_extension_pack: true
+#
+# Sources:
+#   - https://www.virtualbox.org/wiki/Linux_Downloads
+#   - https://docs.oracle.com/en/virtualization/virtualbox/7.2/user/installation.html
+#   - https://linuxiac.com/how-to-install-virtualbox-on-ubuntu-24-04-lts/
+#   - https://linuxtldr.com/install-virtualbox/
+#   - https://lucaspolloni.com/resolving-usb-device-access-issues-in-virtualbox-on-linux/
+
+# Step 1: Install dependencies for VirtualBox kernel module compilation
+- name: VirtualBox | Install dependencies
+  ansible.builtin.raw: apt-get update && apt-get install -y {{ virtualbox_dependencies | join(' ') }}
+  become: true
+  changed_when: true
+
+# Step 2: Ensure keyrings directory exists
+- name: VirtualBox | Ensure keyrings directory exists
+  ansible.builtin.file:
+    path: /usr/share/keyrings
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+
+# Step 3: Download and install Oracle VirtualBox GPG key
+- name: VirtualBox | Download Oracle VirtualBox GPG key
+  ansible.builtin.raw: >
+    wget -q -O- {{ virtualbox_apt_key_url }} |
+    gpg --dearmor --yes --output {{ virtualbox_apt_key_path }}
+  become: true
+  args:
+    creates: "{{ virtualbox_apt_key_path }}"
+  changed_when: true
+
+# Step 4: Add VirtualBox repository
+- name: VirtualBox | Add VirtualBox repository
+  ansible.builtin.copy:
+    dest: /etc/apt/sources.list.d/virtualbox.list
+    content: |
+      {{ virtualbox_repository }}
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+
+- name: VirtualBox | Update apt cache after adding repository
+  ansible.builtin.raw: apt-get update
+  become: true
+  changed_when: true
+
+# Step 5: Install VirtualBox
+- name: VirtualBox | Install VirtualBox
+  ansible.builtin.raw: apt-get install -y virtualbox-{{ virtualbox_version }}
+  become: true
+  changed_when: true
+  notify: VirtualBox | Rebuild kernel modules
+
+# Step 6: Configure USB passthrough - add users to vboxusers group
+- name: VirtualBox | Determine users for vboxusers group
+  ansible.builtin.set_fact:
+    virtualbox_target_users: >-
+      {{ virtualbox_users if virtualbox_users | length > 0
+      else [target_user | default(ansible_user_id)] }}
+  when: virtualbox_enable_usb_passthrough | bool
+
+- name: VirtualBox | Add users to vboxusers group
+  ansible.builtin.user:
+    name: "{{ item }}"
+    groups: vboxusers
+    append: true
+  loop: "{{ virtualbox_target_users }}"
+  become: true
+  when: virtualbox_enable_usb_passthrough | bool
+
+# Step 7: Create udev rules for USB device permissions (optional)
+- name: VirtualBox | Create udev rules for USB permissions
+  ansible.builtin.copy:
+    dest: /etc/udev/rules.d/60-vboxusb.rules
+    content: |
+      # VirtualBox USB device permissions
+      # Allow vboxusers group to access USB devices
+      SUBSYSTEM=="usb", ACTION=="add", ENV{DEVTYPE}=="usb_device", MODE="0666", GROUP="vboxusers"
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  when: virtualbox_create_udev_rules | bool
+  notify: VirtualBox | Reload udev rules
+
+# Step 8: Install VirtualBox Extension Pack
+- name: VirtualBox | Get installed VirtualBox version
+  ansible.builtin.command: vboxmanage -v
+  register: virtualbox_installed_version
+  changed_when: false
+  when: virtualbox_install_extension_pack | bool
+
+- name: VirtualBox | Parse VirtualBox version number
+  ansible.builtin.set_fact:
+    virtualbox_full_version: "{{ virtualbox_installed_version.stdout | regex_replace('r.*$', '') }}"
+  when: virtualbox_install_extension_pack | bool
+
+- name: VirtualBox | Check if Extension Pack is already installed
+  ansible.builtin.command: vboxmanage list extpacks
+  register: virtualbox_extpacks
+  changed_when: false
+  when: virtualbox_install_extension_pack | bool
+
+- name: VirtualBox | Download Extension Pack
+  ansible.builtin.raw: >
+    wget -q -O /tmp/Oracle_VirtualBox_Extension_Pack-{{ virtualbox_full_version }}.vbox-extpack
+    https://download.virtualbox.org/virtualbox/{{ virtualbox_full_version }}/Oracle_VirtualBox_Extension_Pack-{{ virtualbox_full_version }}.vbox-extpack
+  become: true
+  when:
+    - virtualbox_install_extension_pack | bool
+    - "'Oracle VirtualBox Extension Pack' not in virtualbox_extpacks.stdout"
+  changed_when: true
+
+- name: VirtualBox | Install Extension Pack
+  ansible.builtin.raw: >
+    echo "y" | vboxmanage extpack install --replace
+    /tmp/Oracle_VirtualBox_Extension_Pack-{{ virtualbox_full_version }}.vbox-extpack
+  become: true
+  when:
+    - virtualbox_install_extension_pack | bool
+    - "'Oracle VirtualBox Extension Pack' not in virtualbox_extpacks.stdout"
+  changed_when: true
+
+- name: VirtualBox | Remove Extension Pack installer
+  ansible.builtin.file:
+    path: "/tmp/Oracle_VirtualBox_Extension_Pack-{{ virtualbox_full_version }}.vbox-extpack"
+    state: absent
+  become: true
+  when: virtualbox_install_extension_pack | bool
+
+# Step 9: Ensure VirtualBox kernel modules are loaded
+- name: VirtualBox | Check if vboxdrv module is loaded
+  ansible.builtin.command: lsmod
+  register: virtualbox_lsmod
+  changed_when: false
+
+- name: VirtualBox | Load vboxdrv kernel module
+  ansible.builtin.command: modprobe vboxdrv
+  become: true
+  when: "'vboxdrv' not in virtualbox_lsmod.stdout"
+  changed_when: true
+
+# Step 10: Ensure VirtualBox service is enabled and started
+- name: VirtualBox | Ensure vboxdrv service is enabled
+  ansible.builtin.raw: systemctl enable vboxdrv && systemctl start vboxdrv
+  become: true
+  changed_when: true
+  failed_when: false

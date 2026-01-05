@@ -1,0 +1,15 @@
+---
+# VirtualBox role metadata
+
+galaxy_info:
+  author: Adam
+  description: Install and configure Oracle VirtualBox with USB passthrough support
+  company: ""
+  license: MIT
+  min_ansible_version: "2.14"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - noble
+
+dependencies: []

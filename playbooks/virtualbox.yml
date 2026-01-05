@@ -1,0 +1,24 @@
+---
+# VirtualBox Installation Playbook
+# Installs and configures Oracle VirtualBox on Ubuntu 24.04 LTS
+#
+# Usage:
+#   ansible-playbook playbooks/virtualbox.yml --ask-become-pass
+#
+# For localhost:
+#   ansible-playbook playbooks/virtualbox.yml -c local -i localhost, --ask-become-pass
+
+- name: Install and configure VirtualBox
+  hosts: all
+  become: false
+
+  vars:
+    # Override target_user for localhost runs
+    target_user: "{{ ansible_user_id }}"
+
+  roles:
+    - role: virtualbox
+      vars:
+        virtualbox_version: "7.2"
+        virtualbox_install_extension_pack: true
+        virtualbox_enable_usb_passthrough: true

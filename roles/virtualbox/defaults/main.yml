@@ -1,0 +1,38 @@
+---
+# Default variables for VirtualBox role
+
+# VirtualBox version to install (e.g., "7.2" for virtualbox-7.2 package)
+# Use "latest" to install the most recent version available
+virtualbox_version: "7.2"
+
+# Users to add to vboxusers group for USB passthrough support
+# If empty, uses target_user or ansible_user
+virtualbox_users: []
+
+# Whether to install VirtualBox Extension Pack
+# Extension Pack provides: USB 2.0/3.0, VRDP, webcam passthrough, disk encryption, NVMe
+virtualbox_install_extension_pack: true
+
+# Whether to configure USB passthrough (adds users to vboxusers group)
+virtualbox_enable_usb_passthrough: true
+
+# Whether to create udev rules for USB device permissions
+# This is usually handled automatically by the VirtualBox package
+virtualbox_create_udev_rules: false
+
+# VirtualBox repository configuration
+virtualbox_apt_key_url: "https://www.virtualbox.org/download/oracle_vbox_2016.asc"
+virtualbox_apt_key_path: "/usr/share/keyrings/oracle-virtualbox-2016.gpg"
+virtualbox_repository_base: "https://download.virtualbox.org/virtualbox/debian"
+virtualbox_repository: >-
+  deb [arch=amd64 signed-by={{ virtualbox_apt_key_path }}]
+  {{ virtualbox_repository_base }} {{ ansible_distribution_release }} contrib
+
+# Dependencies required for VirtualBox kernel module compilation
+virtualbox_dependencies:
+  - build-essential
+  - dkms
+  - linux-headers-generic
+  - gcc
+  - make
+  - perl
