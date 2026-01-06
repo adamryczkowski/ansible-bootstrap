@@ -1,0 +1,11 @@
+# XDG Desktop Portal configuration for Sway
+# This file configures which portal backends to use for different interfaces
+# Managed by Ansible - do not edit manually
+
+[preferred]
+# Use GTK portal for most interfaces (file chooser, app chooser, etc.)
+default=gtk;
+
+# Use wlr portal for screenshot and screencast (wlroots-specific)
+org.freedesktop.impl.portal.Screenshot=wlr;
+org.freedesktop.impl.portal.ScreenCast=wlr;

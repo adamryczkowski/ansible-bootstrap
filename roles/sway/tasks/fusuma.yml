@@ -1,0 +1,65 @@
+---
+# Sway role - Install Fusuma for touchpad gestures
+
+- name: Sway | Install Fusuma dependencies
+  ansible.builtin.apt:
+    name: "{{ sway_fusuma_packages }}"
+    state: present
+    update_cache: true
+  become: true
+
+- name: Sway | Check if Fusuma is installed
+  ansible.builtin.command:
+    cmd: gem list fusuma -i
+  register: sway_fusuma_installed
+  changed_when: false
+  failed_when: false
+  become: true
+  become_user: "{{ sway_username }}"
+
+- name: Sway | Install Fusuma gem
+  ansible.builtin.command:
+    cmd: gem install fusuma --no-document
+  become: true
+  register: sway_fusuma_install
+  changed_when: sway_fusuma_install.rc == 0
+  ignore_errors: true  # Make non-fatal - network issues shouldn't block Sway installation
+  when: sway_fusuma_installed.rc != 0 or sway_fusuma_installed.stdout != 'true'
+
+- name: Sway | Install fusuma-plugin-sendkey for keyboard simulation
+  ansible.builtin.command:
+    cmd: gem install fusuma-plugin-sendkey --no-document
+  become: true
+  register: sway_sendkey_install
+  changed_when: sway_sendkey_install.rc == 0
+  ignore_errors: true  # Make non-fatal - network issues shouldn't block Sway installation
+  when: sway_fusuma_installed.rc != 0 or sway_fusuma_installed.stdout != 'true'
+
+- name: Sway | Warn if Fusuma installation failed
+  ansible.builtin.debug:
+    msg: "WARNING: Fusuma gem installation failed. Touchpad gestures will not be available. You can install manually later with: sudo gem install fusuma fusuma-plugin-sendkey"
+  when: sway_fusuma_install is failed or (sway_fusuma_install.rc is defined and sway_fusuma_install.rc != 0)
+
+- name: Sway | Add user to input group for Fusuma
+  ansible.builtin.user:
+    name: "{{ sway_username }}"
+    groups: input
+    append: true
+  become: true
+
+- name: Sway | Ensure udev rules for input devices
+  ansible.builtin.copy:
+    content: |
+      KERNEL=="uinput", MODE="0660", GROUP="input", OPTIONS+="static_node=uinput"
+    dest: /etc/udev/rules.d/99-input.rules
+    mode: "0644"
+    owner: root
+    group: root
+  become: true
+  notify: Reload udev rules
+
+- name: Sway | Ensure libinput-gestures is not conflicting
+  ansible.builtin.apt:
+    name: libinput-gestures
+    state: absent
+  become: true

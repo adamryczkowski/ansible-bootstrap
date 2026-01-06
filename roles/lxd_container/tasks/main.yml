@@ -1,0 +1,148 @@
+---
+# LXD Container Role - Create and manage LXD containers
+#
+# Purpose:
+#   Creates LXD containers on an LXD host with specified configuration.
+#   Supports custom profiles, resource limits, and device configuration.
+#
+# Key Variables:
+#   - lxd_container_list: List of containers to create
+#   - lxd_container_image_server: Image server URL
+#   - lxd_container_wait_for_ipv4: Wait for container to get an IP
+#   - lxd_container_timeout: Timeout for container operations
+#
+# Dependencies:
+#   - community.general collection (for lxd_container module)
+#   - LXD must be installed and configured on the host
+#
+# Example Usage:
+#   - role: lxd_container
+#     vars:
+#       lxd_container_list:
+#         - name: my-container
+#           image: ubuntu/24.04
+#           config:
+#             limits.cpu: "2"
+#             limits.memory: 4GB
+
+- name: LXD Container | Validate container list
+  ansible.builtin.assert:
+    that:
+      - lxd_container_list is defined
+      - lxd_container_list | length > 0
+    fail_msg: "No containers defined in lxd_container_list"
+    success_msg: "Found {{ lxd_container_list | length }} container(s) to manage"
+
+# Check if containers already exist
+- name: LXD Container | Check if containers exist
+  ansible.builtin.command: "lxc info {{ item.name }}"
+  loop: "{{ lxd_container_list }}"
+  register: lxd_container_exists
+  failed_when: false
+  changed_when: false
+
+# Create containers without GPU devices first (GPU devices require stopped container)
+- name: LXD Container | Create containers (without GPU devices)
+  community.general.lxd_container:
+    name: "{{ item.name }}"
+    state: "{{ item.state | default('started') }}"
+    source:
+      type: image
+      mode: pull
+      server: "{{ lxd_container_image_server }}"
+      protocol: "{{ lxd_container_image_protocol }}"
+      alias: "{{ item.image }}"
+    profiles: "{{ item.profiles | default(lxd_container_default_profiles) }}"
+    config: "{{ item.config | default({}) }}"
+    # Don't add GPU devices here - they need container to be stopped
+    devices: "{{ item.devices | default({}) | dict2items | rejectattr('value.type', 'equalto', 'gpu') | items2dict }}"
+    wait_for_ipv4_addresses: "{{ lxd_container_wait_for_ipv4 }}"
+    timeout: "{{ lxd_container_timeout }}"
+    force_stop: "{{ lxd_container_force }}"
+  loop: "{{ lxd_container_list }}"
+  register: lxd_container_results
+  when: lxd_container_exists.results[ansible_loop.index0].rc != 0
+  loop_control:
+    extended: true
+
+# Handle GPU device addition for existing containers
+- name: LXD Container | Check GPU device status for existing containers
+  ansible.builtin.command: "lxc config device show {{ item.name }}"
+  loop: "{{ lxd_container_list }}"
+  register: lxd_container_gpu_device_check
+  changed_when: false
+  when: item.devices.gpu0 is defined
+
+- name: LXD Container | Stop container for GPU device addition
+  ansible.builtin.command: "lxc stop {{ item.item.name }} --force"
+  loop: "{{ lxd_container_gpu_device_check.results }}"
+  when:
+    - item.stdout is defined
+    - "'gpu0' not in item.stdout"
+    - item.item.devices.gpu0 is defined
+  register: lxd_container_stopped
+
+- name: LXD Container | Add GPU device to container
+  ansible.builtin.command: >
+    lxc config device add {{ item.item.item.name }} gpu0 gpu
+    gputype={{ item.item.item.devices.gpu0.gputype }}
+    id={{ item.item.item.devices.gpu0.id }}
+  loop: "{{ lxd_container_stopped.results }}"
+  when:
+    - item.changed is defined
+    - item.changed
+  register: lxd_container_gpu_device_added
+
+- name: LXD Container | Start container after GPU device addition
+  ansible.builtin.command: "lxc start {{ item.item.item.item.name }}"
+  loop: "{{ lxd_container_gpu_device_added.results }}"
+  when:
+    - item.changed is defined
+    - item.changed
+
+- name: LXD Container | Wait for container to start after GPU addition
+  ansible.builtin.pause:
+    seconds: 15
+  when: lxd_container_gpu_device_added is changed
+
+- name: LXD Container | Wait for containers to be ready
+  ansible.builtin.pause:
+    seconds: 10
+  when: lxd_container_results.changed
+
+- name: LXD Container | Get container information
+  ansible.builtin.command: "lxc list {{ item.name }} --format json"
+  loop: "{{ lxd_container_list }}"
+  register: lxd_container_info
+  changed_when: false
+  when: item.state | default('started') == 'started'
+
+- name: LXD Container | Display container information
+  ansible.builtin.debug:
+    msg: |
+      Container: {{ item.item.name }}
+      Status: {{ (item.stdout | from_json)[0].status }}
+      IPv4: {{ (item.stdout | from_json)[0].state.network.eth0.addresses | selectattr('family', 'equalto', 'inet') | map(attribute='address') | first | default('No IP yet') }}
+  loop: "{{ lxd_container_info.results }}"
+  when:
+    - item.stdout is defined
+    - (item.stdout | from_json) | length > 0
+
+- name: LXD Container | Set container facts for later use
+  ansible.builtin.set_fact:
+    lxd_container_created_list: "{{ lxd_container_results.results | map(attribute='item') | list }}"
+    lxd_container_ip_list: >-
+      {{
+        lxd_container_info.results
+        | selectattr('stdout', 'defined')
+        | map(attribute='stdout')
+        | map('from_json')
+        | map('first')
+        | selectattr('state.network.eth0', 'defined')
+        | map(attribute='state.network.eth0.addresses')
+        | map('selectattr', 'family', 'equalto', 'inet')
+        | map('map', attribute='address')
+        | map('first')
+        | list
+      }}
+  when: lxd_container_info.results | length > 0

@@ -34,9 +34,6 @@ offline: false
 # Use default rules
 use_default_rules: true
 
-# Parseable output format
-parseable: true
-
 # Quiet mode
 quiet: false
 

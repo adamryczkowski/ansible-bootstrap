@@ -1,0 +1,42 @@
+---
+# Sway role - Install and configure Sway window manager (Wayland compositor)
+#
+# This role installs Sway using Nix for the latest version (1.11+) and
+# configures it with the i3-config repository containing Sway configuration.
+#
+# The setup mirrors the local development environment with:
+# - Sway 1.11 via Nix (with nixGL wrapper for OpenGL)
+# - Supporting tools (waybar, wofi, mako, etc.) via apt
+# - Configuration from https://gitlab.com/adamwam/i3-config.git
+
+- name: Sway | Include apt packages installation
+  ansible.builtin.include_tasks: apt_packages.yml
+
+- name: Sway | Include fonts installation
+  ansible.builtin.include_tasks: fonts.yml
+
+- name: Sway | Include XDG Desktop Portal configuration
+  ansible.builtin.include_tasks: portal.yml
+
+- name: Sway | Include Nix installation
+  ansible.builtin.include_tasks: nix.yml
+  when: sway_install_method == 'nix'
+
+- name: Sway | Include Foot terminal installation
+  ansible.builtin.include_tasks: foot.yml
+  when: sway_install_foot_from_source | bool
+
+- name: Sway | Include configuration setup
+  ansible.builtin.include_tasks: config.yml
+
+- name: Sway | Include XKB keyboard configuration
+  ansible.builtin.include_tasks: xkb.yml
+  when: sway_deploy_custom_xkb_keymap | bool
+
+- name: Sway | Include Fusuma installation
+  ansible.builtin.include_tasks: fusuma.yml
+  when: sway_install_fusuma | bool
+
+- name: Sway | Include session setup
+  ansible.builtin.include_tasks: session.yml
+  when: sway_create_desktop_entry | bool

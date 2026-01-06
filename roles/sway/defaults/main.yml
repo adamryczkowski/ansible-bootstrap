@@ -1,0 +1,103 @@
+---
+# sway role defaults
+
+# Username for sway configuration
+sway_username: "{{ target_user | default(ansible_user) | default('adam') }}"
+
+# Installation method: 'nix' (recommended for latest version) or 'apt' (Ubuntu repo)
+# Note: Ubuntu 24.04 has Sway 1.9, but Nix provides 1.11+ with better features
+sway_install_method: nix
+
+# Nix packages to install (when sway_install_method is 'nix')
+# These provide the core Sway experience with latest versions
+sway_nix_packages:
+  - sway
+  - kanshi           # Dynamic display configuration (like autorandr for Wayland)
+  - wl-gammarelay-rs # Color temperature control (DBus interface)
+  - wlr-randr        # xrandr-like tool for wlroots compositors
+  - wdisplays        # GUI for display configuration
+  - nixGL            # OpenGL wrapper for Nix on non-NixOS
+
+# APT packages to install (Sway ecosystem tools)
+# These work well from Ubuntu repos and complement the Nix-installed Sway
+sway_apt_packages:
+  - waybar           # Status bar
+  - wofi             # Application launcher (rofi alternative)
+  - mako-notifier    # Notification daemon
+  - grim             # Screenshot utility
+  - slurp            # Region selection for screenshots
+  - swayidle         # Idle management daemon
+  - swaylock         # Screen locker
+  - wl-clipboard     # Clipboard utilities
+  - swaybg           # Wallpaper utility
+  - xdg-desktop-portal-wlr  # Screen sharing support
+  - xdg-desktop-portal-gtk  # GTK portal backend
+  - libnotify-bin    # notify-send command
+  - brightnessctl    # Brightness control
+  - playerctl        # Media player control
+  - network-manager-gnome  # nm-applet
+  - blueman          # Bluetooth manager
+  - pasystray        # PulseAudio system tray
+  - pavucontrol      # PulseAudio volume control
+  - xwayland         # X11 compatibility layer
+
+# Foot terminal installation (from source for latest version)
+sway_install_foot_from_source: true
+sway_foot_version: "1.25.0"
+
+# i3-config repository for Sway configuration
+sway_config_repo: "https://gitlab.com/adamwam/i3-config.git"
+sway_config_branch: "sway"  # Branch containing Sway configuration
+sway_config_dest: "/home/{{ sway_username }}/.config/i3-config"
+
+# Create symlinks for Sway configuration
+sway_create_config_symlinks: true
+
+# Symlinks to create (source relative to i3-config, dest relative to ~/.config)
+sway_config_symlinks:
+  - src: sway
+    dest: sway
+  - src: waybar
+    dest: waybar
+  - src: mako
+    dest: mako
+  - src: foot
+    dest: foot
+  - src: fusuma-sway
+    dest: fusuma
+
+# Optional components
+sway_install_fusuma: true  # Touchpad gestures
+
+# Fusuma dependencies
+sway_fusuma_packages:
+  - ruby
+  - ruby-dev
+  - libevdev-dev
+  - build-essential
+
+# Session configuration
+sway_create_desktop_entry: true
+
+# Environment variables for Sway session
+sway_environment_vars:
+  XDG_CURRENT_DESKTOP: "sway:wlroots"
+  XDG_SESSION_TYPE: "wayland"
+  MOZ_ENABLE_WAYLAND: "1"
+  QT_QPA_PLATFORM: "wayland"
+  QT_WAYLAND_DISABLE_WINDOWDECORATION: "1"
+  _JAVA_AWT_WM_NONREPARENTING: "1"
+  SDL_VIDEODRIVER: "wayland"
+  CLUTTER_BACKEND: "wayland"
+
+# XKB keyboard configuration
+# These settings configure the keyboard layout and custom modifier mappings
+sway_xkb_layout: "pl"
+sway_xkb_variant: "intl"
+
+# Enable custom XKB keymap that maps Right Control to Mod3
+# This replicates the local system's /usr/share/X11/xkb/symbols/pc modification
+sway_deploy_custom_xkb_keymap: true
+
+# XKB keymap file location (relative to i3-config repository)
+sway_xkb_keymap_path: "xkb/keymap/custom"

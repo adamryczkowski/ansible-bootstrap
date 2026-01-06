@@ -1,0 +1,16 @@
+---
+# sway role metadata
+
+galaxy_info:
+  author: Adam
+  description: Install and configure Sway window manager (Wayland compositor)
+  company: ""
+  license: MIT
+  min_ansible_version: "2.14"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+        - noble
+
+dependencies: []

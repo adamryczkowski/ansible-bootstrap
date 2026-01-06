@@ -1,0 +1,47 @@
+---
+# Sway role - Create desktop session entry for display manager
+
+- name: Sway | Ensure wayland-sessions directory exists
+  ansible.builtin.file:
+    path: /usr/share/wayland-sessions
+    state: directory
+    mode: "0755"
+    owner: root
+    group: root
+  become: true
+
+- name: Sway | Create Sway desktop entry for display manager
+  ansible.builtin.template:
+    src: sway.desktop.j2
+    dest: /usr/share/wayland-sessions/sway-nix.desktop
+    mode: "0644"
+    owner: root
+    group: root
+  become: true
+
+- name: Sway | Create environment file for Sway session
+  ansible.builtin.template:
+    src: sway-environment.j2
+    dest: "/home/{{ sway_username }}/.config/sway-environment"
+    mode: "0644"
+    owner: "{{ sway_username }}"
+    group: "{{ sway_username }}"
+  become: true
+
+- name: Sway | Ensure systemd user directory exists
+  ansible.builtin.file:
+    path: "/home/{{ sway_username }}/.config/systemd/user"
+    state: directory
+    mode: "0755"
+    owner: "{{ sway_username }}"
+    group: "{{ sway_username }}"
+  become: true
+
+- name: Sway | Create systemd user service for environment import
+  ansible.builtin.template:
+    src: sway-session.target.j2
+    dest: "/home/{{ sway_username }}/.config/systemd/user/sway-session.target"
+    mode: "0644"
+    owner: "{{ sway_username }}"
+    group: "{{ sway_username }}"
+  become: true

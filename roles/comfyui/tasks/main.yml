@@ -1,0 +1,497 @@
+---
+# ComfyUI Role - Install ComfyUI with krita-ai-diffusion support
+#
+# Purpose:
+#   Installs ComfyUI using the official comfy-cli tool and configures it
+#   with the required custom nodes for krita-ai-diffusion plugin.
+#
+# Key Variables:
+#   - comfyui_username: User to install ComfyUI for
+#   - comfyui_install_dir: Installation directory (default: ~/comfy)
+#   - comfyui_gpu_type: GPU type (nvidia, amd, intel, cpu)
+#   - comfyui_enable_service: Whether to create a systemd user service
+#
+# Dependencies:
+#   - Python 3.9+ with pip and venv
+#   - Git
+#
+# Example Usage:
+#   - role: comfyui
+#     vars:
+#       comfyui_gpu_type: nvidia
+#       comfyui_enable_service: true
+#
+# Sources:
+#   - https://docs.comfy.org/comfy-cli/getting-started
+#   - https://github.com/Comfy-Org/comfy-cli
+#   - https://github.com/Acly/krita-ai-diffusion
+#   - https://github.com/Acly/krita-ai-diffusion/blob/main/docs/src/content/docs/comfyui-setup.mdx
+#   - https://github.com/comfyanonymous/ComfyUI
+
+# =============================================================================
+# System Dependencies
+# =============================================================================
+
+- name: ComfyUI | Install system dependencies
+  ansible.builtin.apt:
+    name:
+      - python3
+      - python3-pip
+      - python3-venv
+      - python3-dev
+      - git
+      - git-lfs
+      - build-essential
+      - libgl1
+      - libglib2.0-0
+      - libsm6
+      - libxrender1
+      - libxext6
+      - ffmpeg
+    state: present
+    update_cache: true
+  become: true
+
+# =============================================================================
+# NVIDIA Driver Installation (for GPU passthrough in containers)
+# =============================================================================
+
+- name: ComfyUI | Check if NVIDIA GPU is available
+  ansible.builtin.command: ls /dev/nvidia0
+  register: comfyui_nvidia_device_check
+  failed_when: false
+  changed_when: false
+  when: comfyui_gpu_type == "nvidia"
+
+- name: ComfyUI | Install NVIDIA driver dependencies
+  ansible.builtin.apt:
+    name:
+      - ubuntu-drivers-common
+      - software-properties-common
+    state: present
+  become: true
+  when:
+    - comfyui_gpu_type == "nvidia"
+    - comfyui_nvidia_device_check.rc == 0
+
+- name: ComfyUI | Check if nvidia-smi is available
+  ansible.builtin.command: which nvidia-smi
+  register: comfyui_nvidia_smi_check
+  failed_when: false
+  changed_when: false
+  when:
+    - comfyui_gpu_type == "nvidia"
+    - comfyui_nvidia_device_check.rc == 0
+
+- name: ComfyUI | Install NVIDIA driver (headless server version)
+  ansible.builtin.apt:
+    name:
+      - nvidia-driver-535-server
+      - nvidia-utils-535-server
+    state: present
+  become: true
+  when:
+    - comfyui_gpu_type == "nvidia"
+    - comfyui_nvidia_device_check.rc == 0
+    - comfyui_nvidia_smi_check.rc != 0
+  register: comfyui_nvidia_driver_install
+
+- name: ComfyUI | Verify NVIDIA driver installation
+  ansible.builtin.command: nvidia-smi
+  register: comfyui_nvidia_smi_output
+  changed_when: false
+  when:
+    - comfyui_gpu_type == "nvidia"
+    - comfyui_nvidia_device_check.rc == 0
+
+- name: ComfyUI | Display NVIDIA GPU info
+  ansible.builtin.debug:
+    msg: "{{ comfyui_nvidia_smi_output.stdout_lines }}"
+  when:
+    - comfyui_gpu_type == "nvidia"
+    - comfyui_nvidia_device_check.rc == 0
+    - comfyui_nvidia_smi_output is defined
+
+# =============================================================================
+# Python Virtual Environment for comfy-cli
+# =============================================================================
+
+- name: ComfyUI | Create comfy-cli virtual environment directory
+  ansible.builtin.file:
+    path: "/home/{{ comfyui_username }}/.local/share/comfy-cli-venv"
+    state: directory
+    owner: "{{ comfyui_username }}"
+    group: "{{ comfyui_username }}"
+    mode: "0755"
+  become: true
+
+- name: ComfyUI | Create virtual environment for comfy-cli
+  ansible.builtin.command:
+    cmd: "{{ comfyui_python_version }} -m venv /home/{{ comfyui_username }}/.local/share/comfy-cli-venv"
+    creates: "/home/{{ comfyui_username }}/.local/share/comfy-cli-venv/bin/python"
+  become: true
+  become_user: "{{ comfyui_username }}"
+  environment:
+    HOME: "/home/{{ comfyui_username }}"
+
+- name: ComfyUI | Upgrade pip in comfy-cli venv
+  ansible.builtin.command:
+    cmd: "/home/{{ comfyui_username }}/.local/share/comfy-cli-venv/bin/pip install --upgrade pip"
+  become: true
+  become_user: "{{ comfyui_username }}"
+  environment:
+    HOME: "/home/{{ comfyui_username }}"
+  changed_when: true
+
+# =============================================================================
+# Install comfy-cli
+# =============================================================================
+
+- name: ComfyUI | Check if comfy-cli is installed
+  ansible.builtin.stat:
+    path: "/home/{{ comfyui_username }}/.local/share/comfy-cli-venv/bin/comfy"
+  register: comfyui_cli_installed
+
+- name: ComfyUI | Install comfy-cli
+  ansible.builtin.command:
+    cmd: "/home/{{ comfyui_username }}/.local/share/comfy-cli-venv/bin/pip install comfy-cli"
+  become: true
+  become_user: "{{ comfyui_username }}"
+  environment:
+    HOME: "/home/{{ comfyui_username }}"
+  when: not comfyui_cli_installed.stat.exists
+  changed_when: true
+
+- name: ComfyUI | Ensure .local/bin directory exists
+  ansible.builtin.file:
+    path: "/home/{{ comfyui_username }}/.local/bin"
+    state: directory
+    owner: "{{ comfyui_username }}"
+    group: "{{ comfyui_username }}"
+    mode: "0755"
+  become: true
+
+- name: ComfyUI | Create symlink for comfy command
+  ansible.builtin.file:
+    src: "/home/{{ comfyui_username }}/.local/share/comfy-cli-venv/bin/comfy"
+    dest: "/home/{{ comfyui_username }}/.local/bin/comfy"
+    state: link
+    owner: "{{ comfyui_username }}"
+    group: "{{ comfyui_username }}"
+  become: true
+
+- name: ComfyUI | Ensure .local/bin is in PATH
+  ansible.builtin.lineinfile:
+    path: "/home/{{ comfyui_username }}/.bashrc"
+    line: 'export PATH="$HOME/.local/bin:$PATH"'
+    create: true
+    mode: "0644"
+    owner: "{{ comfyui_username }}"
+    group: "{{ comfyui_username }}"
+  become: true
+
+# =============================================================================
+# Install ComfyUI
+# =============================================================================
+
+- name: ComfyUI | Check if ComfyUI is installed
+  ansible.builtin.stat:
+    # comfy-cli installs ComfyUI directly in the workspace directory
+    # Check for main.py which is the ComfyUI entry point
+    path: "{{ comfyui_install_dir }}/main.py"
+  register: comfyui_installed
+
+- name: ComfyUI | Install ComfyUI with manager
+  ansible.builtin.command:
+    cmd: >
+      /home/{{ comfyui_username }}/.local/share/comfy-cli-venv/bin/comfy
+      --skip-prompt
+      --workspace={{ comfyui_install_dir }}
+      install
+      --nvidia
+  become: true
+  become_user: "{{ comfyui_username }}"
+  environment:
+    HOME: "/home/{{ comfyui_username }}"
+    PATH: "/home/{{ comfyui_username }}/.local/bin:/usr/local/bin:/usr/bin:/bin"
+  when:
+    - not comfyui_installed.stat.exists
+    - comfyui_install_manager | bool
+    - comfyui_gpu_type == "nvidia"
+  changed_when: true
+  register: comfyui_install_result
+  async: 1800
+  poll: 30
+
+- name: ComfyUI | Install ComfyUI with manager (AMD GPU)
+  ansible.builtin.command:
+    cmd: >
+      /home/{{ comfyui_username }}/.local/share/comfy-cli-venv/bin/comfy
+      --skip-prompt
+      --workspace={{ comfyui_install_dir }}
+      install
+      --amd
+  become: true
+  become_user: "{{ comfyui_username }}"
+  environment:
+    HOME: "/home/{{ comfyui_username }}"
+    PATH: "/home/{{ comfyui_username }}/.local/bin:/usr/local/bin:/usr/bin:/bin"
+  when:
+    - not comfyui_installed.stat.exists
+    - comfyui_install_manager | bool
+    - comfyui_gpu_type == "amd"
+  changed_when: true
+  async: 1800
+  poll: 30
+
+- name: ComfyUI | Install ComfyUI with manager (CPU only)
+  ansible.builtin.command:
+    cmd: >
+      /home/{{ comfyui_username }}/.local/share/comfy-cli-venv/bin/comfy
+      --skip-prompt
+      --workspace={{ comfyui_install_dir }}
+      install
+      --cpu
+  become: true
+  become_user: "{{ comfyui_username }}"
+  environment:
+    HOME: "/home/{{ comfyui_username }}"
+    PATH: "/home/{{ comfyui_username }}/.local/bin:/usr/local/bin:/usr/bin:/bin"
+  when:
+    - not comfyui_installed.stat.exists
+    - comfyui_install_manager | bool
+    - comfyui_gpu_type == "cpu"
+  changed_when: true
+  async: 1800
+  poll: 30
+
+- name: ComfyUI | Set default workspace
+  ansible.builtin.command:
+    cmd: >
+      /home/{{ comfyui_username }}/.local/share/comfy-cli-venv/bin/comfy
+      --skip-prompt
+      set-default {{ comfyui_install_dir }}
+  become: true
+  become_user: "{{ comfyui_username }}"
+  environment:
+    HOME: "/home/{{ comfyui_username }}"
+  changed_when: true
+
+# =============================================================================
+# Verify PyTorch CUDA support
+# =============================================================================
+# Note: comfy-cli uses its own venv at ~/.local/share/comfy-cli-venv
+# The PyTorch installation is managed by comfy-cli
+
+- name: ComfyUI | Check if PyTorch has CUDA support
+  ansible.builtin.command:
+    cmd: >
+      /home/{{ comfyui_username }}/.local/share/comfy-cli-venv/bin/python -c
+      "import torch; print('cuda' if torch.cuda.is_available() else 'cpu')"
+  become: true
+  become_user: "{{ comfyui_username }}"
+  environment:
+    HOME: "/home/{{ comfyui_username }}"
+  register: comfyui_pytorch_cuda_check
+  changed_when: false
+  failed_when: false
+  when:
+    - comfyui_installed.stat.exists
+    - comfyui_gpu_type == "nvidia"
+
+- name: ComfyUI | Display PyTorch CUDA status
+  ansible.builtin.debug:
+    msg: "PyTorch CUDA support: {{ comfyui_pytorch_cuda_check.stdout | default('unknown') }}"
+  when:
+    - comfyui_gpu_type == "nvidia"
+    - comfyui_pytorch_cuda_check is defined
+
+- name: ComfyUI | Verify GPU device is accessible
+  ansible.builtin.command:
+    cmd: >
+      /home/{{ comfyui_username }}/.local/share/comfy-cli-venv/bin/python -c
+      "import torch; print(f'CUDA available: {torch.cuda.is_available()}, Device: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"N/A\"}')"
+  become: true
+  become_user: "{{ comfyui_username }}"
+  environment:
+    HOME: "/home/{{ comfyui_username }}"
+  register: comfyui_pytorch_cuda_verify
+  changed_when: false
+  failed_when: false
+  when:
+    - comfyui_gpu_type == "nvidia"
+    - comfyui_pytorch_cuda_check.stdout is defined
+    - comfyui_pytorch_cuda_check.stdout == "cuda"
+
+- name: ComfyUI | Display GPU device info
+  ansible.builtin.debug:
+    msg: "{{ comfyui_pytorch_cuda_verify.stdout }}"
+  when:
+    - comfyui_gpu_type == "nvidia"
+    - pytorch_cuda_verify.stdout is defined
+
+# =============================================================================
+# Install Required Custom Nodes for krita-ai-diffusion
+# =============================================================================
+
+- name: ComfyUI | Install required custom nodes for krita-ai-diffusion
+  ansible.builtin.command:
+    cmd: >
+      /home/{{ comfyui_username }}/.local/share/comfy-cli-venv/bin/comfy
+      --skip-prompt
+      --workspace={{ comfyui_install_dir }}
+      node install {{ item }}
+  loop: "{{ comfyui_required_nodes }}"
+  become: true
+  become_user: "{{ comfyui_username }}"
+  environment:
+    HOME: "/home/{{ comfyui_username }}"
+    PATH: "/home/{{ comfyui_username }}/.local/bin:/usr/local/bin:/usr/bin:/bin"
+  register: comfyui_node_install
+  changed_when: "'already installed' not in comfyui_node_install.stdout"
+  failed_when:
+    - comfyui_node_install.rc != 0
+    - "'already installed' not in comfyui_node_install.stdout"
+    - "'already exists' not in comfyui_node_install.stderr"
+
+# =============================================================================
+# Install Optional Custom Nodes
+# =============================================================================
+
+- name: ComfyUI | Install optional custom nodes for krita-ai-diffusion
+  ansible.builtin.command:
+    cmd: >
+      /home/{{ comfyui_username }}/.local/share/comfy-cli-venv/bin/comfy
+      --skip-prompt
+      --workspace={{ comfyui_install_dir }}
+      node install {{ item }}
+  loop: "{{ comfyui_optional_nodes }}"
+  become: true
+  become_user: "{{ comfyui_username }}"
+  environment:
+    HOME: "/home/{{ comfyui_username }}"
+    PATH: "/home/{{ comfyui_username }}/.local/bin:/usr/local/bin:/usr/bin:/bin"
+  register: comfyui_optional_node_install
+  changed_when: "'already installed' not in comfyui_optional_node_install.stdout"
+  failed_when:
+    - comfyui_optional_node_install.rc != 0
+    - "'already installed' not in comfyui_optional_node_install.stdout"
+    - "'already exists' not in comfyui_optional_node_install.stderr"
+  when: comfyui_install_optional_nodes | bool
+
+# =============================================================================
+# Install Extra Custom Nodes (User-defined)
+# =============================================================================
+
+- name: ComfyUI | Install extra custom nodes
+  ansible.builtin.command:
+    cmd: >
+      /home/{{ comfyui_username }}/.local/share/comfy-cli-venv/bin/comfy
+      --skip-prompt
+      --workspace={{ comfyui_install_dir }}
+      node install {{ item }}
+  loop: "{{ comfyui_extra_nodes }}"
+  become: true
+  become_user: "{{ comfyui_username }}"
+  environment:
+    HOME: "/home/{{ comfyui_username }}"
+    PATH: "/home/{{ comfyui_username }}/.local/bin:/usr/local/bin:/usr/bin:/bin"
+  register: comfyui_extra_node_install
+  changed_when: "'already installed' not in comfyui_extra_node_install.stdout"
+  failed_when:
+    - comfyui_extra_node_install.rc != 0
+    - "'already installed' not in comfyui_extra_node_install.stdout"
+    - "'already exists' not in comfyui_extra_node_install.stderr"
+  when: comfyui_extra_nodes | length > 0
+
+# =============================================================================
+# Configure Systemd User Service
+# =============================================================================
+
+- name: ComfyUI | Create systemd user directory
+  ansible.builtin.file:
+    path: "/home/{{ comfyui_username }}/.config/systemd/user"
+    state: directory
+    owner: "{{ comfyui_username }}"
+    group: "{{ comfyui_username }}"
+    mode: "0755"
+  become: true
+  when: comfyui_enable_service | bool
+
+- name: ComfyUI | Create systemd user service
+  ansible.builtin.template:
+    src: comfyui.service.j2
+    dest: "/home/{{ comfyui_username }}/.config/systemd/user/comfyui.service"
+    owner: "{{ comfyui_username }}"
+    group: "{{ comfyui_username }}"
+    mode: "0644"
+  become: true
+  when: comfyui_enable_service | bool
+
+- name: ComfyUI | Get user UID for XDG_RUNTIME_DIR
+  ansible.builtin.command:
+    cmd: "id -u {{ comfyui_username }}"
+  register: comfyui_user_uid
+  changed_when: false
+  when: comfyui_enable_service | bool
+
+- name: ComfyUI | Enable lingering for user (allows user services without login)
+  ansible.builtin.command:
+    cmd: "loginctl enable-linger {{ comfyui_username }}"
+  become: true
+  changed_when: true
+  when: comfyui_enable_service | bool
+
+- name: ComfyUI | Reload systemd user daemon
+  ansible.builtin.systemd:
+    daemon_reload: true
+    scope: user
+  become: true
+  become_user: "{{ comfyui_username }}"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ comfyui_user_uid.stdout }}"
+  when: comfyui_enable_service | bool
+  ignore_errors: true
+
+# =============================================================================
+# Display Installation Summary
+# =============================================================================
+
+- name: ComfyUI | Display installation summary
+  ansible.builtin.debug:
+    msg: |
+      ============================================================
+      ComfyUI Installation Complete!
+      ============================================================
+
+      Installation Directory: {{ comfyui_install_dir }}
+      GPU Type: {{ comfyui_gpu_type }}
+
+      Required custom nodes installed for krita-ai-diffusion:
+        - comfyui_controlnet_aux (ControlNet preprocessors)
+        - ComfyUI_IPAdapter_plus (IP-Adapter)
+        - comfyui-inpaint-nodes (Inpaint nodes)
+        - comfyui-tooling-nodes (External tooling nodes)
+
+      To start ComfyUI manually:
+        comfy --workspace={{ comfyui_install_dir }} launch
+
+      To start with network access:
+        comfy --workspace={{ comfyui_install_dir }} launch -- --listen {{ comfyui_listen_address }} --port {{ comfyui_port }}
+
+      {% if comfyui_enable_service | bool %}
+      Systemd user service created. To manage:
+        systemctl --user start comfyui
+        systemctl --user stop comfyui
+        systemctl --user enable comfyui  # Start on boot
+        systemctl --user status comfyui
+      {% endif %}
+
+      Next steps:
+        1. Download a diffusion model (checkpoint) to:
+          {{ comfyui_install_dir }}/ComfyUI/models/checkpoints/
+
+        2. Configure krita-ai-diffusion plugin to connect to:
+          http://{{ comfyui_listen_address }}:{{ comfyui_port }}
+
+      ============================================================

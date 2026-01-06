@@ -1,0 +1,34 @@
+---
+# LXD Container role defaults
+#
+# This role creates and manages LXD containers on an LXD host.
+
+# List of containers to create
+# Each container should have:
+#   - name: Container name (required)
+#   - image: Image alias (e.g., ubuntu/24.04) (required)
+#   - profiles: List of profiles to apply (default: ['default'])
+#   - config: Container configuration options (default: {})
+#   - devices: Container devices (default: {})
+#   - state: Container state (started, stopped, restarted, absent) (default: started)
+lxd_container_list: "{{ lxd_containers | default([]) }}"
+
+# Default image server (canonical LXD image server)
+lxd_container_image_server: https://images.lxd.canonical.com
+
+# Image server protocol (lxd or simplestreams)
+# Use 'simplestreams' for canonical image servers and cloud-images.ubuntu.com
+lxd_container_image_protocol: simplestreams
+
+# Default profiles
+lxd_container_default_profiles:
+  - default
+
+# Wait for container to get an IPv4 address
+lxd_container_wait_for_ipv4: true
+
+# Timeout for container operations (seconds)
+lxd_container_timeout: 600
+
+# Whether to force container recreation if it exists
+lxd_container_force: false

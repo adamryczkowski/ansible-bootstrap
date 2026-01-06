@@ -1,0 +1,92 @@
+---
+# Sway role - Clone and configure i3-config repository
+
+- name: Sway | Ensure .config directory exists
+  ansible.builtin.file:
+    path: "/home/{{ sway_username }}/.config"
+    state: directory
+    mode: "0755"
+    owner: "{{ sway_username }}"
+    group: "{{ sway_username }}"
+  become: true
+
+- name: Sway | Check if i3-config repository exists
+  ansible.builtin.stat:
+    path: "{{ sway_config_dest }}/.git"
+  register: sway_i3_config_repo
+
+- name: Sway | Clone i3-config repository
+  ansible.builtin.git:
+    repo: "{{ sway_config_repo }}"
+    dest: "{{ sway_config_dest }}"
+    version: "{{ sway_config_branch }}"
+    update: true
+    recursive: false
+  become: true
+  become_user: "{{ sway_username }}"
+  when: not sway_i3_config_repo.stat.exists
+
+- name: Sway | Update i3-config repository
+  ansible.builtin.git:
+    repo: "{{ sway_config_repo }}"
+    dest: "{{ sway_config_dest }}"
+    version: "{{ sway_config_branch }}"
+    update: true
+    recursive: false
+    force: true  # Allow overwriting local modifications (XKB keymap is managed by Ansible)
+  become: true
+  become_user: "{{ sway_username }}"
+  when: i3_config_repo.stat.exists
+
+- name: Sway | Create configuration symlinks
+  when: sway_create_config_symlinks | bool
+  block:
+    - name: Sway | Remove existing config directories if they are not symlinks
+      ansible.builtin.file:
+        path: "/home/{{ sway_username }}/.config/{{ item.dest }}"
+        state: absent
+      become: true
+      loop: "{{ sway_config_symlinks }}"
+      when: >
+        (lookup('ansible.builtin.file', '/home/' + sway_username + '/.config/' + item.dest, errors='ignore') | default('', true)) != ''
+        and not (lookup('ansible.builtin.pipe', 'test -L /home/' + sway_username + '/.config/' + item.dest + ' && echo yes || echo no', errors='ignore') | default('no', true) == 'yes')
+
+    - name: Sway | Create symlinks for Sway configuration
+      ansible.builtin.file:
+        src: "{{ sway_config_dest }}/{{ item.src }}"
+        dest: "/home/{{ sway_username }}/.config/{{ item.dest }}"
+        state: link
+        owner: "{{ sway_username }}"
+        group: "{{ sway_username }}"
+        force: true
+      become: true
+      loop: "{{ sway_config_symlinks }}"
+
+- name: Sway | Ensure XKB config directory exists
+  ansible.builtin.file:
+    path: "/home/{{ sway_username }}/.config/xkb"
+    state: directory
+    mode: "0755"
+    owner: "{{ sway_username }}"
+    group: "{{ sway_username }}"
+  become: true
+
+- name: Sway | Create XKB symlink if xkb directory exists in i3-config
+  ansible.builtin.file:
+    src: "{{ sway_config_dest }}/xkb"
+    dest: "/home/{{ sway_username }}/.config/xkb"
+    state: link
+    owner: "{{ sway_username }}"
+    group: "{{ sway_username }}"
+    force: true
+  become: true
+  when: lookup('ansible.builtin.file', sway_config_dest + '/xkb', errors='ignore') is defined
+
+- name: Sway | Ensure kanshi config directory exists
+  ansible.builtin.file:
+    path: "/home/{{ sway_username }}/.config/kanshi"
+    state: directory
+    mode: "0755"
+    owner: "{{ sway_username }}"
+    group: "{{ sway_username }}"
+  become: true

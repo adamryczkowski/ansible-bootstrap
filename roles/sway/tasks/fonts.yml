@@ -1,0 +1,65 @@
+---
+# Sway role - Install fonts for waybar and other applications
+# This includes Nerd Fonts for icon glyphs
+
+- name: Sway | Install font packages from apt
+  become: true
+  ansible.builtin.apt:
+    name:
+      - fonts-noto
+      - fonts-noto-color-emoji
+      - fonts-font-awesome
+      - fonts-firacode
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Sway | Ensure user fonts directory exists
+  ansible.builtin.file:
+    path: "/home/{{ sway_username }}/.local/share/fonts"
+    state: directory
+    mode: "0755"
+    owner: "{{ sway_username }}"
+    group: "{{ sway_username }}"
+
+- name: Sway | Check if Symbols Nerd Font is installed
+  ansible.builtin.stat:
+    path: "/home/{{ sway_username }}/.local/share/fonts/SymbolsNerdFont-Regular.ttf"
+  register: sway_nerd_font_check
+
+- name: Sway | Download Nerd Fonts Symbols
+  ansible.builtin.get_url:
+    url: "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.3.0/NerdFontsSymbolsOnly.zip"
+    dest: "/tmp/NerdFontsSymbolsOnly.zip"
+    mode: "0644"
+  when: not sway_nerd_font_check.stat.exists
+
+- name: Sway | Extract Nerd Fonts Symbols
+  ansible.builtin.unarchive:
+    src: "/tmp/NerdFontsSymbolsOnly.zip"
+    dest: "/home/{{ sway_username }}/.local/share/fonts/"
+    remote_src: true
+    owner: "{{ sway_username }}"
+    group: "{{ sway_username }}"
+  when: not sway_nerd_font_check.stat.exists
+  notify: Update font cache
+
+- name: Sway | Check if Exo2 font is installed
+  ansible.builtin.stat:
+    path: "/home/{{ sway_username }}/.local/share/fonts/Exo2-Regular.ttf"
+  register: sway_exo2_font_check
+
+- name: Sway | Download Exo2 font
+  ansible.builtin.get_url:
+    url: "https://github.com/google/fonts/raw/main/ofl/exo2/Exo2%5Bwght%5D.ttf"
+    dest: "/home/{{ sway_username }}/.local/share/fonts/Exo2-Regular.ttf"
+    mode: "0644"
+    owner: "{{ sway_username }}"
+    group: "{{ sway_username }}"
+  when: not sway_exo2_font_check.stat.exists
+  notify: Update font cache
+
+- name: Sway | Clean up downloaded zip file
+  ansible.builtin.file:
+    path: "/tmp/NerdFontsSymbolsOnly.zip"
+    state: absent

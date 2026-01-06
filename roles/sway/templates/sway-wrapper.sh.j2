@@ -1,0 +1,38 @@
+#!/bin/bash
+# Sway session wrapper script
+# This script sets up the environment and launches Sway with nixGL for OpenGL support
+
+# Source Nix profile
+if [ -e /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ]; then
+    . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
+fi
+
+# Source user's Nix profile
+if [ -e "$HOME/.nix-profile/etc/profile.d/nix.sh" ]; then
+    . "$HOME/.nix-profile/etc/profile.d/nix.sh"
+fi
+
+# Set environment variables for Wayland session
+{% for key, value in sway_environment_vars.items() %}
+export {{ key }}="{{ value }}"
+{% endfor %}
+
+# Ensure XDG runtime directory exists
+if [ -z "$XDG_RUNTIME_DIR" ]; then
+    export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+fi
+
+# Export systemd and dbus environment
+# This is needed for xdg-desktop-portal and other services
+dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP SWAYSOCK I3SOCK 2>/dev/null || true
+
+# Launch Sway with nixGL wrapper for OpenGL support
+# nixGLMesa is used for Mesa-based graphics (Intel, AMD, nouveau)
+if command -v nixGLMesa &> /dev/null; then
+    exec nixGLMesa sway "$@"
+elif command -v nixGL &> /dev/null; then
+    exec nixGL sway "$@"
+else
+    # Fallback to direct sway if nixGL is not available
+    exec sway "$@"
+fi

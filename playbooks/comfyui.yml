@@ -1,0 +1,91 @@
+---
+# ComfyUI Playbook - Install ComfyUI backend for krita-ai-diffusion
+#
+# This playbook installs and configures ComfyUI on Ubuntu 24.04 LTS
+# with all required custom nodes for the krita-ai-diffusion plugin.
+#
+# Usage:
+#   ansible-playbook playbooks/comfyui.yml -i inventory/your-inventory
+#
+# With custom variables:
+#   ansible-playbook playbooks/comfyui.yml -i inventory/your-inventory \
+#     -e "comfyui_gpu_type=nvidia" \
+#     -e "comfyui_username=myuser"
+#
+# Sources:
+#   - https://docs.comfy.org/comfy-cli/getting-started
+#   - https://github.com/Comfy-Org/comfy-cli
+#   - https://github.com/Acly/krita-ai-diffusion
+#   - https://github.com/Acly/krita-ai-diffusion/blob/main/docs/src/content/docs/comfyui-setup.mdx
+#   - https://github.com/comfyanonymous/ComfyUI
+
+- name: Install ComfyUI for krita-ai-diffusion
+  hosts: all
+  become: true
+
+  # Variables can be overridden via -e on command line or in inventory
+  # Example:
+  #   ansible-playbook playbooks/comfyui.yml -e "comfyui_gpu_type=nvidia"
+  #
+  # Available variables (see roles/comfyui/defaults/main.yml for all options):
+  #   comfyui_username: User to install for
+  #   comfyui_gpu_type: nvidia, amd, intel, cpu
+  #   comfyui_enable_service: true/false
+  #   comfyui_listen_address: 127.0.0.1 or 0.0.0.0
+  #   comfyui_port: 8188
+
+  pre_tasks:
+    - name: Verify Ubuntu version
+      ansible.builtin.assert:
+        that:
+          - ansible_distribution == "Ubuntu"
+          - ansible_distribution_version is version('22.04', '>=')
+        fail_msg: "This playbook requires Ubuntu 22.04 or later. Current: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+        success_msg: "Running on {{ ansible_distribution }} {{ ansible_distribution_version }}"
+
+    - name: Check Python version
+      ansible.builtin.command: python3 --version
+      register: python_version_check
+      changed_when: false
+
+    - name: Verify Python 3.9+
+      ansible.builtin.assert:
+        that:
+          - python_version_check.stdout is search('Python 3\.(9|1[0-9]|[2-9][0-9])')
+        fail_msg: "Python 3.9+ is required. Found: {{ python_version_check.stdout }}"
+        success_msg: "Python version OK: {{ python_version_check.stdout }}"
+
+  roles:
+    - role: comfyui
+
+  post_tasks:
+    - name: Display next steps
+      ansible.builtin.debug:
+        msg: |
+          ============================================================
+          NEXT STEPS
+          ============================================================
+
+          1. Download a diffusion model checkpoint:
+            - For SD 1.5: https://huggingface.co/runwayml/stable-diffusion-v1-5
+            - For SDXL: https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0
+            - For Flux: https://huggingface.co/black-forest-labs/FLUX.1-schnell
+
+            Place the model file in:
+            {{ comfyui_install_dir | default('~/comfy') }}/ComfyUI/models/checkpoints/
+
+          2. Start ComfyUI:
+            comfy launch
+
+            Or with network access:
+            comfy launch -- --listen 0.0.0.0 --port 8188
+
+          3. Configure krita-ai-diffusion:
+            - Open Krita
+            - Go to Settings > Configure Krita > Python Plugin Manager
+            - Enable "AI Image Diffusion"
+            - Restart Krita
+            - Go to Settings > Dockers > AI Image Diffusion
+            - Set server URL to: http://localhost:8188
+
+          ============================================================

@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- ComfyUI role for installing and configuring ComfyUI backend for krita-ai-diffusion
+- LXD container role for creating and managing LXD containers with GPU passthrough
+- Sway role for installing Sway window manager via Nix with nixGL support
+- ComfyUI playbooks: standalone (comfyui.yml) and LXD-based (comfyui_lxd.yml)
+- ComfyUI inventory for deployment configuration
+- Playbooks README.md with comprehensive documentation
 - Troubleshooting section in README.md
 - LXD E2E testing documentation in README.md
 - CONTRIBUTING.md with development guidelines
@@ -26,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Removed deprecated `parseable` option from .ansible-lint configuration
 - Pre-commit configuration file patterns (removed incorrect path prefix)
 - ansible-lint hook now uses local installation to avoid version conflicts
 - Variable naming convention: renamed `authorized_operators` to

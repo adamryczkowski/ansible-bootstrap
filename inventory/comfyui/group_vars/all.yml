@@ -1,0 +1,64 @@
+---
+# ComfyUI LXD Container Configuration
+# This configuration defines the LXD container for ComfyUI
+
+# Target user for configuration inside the container
+target_user: adam
+
+# LXD container definitions
+# Using ubuntu: remote (cloud-images.ubuntu.com) for container images
+lxd_container_image_server: https://cloud-images.ubuntu.com/releases/
+lxd_container_image_protocol: simplestreams
+
+lxd_containers:
+  - name: comfyui
+    image: "24.04"  # Ubuntu 24.04 LTS (Noble Numbat) container image
+    profiles:
+      - default
+    config:
+      # Resource limits for ComfyUI (adjust based on available resources)
+      limits.cpu: "4"
+      limits.memory: 8GB
+      # Security settings for GPU passthrough
+      # security.nesting: "true"
+    devices:
+      # GPU passthrough for NVIDIA GPU
+      # This passes the host's NVIDIA GPU to the container
+      gpu0:
+        type: gpu
+        gputype: physical
+        id: nvidia.com/gpu=0
+    # Network will use the default profile's lxdbr0 bridge (192.168.10.0/24)
+
+# ComfyUI role configuration
+comfyui_username: "{{ target_user }}"
+comfyui_gpu_type: nvidia  # Using NVIDIA GPU passthrough
+comfyui_enable_service: true
+comfyui_listen_address: "0.0.0.0"  # Allow network access from Krita
+comfyui_port: 8188
+comfyui_install_optional_nodes: false
+
+# Common packages to install in the container
+common_packages:
+  - curl
+  - wget
+  - git
+  - vim
+  - tmux
+  - unzip
+  - htop
+
+# Package configuration
+packages_update_cache: true
+packages_upgrade: true
+
+# Bashrc configuration
+bashrc_enabled: true
+
+# User setup configuration
+user_setup_create_user: true
+user_setup_username: "{{ target_user }}"
+user_setup_shell: /bin/bash
+user_setup_authorized_operators:
+  - adam@legion9
+  - adam@potwor

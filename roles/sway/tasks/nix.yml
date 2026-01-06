@@ -1,0 +1,90 @@
+---
+# Sway role - Install Nix package manager and Sway packages
+
+- name: Sway | Check if Nix is installed
+  ansible.builtin.stat:
+    path: /nix
+  register: sway_nix_installed
+
+- name: Sway | Install Nix package manager
+  when: not sway_nix_installed.stat.exists
+  block:
+    - name: Sway | Download Nix installer
+      ansible.builtin.get_url:
+        url: https://nixos.org/nix/install
+        dest: /tmp/nix-install.sh
+        mode: "0755"
+      become: true
+      become_user: "{{ sway_username }}"
+
+    - name: Sway | Run Nix installer (multi-user)
+      ansible.builtin.command:
+        cmd: sh /tmp/nix-install.sh --daemon --yes
+      become: true
+      register: sway_nix_install_result
+      changed_when: sway_nix_install_result.rc == 0
+
+    - name: Sway | Clean up Nix installer
+      ansible.builtin.file:
+        path: /tmp/nix-install.sh
+        state: absent
+      become: true
+
+- name: Sway | Ensure Nix profile is sourced in bashrc
+  ansible.builtin.lineinfile:
+    path: "/home/{{ sway_username }}/.bashrc"
+    line: '[ -e /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ] && . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh'
+    state: present
+    create: true
+    mode: "0644"
+    owner: "{{ sway_username }}"
+    group: "{{ sway_username }}"
+  become: true
+
+- name: Sway | Ensure Nix profile is sourced in profile
+  ansible.builtin.lineinfile:
+    path: "/home/{{ sway_username }}/.profile"
+    line: '[ -e /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ] && . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh'
+    state: present
+    create: true
+    mode: "0644"
+    owner: "{{ sway_username }}"
+    group: "{{ sway_username }}"
+  become: true
+
+- name: Sway | Add nixGL channel for OpenGL support
+  ansible.builtin.command:
+    cmd: >
+      bash -lc 'nix-channel --add https://github.com/nix-community/nixGL/archive/main.tar.gz nixgl &&
+      nix-channel --update'
+  become: true
+  become_user: "{{ sway_username }}"
+  register: sway_nixgl_channel_result
+  changed_when: "'unpacking' in sway_nixgl_channel_result.stdout"
+
+- name: Sway | Install Sway and related packages via Nix
+  ansible.builtin.command:
+    cmd: "bash -lc 'nix-env -iA nixpkgs.{{ item }}'"
+  become: true
+  become_user: "{{ sway_username }}"
+  loop: "{{ sway_nix_packages | reject('equalto', 'nixGL') | list }}"
+  register: sway_nix_pkg_install_result
+  changed_when: "'installing' in sway_nix_pkg_install_result.stdout"
+
+- name: Sway | Install nixGL for OpenGL wrapper
+  ansible.builtin.command:
+    cmd: "bash -lc 'nix-env -iA nixgl.auto.nixGLDefault'"
+  become: true
+  become_user: "{{ sway_username }}"
+  register: sway_nixgl_install_result
+  changed_when: "'installing' in sway_nixgl_install_result.stdout"
+  when: "'nixGL' in sway_nix_packages"
+
+- name: Sway | Create sway wrapper script with nixGL
+  ansible.builtin.template:
+    src: sway-wrapper.sh.j2
+    dest: /usr/local/bin/sway-session
+    mode: "0755"
+    owner: root
+    group: root
+  become: true

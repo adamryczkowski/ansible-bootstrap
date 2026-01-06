@@ -1,0 +1,42 @@
+---
+# XDG Desktop Portal configuration for Sway
+# This configures the portal backends to work properly with Sway/wlroots
+
+- name: Install XDG Desktop Portal packages
+  become: true
+  ansible.builtin.apt:
+    name:
+      - xdg-desktop-portal
+      - xdg-desktop-portal-gtk
+      - xdg-desktop-portal-wlr
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Deploy Sway portal configuration
+  become: true
+  ansible.builtin.template:
+    src: sway-portals.conf.j2
+    dest: /usr/share/xdg-desktop-portal/sway-portals.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart xdg-desktop-portal
+
+- name: Ensure Sway config.d directory exists
+  become: true
+  ansible.builtin.file:
+    path: /etc/sway/config.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Deploy portal environment config for Sway
+  become: true
+  ansible.builtin.template:
+    src: 50-portal-env.conf.j2
+    dest: /etc/sway/config.d/50-portal-env.conf
+    owner: root
+    group: root
+    mode: "0644"

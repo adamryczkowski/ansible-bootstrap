@@ -1,0 +1,18 @@
+---
+# Sway role - Install APT packages for Sway ecosystem
+
+- name: Sway | Install Sway ecosystem packages from apt
+  ansible.builtin.apt:
+    name: "{{ sway_apt_packages }}"
+    state: present
+    update_cache: true
+  become: true
+
+- name: Sway | Ensure Pictures/Screenshots directory exists
+  ansible.builtin.file:
+    path: "/home/{{ sway_username }}/Pictures/Screenshots"
+    state: directory
+    mode: "0755"
+    owner: "{{ sway_username }}"
+    group: "{{ sway_username }}"
+  become: true

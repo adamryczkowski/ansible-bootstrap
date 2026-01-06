@@ -1,0 +1,21 @@
+// Custom XKB keymap for Sway
+// Replicates the custom /usr/share/X11/xkb/symbols/pc modification
+// where Right Control is mapped to Mod3 instead of Control
+// Managed by Ansible - do not edit manually
+
+xkb_keymap {
+    xkb_keycodes { include "evdev+aliases(qwerty)" };
+    xkb_types    { include "complete" };
+    xkb_compat   { include "complete" };
+    xkb_symbols  {
+        include "pc+{{ sway_xkb_layout }}({{ sway_xkb_variant }})+inet(evdev)"
+
+        // Override: Remove Control_R from Control modifier, map it to Mod3 instead
+        // First, redefine Control modifier to only include Control_L
+        modifier_map Control { Control_L };
+        // Then, map Control_R to Mod3
+        key <RCTL> { [ Control_R ] };
+        modifier_map Mod3 { Control_R };
+    };
+    xkb_geometry { include "pc(pc105)" };
+};

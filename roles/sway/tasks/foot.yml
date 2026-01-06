@@ -1,0 +1,96 @@
+---
+# Sway role - Install Foot terminal from source for latest version
+
+- name: Sway | Check if Foot is already installed
+  ansible.builtin.command:
+    cmd: /usr/local/bin/foot --version
+  register: sway_foot_version_check
+  changed_when: false
+  failed_when: false
+
+- name: Sway | Install Foot build dependencies
+  ansible.builtin.apt:
+    name:
+      - meson
+      - ninja-build
+      - pkg-config
+      - scdoc
+      - wayland-protocols
+      - libwayland-dev
+      - libpixman-1-dev
+      - libfontconfig-dev
+      - libfreetype-dev
+      - libxkbcommon-dev
+      - libutf8proc-dev
+      - libfcft-dev
+      - libnotify-dev
+      - libtllist-dev
+      - check
+      - libsystemd-dev
+    state: present
+    update_cache: true
+  become: true
+  when: sway_foot_version_check.rc != 0 or sway_foot_version not in (sway_foot_version_check.stdout | default(''))
+
+- name: Sway | Create build directory
+  ansible.builtin.file:
+    path: /tmp/foot-build
+    state: directory
+    mode: "0755"
+  become: true
+  become_user: "{{ sway_username }}"
+  when: sway_foot_version_check.rc != 0 or sway_foot_version not in (sway_foot_version_check.stdout | default(''))
+
+- name: Sway | Download Foot source
+  ansible.builtin.get_url:
+    url: "https://codeberg.org/dnkl/foot/archive/{{ sway_foot_version }}.tar.gz"
+    dest: "/tmp/foot-build/foot-{{ sway_foot_version }}.tar.gz"
+    mode: "0644"
+  become: true
+  become_user: "{{ sway_username }}"
+  when: sway_foot_version_check.rc != 0 or sway_foot_version not in (sway_foot_version_check.stdout | default(''))
+
+- name: Sway | Extract Foot source
+  ansible.builtin.unarchive:
+    src: "/tmp/foot-build/foot-{{ sway_foot_version }}.tar.gz"
+    dest: /tmp/foot-build
+    remote_src: true
+  become: true
+  become_user: "{{ sway_username }}"
+  when: sway_foot_version_check.rc != 0 or sway_foot_version not in (sway_foot_version_check.stdout | default(''))
+
+- name: Sway | Configure Foot with meson
+  ansible.builtin.command:
+    cmd: meson setup build --prefix=/usr/local --buildtype=release
+    chdir: /tmp/foot-build/foot
+  become: true
+  become_user: "{{ sway_username }}"
+  register: sway_meson_setup
+  changed_when: sway_meson_setup.rc == 0
+  when: sway_foot_version_check.rc != 0 or sway_foot_version not in (sway_foot_version_check.stdout | default(''))
+
+- name: Sway | Build Foot
+  ansible.builtin.command:
+    cmd: ninja -C build
+    chdir: /tmp/foot-build/foot
+  become: true
+  become_user: "{{ sway_username }}"
+  register: sway_ninja_build
+  changed_when: sway_ninja_build.rc == 0
+  when: sway_foot_version_check.rc != 0 or sway_foot_version not in (sway_foot_version_check.stdout | default(''))
+
+- name: Sway | Install Foot
+  ansible.builtin.command:
+    cmd: ninja -C build install
+    chdir: /tmp/foot-build/foot
+  become: true
+  register: sway_ninja_install
+  changed_when: sway_ninja_install.rc == 0
+  when: sway_foot_version_check.rc != 0 or sway_foot_version not in (sway_foot_version_check.stdout | default(''))
+
+- name: Sway | Clean up Foot build directory
+  ansible.builtin.file:
+    path: /tmp/foot-build
+    state: absent
+  become: true
+  when: sway_foot_version_check.rc != 0 or sway_foot_version not in (sway_foot_version_check.stdout | default(''))

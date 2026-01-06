@@ -1,0 +1,23 @@
+---
+# Sway role handlers
+
+- name: Reload udev rules
+  ansible.builtin.shell:
+    cmd: udevadm control --reload-rules && udevadm trigger
+  become: true
+  listen: Reload udev rules
+
+- name: Restart xdg-desktop-portal
+  ansible.builtin.systemd:
+    name: xdg-desktop-portal
+    scope: user
+    state: restarted
+  become: false
+  listen: Restart xdg-desktop-portal
+  ignore_errors: true  # May fail if not in a graphical session
+
+- name: Update font cache
+  ansible.builtin.command:
+    cmd: fc-cache -fv
+  become: false
+  listen: Update font cache

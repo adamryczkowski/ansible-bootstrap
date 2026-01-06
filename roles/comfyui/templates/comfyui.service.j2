@@ -1,0 +1,22 @@
+[Unit]
+Description=ComfyUI - Stable Diffusion GUI
+Documentation=https://github.com/comfyanonymous/ComfyUI
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory={{ comfyui_install_dir }}/ComfyUI
+ExecStart={{ comfyui_install_dir }}/.venv/bin/python main.py --listen {{ comfyui_listen_address }} --port {{ comfyui_port }}
+Restart=on-failure
+RestartSec=10
+
+# Environment
+Environment="HOME=/home/{{ comfyui_username }}"
+Environment="PATH={{ comfyui_install_dir }}/.venv/bin:/usr/local/bin:/usr/bin:/bin"
+
+# Resource limits (optional, adjust as needed)
+# MemoryMax=32G
+# CPUQuota=400%
+
+[Install]
+WantedBy=default.target

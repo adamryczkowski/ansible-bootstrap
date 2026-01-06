@@ -1,0 +1,9 @@
+# XDG Desktop Portal environment setup for Sway
+# This file is included by Sway via /etc/sway/config.d/
+# Managed by Ansible - do not edit manually
+#
+# This command imports the necessary environment variables into the
+# systemd user session and D-Bus activation environment, which is
+# required for xdg-desktop-portal-wlr to work properly.
+
+exec dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP=sway

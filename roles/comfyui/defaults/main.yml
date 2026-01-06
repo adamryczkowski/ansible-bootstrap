@@ -1,0 +1,51 @@
+---
+# Default variables for comfyui role
+#
+# This role installs ComfyUI and configures it for use with krita-ai-diffusion plugin.
+# It uses the official comfy-cli tool for installation and management.
+
+# Username to install ComfyUI for
+comfyui_username: "{{ target_user | default(ansible_user) | default('adam') }}"
+
+# ComfyUI installation directory
+# Default is ~/comfy as recommended by comfy-cli
+comfyui_install_dir: "/home/{{ comfyui_username }}/comfy"
+
+# Whether to install ComfyUI Manager (recommended)
+comfyui_install_manager: true
+
+# Python version to use (must be 3.9+)
+comfyui_python_version: "python3"
+
+# GPU type: nvidia, amd, intel, cpu
+# This affects PyTorch installation
+comfyui_gpu_type: "nvidia"
+
+# Whether to configure ComfyUI as a systemd user service
+comfyui_enable_service: true
+
+# Port for ComfyUI server
+comfyui_port: 8188
+
+# Listen address (0.0.0.0 for network access, 127.0.0.1 for local only)
+comfyui_listen_address: "127.0.0.1"
+
+# Required custom nodes for krita-ai-diffusion
+# These are installed automatically
+comfyui_required_nodes:
+  - "https://github.com/Fannovel16/comfyui_controlnet_aux"
+  - "https://github.com/cubiq/ComfyUI_IPAdapter_plus"
+  - "https://github.com/Acly/comfyui-inpaint-nodes"
+  - "https://github.com/Acly/comfyui-tooling-nodes"
+
+# Optional custom nodes for krita-ai-diffusion
+# Set to true to install these additional nodes
+comfyui_install_optional_nodes: false
+
+# Optional nodes (installed if comfyui_install_optional_nodes is true)
+comfyui_optional_nodes:
+  - "https://github.com/city96/ComfyUI-GGUF"
+  - "https://github.com/nunchaku-tech/ComfyUI-nunchaku"
+
+# Additional custom nodes to install (user-defined)
+comfyui_extra_nodes: []

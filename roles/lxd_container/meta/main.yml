@@ -1,0 +1,19 @@
+---
+# LXD Container role metadata
+
+galaxy_info:
+  author: Adam
+  description: Create and manage LXD containers
+  company: ""
+  license: MIT
+  min_ansible_version: "2.14"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+        - noble
+
+dependencies: []
+
+collections:
+  - community.general

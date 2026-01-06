@@ -1,0 +1,178 @@
+---
+# ComfyUI LXD Playbook - Create LXD container and install ComfyUI
+#
+# This playbook:
+# 1. Creates an LXD container on the specified host
+# 2. Configures the container with basic packages and user setup
+# 3. Installs ComfyUI with krita-ai-diffusion support
+#
+# Usage:
+#   ansible-playbook playbooks/comfyui_lxd.yml -i inventory/comfyui
+#
+# Prerequisites:
+#   - LXD must be installed and configured on the target host
+#   - The lxdbr0 bridge should be configured for the 192.168.10.0/24 network
+
+# =============================================================================
+# Play 1: Create LXD Container on Host
+# =============================================================================
+
+- name: Create LXD container for ComfyUI
+  hosts: lxd_hosts
+  become: false
+  gather_facts: true
+
+  pre_tasks:
+    - name: Verify LXD is available
+      ansible.builtin.command: lxc --version
+      register: lxd_version_check
+      changed_when: false
+      failed_when: lxd_version_check.rc != 0
+
+    - name: Display LXD version
+      ansible.builtin.debug:
+        msg: "LXD version: {{ lxd_version_check.stdout }}"
+
+  roles:
+    - role: lxd_container
+      tags: [lxd, container]
+
+  post_tasks:
+    - name: Get container IP address
+      ansible.builtin.command: "lxc list comfyui --format json"
+      register: lxd_comfyui_info
+      changed_when: false
+
+    - name: Parse container IP
+      ansible.builtin.set_fact:
+        lxd_comfyui_ip: >-
+          {{
+            (lxd_comfyui_info.stdout | from_json)[0].state.network.eth0.addresses
+            | selectattr('family', 'equalto', 'inet')
+            | map(attribute='address')
+            | first
+          }}
+      when: (lxd_comfyui_info.stdout | from_json) | length > 0
+
+    - name: Display container information
+      ansible.builtin.debug:
+        msg: |
+          ============================================================
+          LXD Container Created Successfully!
+          ============================================================
+          Container Name: comfyui
+          Container IP: {{ lxd_comfyui_ip | default('Not available yet') }}
+          ============================================================
+
+    - name: Add container to in-memory inventory
+      ansible.builtin.add_host:
+        name: comfyui
+        groups: lxd_containers
+        ansible_host: "{{ lxd_comfyui_ip }}"
+        ansible_user: "{{ target_user }}"
+        ansible_ssh_common_args: "-o ProxyJump={{ ansible_user }}@{{ ansible_host }} -o StrictHostKeyChecking=no"
+        ansible_python_interpreter: /usr/bin/python3
+      when: lxd_comfyui_ip is defined
+
+# =============================================================================
+# Play 2: Configure Container Base System
+# =============================================================================
+
+- name: Configure ComfyUI container base system
+  hosts: comfyui
+  become: true
+  gather_facts: true
+
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+
+  pre_tasks:
+    - name: Wait for container to be fully ready
+      ansible.builtin.wait_for_connection:
+        timeout: 60
+
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install Python (required for Ansible)
+      ansible.builtin.raw: apt-get install -y python3 python3-apt
+      changed_when: true
+
+    - name: Gather facts after Python installation
+      ansible.builtin.setup:
+
+  roles:
+    - role: common
+      tags: [common]
+
+    - role: packages
+      tags: [packages]
+
+# =============================================================================
+# Play 3: Create User and Install ComfyUI
+# =============================================================================
+
+- name: Install ComfyUI in container
+  hosts: comfyui
+  become: true
+  gather_facts: true
+
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+
+  pre_tasks:
+    - name: Ensure target user exists
+      ansible.builtin.user:
+        name: "{{ target_user }}"
+        shell: /bin/bash
+        create_home: true
+        groups: sudo
+        append: true
+        state: present
+
+    - name: Ensure passwordless sudo for user
+      ansible.builtin.lineinfile:
+        path: /etc/sudoers.d/{{ target_user }}
+        line: "{{ target_user }} ALL=(ALL) NOPASSWD:ALL"
+        create: true
+        mode: "0440"
+        validate: "visudo -cf %s"
+
+  roles:
+    - role: comfyui
+      tags: [comfyui]
+
+  post_tasks:
+    - name: Get container IP for final message
+      ansible.builtin.command: hostname -I
+      register: lxd_container_hostname
+      changed_when: false
+
+    - name: Display final installation summary
+      ansible.builtin.debug:
+        msg: |
+          ============================================================
+          ComfyUI Installation Complete!
+          ============================================================
+
+          Container Name: comfyui
+          Container IP: {{ lxd_container_hostname.stdout | trim }}
+
+          ComfyUI is installed at: /home/{{ target_user }}/comfy
+
+          To access ComfyUI:
+            1. Start ComfyUI service:
+              lxc exec comfyui -- sudo -u {{ target_user }} systemctl --user start comfyui
+
+            2. Or start manually:
+              lxc exec comfyui -- sudo -u {{ target_user }} bash -c 'cd ~/comfy && comfy launch -- --listen 0.0.0.0'
+
+            3. Access from browser or Krita:
+              http://{{ lxd_container_hostname.stdout | trim }}:{{ comfyui_port }}
+
+          To connect from Krita AI Diffusion:
+            - Set server URL to: http://{{ lxd_container_hostname.stdout | trim }}:{{ comfyui_port }}
+
+          ============================================================
