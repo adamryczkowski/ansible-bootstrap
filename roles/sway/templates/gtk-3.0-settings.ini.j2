@@ -1,0 +1,36 @@
+[Settings]
+# GTK-3 settings for Sway
+#
+# Theme switching is handled by the set-dark-mode/set-light-mode scripts
+# in ~/.config/i3-config/sway/scripts/. These scripts update both:
+# 1. gsettings (org.gnome.desktop.interface) - primary mechanism
+# 2. This file (settings.ini) - fallback for apps that don't read gsettings
+#
+# The scripts use sed to update gtk-theme-name and gtk-application-prefer-dark-theme
+# so these lines must be present for the fallback mechanism to work.
+
+# Theme settings (updated by set-dark-mode/set-light-mode scripts)
+gtk-application-prefer-dark-theme={{ '1' if sway_gtk_color_scheme == 'prefer-dark' else '0' }}
+gtk-theme-name={{ sway_gtk_theme_name }}{{ '-dark' if sway_gtk_color_scheme == 'prefer-dark' else '' }}
+
+# Icon and cursor themes
+gtk-icon-theme-name={{ sway_gtk_icon_theme_name }}
+gtk-cursor-theme-name={{ sway_gtk_cursor_theme_name }}
+gtk-cursor-theme-size=24
+
+# Font settings
+gtk-font-name={{ sway_gtk_font_name }}
+
+# UI behavior settings
+gtk-toolbar-style=GTK_TOOLBAR_BOTH_HORIZ
+gtk-toolbar-icon-size=GTK_ICON_SIZE_LARGE_TOOLBAR
+gtk-button-images=1
+gtk-menu-images=1
+gtk-enable-event-sounds=1
+gtk-enable-input-feedback-sounds=0
+
+# Font rendering
+gtk-xft-antialias=1
+gtk-xft-hinting=1
+gtk-xft-hintstyle=hintfull
+gtk-xft-rgba=rgb

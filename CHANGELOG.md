@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Sway role: PCManFM file manager with automatic dark/light theme switching via gsettings
+- Sway role: GTK theme configuration task (gtk_theme.yml) for dconf-based theme management
+- Documentation: GTK theme switching guide (docs/gtk-theme-switching.md)
 - Sway role: iotop configuration for disk traffic monitoring in waybar (installs iotop-c with capabilities)
 - Sway role: usbmon configuration for USB traffic monitoring in waybar (kernel module, udev rules, sudoers)
 - Sway role: Slack Wayland compatibility fix (desktop entry override with GPU/EGL workaround flags)

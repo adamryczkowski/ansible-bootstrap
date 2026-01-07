@@ -31,7 +31,7 @@ sway_apt_packages:
   - wl-clipboard     # Clipboard utilities
   - swaybg           # Wallpaper utility
   - xdg-desktop-portal-wlr  # Screen sharing support
-  - xdg-desktop-portal-gtk  # GTK portal backend
+  - xdg-desktop-portal-gtk  # GTK portal backend (required for gsettings theme switching)
   - libnotify-bin    # notify-send command
   - brightnessctl    # Brightness control
   - playerctl        # Media player control
@@ -41,6 +41,7 @@ sway_apt_packages:
   - pavucontrol      # PulseAudio volume control
   - xwayland         # X11 compatibility layer
   - nethogs          # Network traffic monitor (for waybar)
+  - pcmanfm          # Lightweight file manager with GTK theme support
 
 # Nethogs sudoers configuration
 # Allows the user to run nethogs without password for waybar network traffic display
@@ -138,3 +139,21 @@ sway_configure_slack_wayland: true
 # Slack binary and icon paths (for desktop entry override)
 sway_slack_binary_path: "/usr/lib/slack/slack"
 sway_slack_icon_path: "/usr/share/pixmaps/slack.png"
+
+# GTK theme configuration for automatic dark/light mode switching
+# This enables PCManFM and other GTK apps to follow the system theme
+# The theme is controlled via gsettings (org.gnome.desktop.interface)
+# and the set-dark-mode/set-light-mode scripts in the i3-config repository
+sway_configure_gtk_theme: true
+
+# Initial GTK theme settings (applied via dconf/gsettings)
+# These are the default values; the set-dark-mode/set-light-mode scripts
+# will update these at runtime for theme switching
+sway_gtk_theme_name: "Adwaita"
+sway_gtk_icon_theme_name: "Adwaita"
+sway_gtk_cursor_theme_name: "Adwaita"
+sway_gtk_font_name: "Sans 10"
+
+# Color scheme preference: 'prefer-dark', 'prefer-light', or 'default'
+# This controls GTK4 apps and is used by the theme switching scripts
+sway_gtk_color_scheme: "prefer-dark"

@@ -39,6 +39,10 @@
 - name: Sway | Include configuration setup
   ansible.builtin.include_tasks: config.yml
 
+- name: Sway | Include GTK theme configuration for automatic dark/light mode
+  ansible.builtin.include_tasks: gtk_theme.yml
+  when: sway_configure_gtk_theme | bool
+
 - name: Sway | Include XKB keyboard configuration
   ansible.builtin.include_tasks: xkb.yml
   when: sway_deploy_custom_xkb_keymap | bool

@@ -1,0 +1,71 @@
+---
+# Sway role - GTK theme configuration for automatic dark/light mode switching
+#
+# This task configures GTK apps (like PCManFM) to follow the system theme
+# via gsettings. The theme can be switched at runtime using the
+# set-dark-mode and set-light-mode scripts in the i3-config repository.
+#
+# Key points for automatic theme switching:
+# 1. GTK theme is controlled via gsettings (org.gnome.desktop.interface)
+# 2. xdg-desktop-portal-gtk must be running for gsettings to work on Wayland
+# 3. The ~/.config/gtk-3.0/settings.ini file should NOT hardcode the theme
+#    (gsettings takes precedence when xdg-desktop-portal-gtk is running)
+# 4. PCManFM and other GTK3 apps will automatically follow gsettings
+
+- name: Sway GTK | Ensure gtk-3.0 config directory exists
+  ansible.builtin.file:
+    path: "/home/{{ sway_username }}/.config/gtk-3.0"
+    state: directory
+    mode: "0755"
+    owner: "{{ sway_username }}"
+    group: "{{ sway_username }}"
+  become: true
+
+- name: Sway GTK | Deploy GTK-3 settings.ini (without hardcoded theme)
+  ansible.builtin.template:
+    src: gtk-3.0-settings.ini.j2
+    dest: "/home/{{ sway_username }}/.config/gtk-3.0/settings.ini"
+    owner: "{{ sway_username }}"
+    group: "{{ sway_username }}"
+    mode: "0644"
+  become: true
+
+- name: Sway GTK | Configure GTK theme via dconf (color-scheme)
+  community.general.dconf:
+    key: "/org/gnome/desktop/interface/color-scheme"
+    value: "'{{ sway_gtk_color_scheme }}'"
+    state: present
+  become: true
+  become_user: "{{ sway_username }}"
+
+- name: Sway GTK | Configure GTK theme via dconf (gtk-theme)
+  community.general.dconf:
+    key: "/org/gnome/desktop/interface/gtk-theme"
+    value: "'{{ sway_gtk_theme_name }}{{ '-dark' if sway_gtk_color_scheme == 'prefer-dark' else '' }}'"
+    state: present
+  become: true
+  become_user: "{{ sway_username }}"
+
+- name: Sway GTK | Configure icon theme via dconf
+  community.general.dconf:
+    key: "/org/gnome/desktop/interface/icon-theme"
+    value: "'{{ sway_gtk_icon_theme_name }}'"
+    state: present
+  become: true
+  become_user: "{{ sway_username }}"
+
+- name: Sway GTK | Configure cursor theme via dconf
+  community.general.dconf:
+    key: "/org/gnome/desktop/interface/cursor-theme"
+    value: "'{{ sway_gtk_cursor_theme_name }}'"
+    state: present
+  become: true
+  become_user: "{{ sway_username }}"
+
+- name: Sway GTK | Configure font via dconf
+  community.general.dconf:
+    key: "/org/gnome/desktop/interface/font-name"
+    value: "'{{ sway_gtk_font_name }}'"
+    state: present
+  become: true
+  become_user: "{{ sway_username }}"
