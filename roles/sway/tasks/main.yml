@@ -37,6 +37,10 @@
   ansible.builtin.include_tasks: fusuma.yml
   when: sway_install_fusuma | bool
 
+- name: Sway | Include nethogs sudoers configuration
+  ansible.builtin.include_tasks: nethogs.yml
+  when: sway_configure_nethogs_sudoers | bool
+
 - name: Sway | Include session setup
   ansible.builtin.include_tasks: session.yml
   when: sway_create_desktop_entry | bool

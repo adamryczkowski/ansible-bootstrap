@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ComfyUI role for installing and configuring ComfyUI backend for krita-ai-diffusion
 - LXD container role for creating and managing LXD containers with GPU passthrough
 - Sway role for installing Sway window manager via Nix with nixGL support
+- Sway role: nethogs sudoers configuration for waybar network traffic display
 - ComfyUI playbooks: standalone (comfyui.yml) and LXD-based (comfyui_lxd.yml)
 - ComfyUI inventory for deployment configuration
 - Playbooks README.md with comprehensive documentation
@@ -40,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Molecule verification path in lxd-e2e scenario
 - LXD preseed template syntax for storage pool configuration
 - Rust role error handling for already-installed packages
+- Sway role: variable name typo in config.yml (`i3_config_repo` → `sway_i3_config_repo`)
 
 ## [0.1.0] - 2025-12-25
 

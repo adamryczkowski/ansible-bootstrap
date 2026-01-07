@@ -40,6 +40,11 @@ sway_apt_packages:
   - pasystray        # PulseAudio system tray
   - pavucontrol      # PulseAudio volume control
   - xwayland         # X11 compatibility layer
+  - nethogs          # Network traffic monitor (for waybar)
+
+# Nethogs sudoers configuration
+# Allows the user to run nethogs without password for waybar network traffic display
+sway_configure_nethogs_sudoers: true
 
 # Foot terminal installation (from source for latest version)
 sway_install_foot_from_source: true

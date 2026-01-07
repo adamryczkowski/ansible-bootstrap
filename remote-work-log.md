@@ -500,3 +500,169 @@ potwor                     : ok=13   changed=1    unreachable=0    failed=0    s
 3. **PyTorch detects CUDA** - CUDA is available and the GPU device is recognized
 4. **ComfyUI is ready** - All required custom nodes for krita-ai-diffusion are installed
 5. **Systemd service created** - ComfyUI can be started as a user service
+
+---
+
+## Session 6: Sway Desktop Installation on SK-PF3D0A9T
+
+### Session 6 Host Information
+
+- **Host**: 192.168.42.205 (SK-PF3D0A9T)
+- **User**: adam
+- **OS**: Ubuntu 24.04.3 LTS (Noble Numbat)
+- **Kernel**: 6.14.0-37-generic x86_64
+- **Purpose**: Install Sway desktop environment using Ansible playbook
+
+### Session 6 Commands Executed
+
+#### 1. Verify host connectivity and OS version
+
+- **Intention**: Confirm SSH access and check OS version
+- **Command**: `hostname && cat /etc/os-release | head -5`
+- **Output**:
+
+  ```text
+  SK-PF3D0A9T
+  PRETTY_NAME="Ubuntu 24.04.3 LTS"
+  NAME="Ubuntu"
+  VERSION_ID="24.04"
+  VERSION="24.04.3 LTS (Noble Numbat)"
+  VERSION_CODENAME=noble
+  ```
+
+- **Interpretation**: Host is Ubuntu 24.04.3 LTS, compatible with the Sway playbook
+
+#### 2. Check if Sway is already installed
+
+- **Intention**: Verify Sway is not already installed
+- **Command**: `which sway && sway --version`
+- **Output**: (empty - command failed)
+- **Interpretation**: Sway is not installed, proceed with installation
+
+#### 3. Check sudo access
+
+- **Intention**: Verify sudo works for Ansible become
+- **Command**: `sudo -n true && echo "sudo works"`
+- **Output**: `sudo: a password is required`
+- **Interpretation**: Sudo requires password, need to use `--ask-become-pass` with Ansible
+
+### Session 6 Issues Encountered and Resolved
+
+#### 1. Python cffi module missing on remote host
+
+- **Problem**: Ansible apt module failed with `ModuleNotFoundError: No module named '_cffi_backend'`
+- **Cause**: Remote host uses pyenv with Python 3.12.11, which doesn't have cffi installed. System Python has it.
+- **Solution**: Added `-e "ansible_python_interpreter=/usr/bin/python3"` to use system Python
+
+#### 2. Variable name typo in sway role
+
+- **Problem**: Task "Sway | Update i3-config repository" failed with `'i3_config_repo' is undefined`
+- **Cause**: Variable name mismatch - task referenced `i3_config_repo` but previous task registered `sway_i3_config_repo`
+- **Solution**: Fixed [`roles/sway/tasks/config.yml`](roles/sway/tasks/config.yml:39) line 39 to use `sway_i3_config_repo.stat.exists`
+
+#### 3. Git sway branch not fetched
+
+- **Problem**: Git checkout failed with `fatal: 'origin/sway' is not a commit and a branch 'sway' cannot be created from it`
+- **Cause**: Repository was cloned with single-branch refspec (`+refs/heads/master:refs/remotes/origin/master`)
+- **Solution**: Manually fixed on remote host:
+
+  ```bash
+  cd ~/.config/i3-config
+  git remote set-branches origin '*'
+  git fetch origin
+  ```
+
+### Final Ansible Playbook Run
+
+```bash
+ansible-playbook playbooks/sway.yml -i "adam@192.168.42.205," --ask-become-pass -e "ansible_python_interpreter=/usr/bin/python3"
+```
+
+**Result**:
+
+```text
+PLAY RECAP *********************************************************************
+adam@192.168.42.205        : ok=53   changed=13   unreachable=0    failed=0    skipped=19   rescued=0    ignored=0
+```
+
+### Session 6 What Was Installed
+
+#### Via Nix Package Manager
+
+- **Sway** - Wayland compositor (version 1.11+)
+- **kanshi** - Dynamic display configuration
+- **wl-gammarelay-rs** - Color temperature control
+- **wlr-randr** - xrandr-like tool for wlroots
+- **wdisplays** - GUI for display configuration
+- **nixGL** - OpenGL wrapper for Nix on non-NixOS
+
+#### Via APT
+
+- **waybar** - Status bar
+- **wofi** - Application launcher
+- **mako-notifier** - Notification daemon
+- **grim, slurp** - Screenshot utilities
+- **swayidle, swaylock** - Idle management and screen locker
+- **wl-clipboard** - Clipboard utilities
+- **xdg-desktop-portal-wlr, xdg-desktop-portal-gtk** - Portal backends
+- **brightnessctl, playerctl** - Hardware control
+- **network-manager-gnome, blueman, pasystray, pavucontrol** - System tray apps
+- **xwayland** - X11 compatibility layer
+
+#### Compiled from Source
+
+- **Foot terminal 1.25.0** - Fast Wayland terminal
+
+#### Configuration
+
+- **i3-config repository** cloned to `~/.config/i3-config` (sway branch)
+- **Symlinks created** for sway, waybar, mako, foot, fusuma configs
+- **XKB custom keymap** deployed for keyboard configuration
+- **XDG Desktop Portal** configured for Sway/wlroots
+- **Fonts installed**: Nerd Fonts Symbols, Exo2
+
+#### Session Entry
+
+- **Desktop entry**: `/usr/share/wayland-sessions/sway-nix.desktop`
+- **Session wrapper**: `/usr/local/bin/sway-session`
+
+### How to Use Sway
+
+1. Log out of current session
+2. Select "Sway (Nix)" from the display manager session menu
+3. Or run `sway-session` from a TTY
+
+### Session 6 Conclusions
+
+1. **Sway 1.11** successfully installed via Nix package manager
+2. **Foot 1.25.0** terminal compiled and installed
+3. **i3-config repository** cloned and configured with sway branch
+4. **All supporting tools** (waybar, wofi, mako, etc.) installed
+5. **Session entry** available in display manager
+6. **Bug fixed** in [`roles/sway/tasks/config.yml`](roles/sway/tasks/config.yml:39) - variable name typo
+
+### Session 6 Follow-up: Nethogs Sudoers Configuration
+
+#### Additional Changes Made
+
+Added nethogs sudoers configuration to allow waybar network traffic display:
+
+1. **Added `nethogs` to apt packages** in [`roles/sway/defaults/main.yml`](roles/sway/defaults/main.yml:43)
+2. **Created new task file** [`roles/sway/tasks/nethogs.yml`](roles/sway/tasks/nethogs.yml)
+3. **Added task inclusion** in [`roles/sway/tasks/main.yml`](roles/sway/tasks/main.yml:39)
+
+#### Sudoers Configuration
+
+- **File created**: `/etc/sudoers.d/nethogs-adam`
+- **Content**: `adam ALL=(root) NOPASSWD: /usr/sbin/nethogs`
+- **Permissions**: 0440, owned by root
+- **Validation**: Used `visudo -cf` to validate syntax before writing
+
+#### Playbook Run Result
+
+```text
+PLAY RECAP *********************************************************************
+adam@192.168.42.205        : ok=56   changed=4    unreachable=0    failed=0    skipped=19   rescued=0    ignored=0
+```
+
+The nethogs sudoers configuration was successfully applied. Waybar can now display network traffic without requiring a password prompt.

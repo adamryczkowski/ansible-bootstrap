@@ -1,0 +1,33 @@
+---
+# Sway role - Configure nethogs for passwordless sudo
+#
+# This task configures sudoers to allow the user to run nethogs without
+# a password, which is required for waybar's network traffic display.
+#
+# IMPORTANT: This uses /etc/sudoers.d/ which is the safest way to extend
+# sudoers configuration. The file is validated before being written.
+
+- name: Sway | Install nethogs package
+  ansible.builtin.apt:
+    name: nethogs
+    state: present
+  become: true
+
+- name: Sway | Get full path to nethogs binary
+  ansible.builtin.command:
+    cmd: which nethogs
+  register: sway_nethogs_path
+  changed_when: false
+
+- name: Sway | Create sudoers file for nethogs (with validation)
+  ansible.builtin.copy:
+    dest: /etc/sudoers.d/nethogs-{{ sway_username }}
+    content: |
+      # Allow {{ sway_username }} to run nethogs without password
+      # This is required for waybar network traffic display
+      {{ sway_username }} ALL=(root) NOPASSWD: {{ sway_nethogs_path.stdout }}
+    owner: root
+    group: root
+    mode: "0440"
+    validate: /usr/sbin/visudo -cf %s
+  become: true

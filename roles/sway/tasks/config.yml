@@ -36,7 +36,7 @@
     force: true  # Allow overwriting local modifications (XKB keymap is managed by Ansible)
   become: true
   become_user: "{{ sway_username }}"
-  when: i3_config_repo.stat.exists
+  when: sway_i3_config_repo.stat.exists
 
 - name: Sway | Create configuration symlinks
   when: sway_create_config_symlinks | bool
