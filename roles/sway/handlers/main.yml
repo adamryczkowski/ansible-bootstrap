@@ -1,6 +1,12 @@
 ---
 # Sway role handlers
 
+- name: Reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: true
+  become: true
+  listen: Reload systemd daemon
+
 - name: Reload udev rules
   ansible.builtin.shell:
     cmd: udevadm control --reload-rules && udevadm trigger

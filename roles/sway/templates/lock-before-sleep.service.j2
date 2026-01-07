@@ -1,19 +1,31 @@
-# Systemd user service to lock screen before system sleep
+# Systemd SYSTEM service to lock screen before system sleep
 # This service ensures the screen is locked BEFORE the system suspends,
 # working around the unreliable swayidle before-sleep event.
 #
+# IMPORTANT: This is a SYSTEM service (not a user service) because:
+# - sleep.target is a system-level target
+# - User services cannot be triggered by system targets
+# - This service runs as the specified user with proper environment
+#
 # See: https://github.com/swaywm/swayidle/issues/127
 # See: https://wiki.archlinux.org/title/Sway#Screen_content_shown_briefly_upon_resume
+# See: https://git.sr.ht/~whynothugo/systemd-lock-handler
 
 [Unit]
-Description=Lock screen before sleep
+Description=Lock Sway screen before sleep for user {{ sway_username }}
 Documentation=man:swaylock(1)
 Before=sleep.target
+# Note: Do NOT use StopWhenUnneeded=yes here, as it would kill swaylock
+# when the system wakes up, before the user has a chance to unlock.
 
 [Service]
 Type=forking
+User={{ sway_username }}
 Environment=WAYLAND_DISPLAY={{ sway_lock_wayland_display }}
+Environment=XDG_RUNTIME_DIR=/run/user/{{ sway_user_uid }}
 ExecStart={{ sway_lock_command }}
+# Give swaylock time to grab the screen before suspend proceeds
+ExecStartPost=/bin/sleep 0.5
 
 [Install]
 WantedBy=sleep.target

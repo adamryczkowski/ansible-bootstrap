@@ -1,40 +1,51 @@
 ---
 # Lock before sleep service configuration
-# This creates a systemd user service that locks the screen before system suspend
+# This creates a systemd SYSTEM service that locks the screen before system suspend
 #
 # Why this is needed:
 # - swayidle's before-sleep event relies on logind D-Bus signals
 # - This integration is considered buggy and unreliable
-# - A systemd service bound to sleep.target is more reliable
+# - A systemd SYSTEM service bound to sleep.target is more reliable
+#
+# Why SYSTEM service instead of USER service:
+# - sleep.target is a SYSTEM-level target, not a user target
+# - User services CANNOT be triggered by system targets
+# - The system service runs as the specified user with proper environment
 #
 # References:
 # - https://github.com/swaywm/swayidle/issues/127
 # - https://wiki.archlinux.org/title/Sway#Screen_content_shown_briefly_upon_resume
-# - https://whynothugo.nl/journal/2022/10/26/systemd-locking-and-sleeping/
+# - https://git.sr.ht/~whynothugo/systemd-lock-handler
 
-- name: Sway | Ensure user systemd directory exists
-  ansible.builtin.file:
-    path: "/home/{{ sway_username }}/.config/systemd/user"
-    state: directory
-    owner: "{{ sway_username }}"
-    group: "{{ sway_username }}"
-    mode: "0755"
-
-- name: Sway | Deploy lock-before-sleep systemd user service
+- name: Sway | Deploy lock-before-sleep systemd SYSTEM service
   ansible.builtin.template:
     src: lock-before-sleep.service.j2
-    dest: "/home/{{ sway_username }}/.config/systemd/user/lock-before-sleep.service"
-    owner: "{{ sway_username }}"
-    group: "{{ sway_username }}"
+    dest: "/etc/systemd/system/lock-before-sleep-{{ sway_username }}.service"
+    owner: root
+    group: root
     mode: "0644"
   register: sway_lock_service_deployed
+  notify: Reload systemd daemon
 
-- name: Sway | Enable lingering for user (allows user services without login)
-  ansible.builtin.command:
-    cmd: "loginctl enable-linger {{ sway_username }}"
-  changed_when: false
+- name: Sway | Reload systemd daemon immediately if service changed
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: sway_lock_service_deployed.changed
 
-- name: Sway | Reload systemd user daemon
+- name: Sway | Enable lock-before-sleep system service
+  ansible.builtin.systemd:
+    name: "lock-before-sleep-{{ sway_username }}.service"
+    enabled: true
+    state: stopped
+  # Service is triggered by sleep.target, not started directly
+
+- name: Sway | Remove old user service if it exists
+  ansible.builtin.file:
+    path: "/home/{{ sway_username }}/.config/systemd/user/lock-before-sleep.service"
+    state: absent
+  register: sway_old_user_service_removed
+
+- name: Sway | Reload user systemd daemon if old service was removed
   become: true
   become_user: "{{ sway_username }}"
   ansible.builtin.systemd:
@@ -42,21 +53,12 @@
     scope: user
   environment:
     XDG_RUNTIME_DIR: "/run/user/{{ sway_user_uid }}"
-  when: sway_lock_service_deployed.changed
-
-- name: Sway | Enable lock-before-sleep service
-  become: true
-  become_user: "{{ sway_username }}"
-  ansible.builtin.systemd:
-    name: lock-before-sleep.service
-    enabled: true
-    scope: user
-  environment:
-    XDG_RUNTIME_DIR: "/run/user/{{ sway_user_uid }}"
+  when: sway_old_user_service_removed.changed
 
 - name: Sway | Display lock-before-sleep service status
   ansible.builtin.debug:
     msg: >-
-      Lock-before-sleep service deployed and enabled.
+      Lock-before-sleep SYSTEM service deployed and enabled.
       The screen will now be locked before system suspend.
-      Service location: ~/.config/systemd/user/lock-before-sleep.service
+      Service location: /etc/systemd/system/lock-before-sleep-{{ sway_username }}.service
+      Note: This is a system service (not user service) because sleep.target is system-level.
