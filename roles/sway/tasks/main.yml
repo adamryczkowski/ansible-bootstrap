@@ -9,6 +9,16 @@
 # - Supporting tools (waybar, wofi, mako, etc.) via apt
 # - Configuration from https://gitlab.com/adamwam/i3-config.git
 
+- name: Sway | Get user UID for systemd user services
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ sway_username }}"
+  register: sway_user_info
+
+- name: Sway | Set user UID fact
+  ansible.builtin.set_fact:
+    sway_user_uid: "{{ sway_user_info.ansible_facts.getent_passwd[sway_username][1] }}"
+
 - name: Sway | Include apt packages installation
   ansible.builtin.include_tasks: apt_packages.yml
 
@@ -40,6 +50,10 @@
 - name: Sway | Include nethogs sudoers configuration
   ansible.builtin.include_tasks: nethogs.yml
   when: sway_configure_nethogs_sudoers | bool
+
+- name: Sway | Include lock-before-sleep service configuration
+  ansible.builtin.include_tasks: lock_before_sleep.yml
+  when: sway_configure_lock_before_sleep | bool
 
 - name: Sway | Include session setup
   ansible.builtin.include_tasks: session.yml

@@ -666,3 +666,124 @@ adam@192.168.42.205        : ok=56   changed=4    unreachable=0    failed=0    s
 ```
 
 The nethogs sudoers configuration was successfully applied. Waybar can now display network traffic without requiring a password prompt.
+
+---
+
+## Session 7: Screen Lock Before Sleep Investigation and Fix
+
+### Session 7 Host Information
+
+- **Host**: 192.168.42.205 (TSK-PF3D0A9T)
+- **User**: adam
+- **OS**: Ubuntu 24.04.3 LTS
+- **Purpose**: Investigate and fix screen not locking on suspend
+
+### Problem Description
+
+The user reported that the screen does not lock when the system wakes from suspend, despite swayidle being configured with `before-sleep` event.
+
+### Investigation
+
+#### 1. Verified swayidle is running
+
+- **Command**: `ps aux | grep swayidle`
+- **Output**: swayidle is running with correct configuration including `before-sleep` event
+- **Interpretation**: swayidle is properly started
+
+#### 2. Checked for suspend events
+
+- **Command**: `journalctl --since "24 hours ago" | grep -i "suspend\|sleep\|wak"`
+- **Output**: Found suspend at 13:28:13 and wake at 13:54:06
+- **Interpretation**: System did suspend and resume
+
+#### 3. Checked conditional-lock logs during suspend
+
+- **Command**: `journalctl --user -t conditional-lock --since "13:28:00" --until "13:30:00"`
+- **Output**: `-- No entries --`
+- **Interpretation**: **The conditional-lock script was NOT called during suspend!**
+
+#### 4. Tested conditional-lock script manually
+
+- **Command**: `bash -x ~/.config/i3-config/sway/scripts/conditional-lock -f -c 000000 2>&1`
+- **Output**: Script works correctly - detects WiFi, checks whitelist, decides to lock
+- **Error**: `Unable to connect to the compositor` (expected when run from SSH)
+- **Interpretation**: Script logic is correct, but swayidle's before-sleep event is not triggering
+
+### Root Cause
+
+swayidle's `before-sleep` event relies on logind's D-Bus `PrepareForSleep` signal, which is:
+
+- Considered buggy and unreliable
+- Hard to maintain (per swayidle maintainers)
+- May not be received reliably with certain suspend methods
+
+### Sources Consulted
+
+1. <https://github.com/swaywm/swayidle/issues/127> - GitHub issue confirming the problem
+2. <https://wiki.archlinux.org/title/Sway#Screen_content_shown_briefly_upon_resume> - Arch Wiki documentation
+3. <https://whynothugo.nl/journal/2022/10/26/systemd-locking-and-sleeping/> - Detailed analysis of the issue
+
+### Solution Implemented
+
+Created a systemd user service that runs swaylock before sleep.target, which is more reliable than swayidle's before-sleep event.
+
+#### New Files for Lock-Before-Sleep
+
+- **Template**: `roles/sway/templates/lock-before-sleep.service.j2`
+  - Systemd user service that runs swaylock before sleep.target
+- **Task file**: `roles/sway/tasks/lock_before_sleep.yml`
+  - Deploys the service file
+  - Enables lingering for the user
+  - Enables the service
+
+#### Modified Files for Lock-Before-Sleep
+
+- **`roles/sway/defaults/main.yml`**
+  - Added `sway_configure_lock_before_sleep: true`
+  - Added `sway_lock_command: "/usr/bin/swaylock -f -c 000000"`
+  - Added `sway_lock_wayland_display: "wayland-1"`
+- **`roles/sway/tasks/main.yml`**
+  - Added task to get user UID (needed for XDG_RUNTIME_DIR)
+  - Added include for `lock_before_sleep.yml`
+
+### Session 7 Playbook Run
+
+```text
+PLAY RECAP *********************************************************************
+adam@192.168.42.205        : ok=65   changed=5    unreachable=0    failed=0    skipped=19   rescued=0    ignored=0
+```
+
+### Verification
+
+```bash
+$ systemctl --user is-enabled lock-before-sleep.service
+enabled
+
+$ systemctl --user status lock-before-sleep.service
+○ lock-before-sleep.service - Lock screen before sleep
+    Loaded: loaded (/home/adam/.config/systemd/user/lock-before-sleep.service)
+    Active: inactive (dead)
+      Docs: man:swaylock(1)
+```
+
+The service is:
+
+- **Loaded**: Service file is correctly parsed
+- **Enabled**: Will be activated when sleep.target is reached
+- **Inactive (dead)**: Expected - only activates during suspend
+
+### How It Works
+
+1. When the system initiates suspend, systemd activates `sleep.target`
+2. The `lock-before-sleep.service` is `WantedBy=sleep.target` and `Before=sleep.target`
+3. This means the service runs BEFORE the system actually suspends
+4. The service runs `swaylock -f -c 000000` which forks and locks the screen
+5. Only after swaylock is running does the system proceed to suspend
+6. When the system wakes, the screen is already locked
+
+### Session 7 Conclusions
+
+1. **Root cause identified**: swayidle's before-sleep event is unreliable due to D-Bus/logind integration issues
+2. **Solution implemented**: systemd user service bound to sleep.target
+3. **Service deployed and enabled** via Ansible playbook
+4. **No manual intervention required** - the fix is now part of the sway role

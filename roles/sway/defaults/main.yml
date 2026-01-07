@@ -106,3 +106,16 @@ sway_deploy_custom_xkb_keymap: true
 
 # XKB keymap file location (relative to i3-config repository)
 sway_xkb_keymap_path: "xkb/keymap/custom"
+
+# Lock before sleep configuration
+# This creates a systemd user service that locks the screen before system suspend
+# This is more reliable than swayidle's before-sleep event which depends on logind D-Bus
+sway_configure_lock_before_sleep: true
+
+# Command to run for locking the screen before sleep
+# Use -f (fork) so the service can complete and allow suspend to proceed
+sway_lock_command: "/usr/bin/swaylock -f -c 000000"
+
+# Wayland display to use for the lock command
+# This is typically wayland-1 for the first Wayland session
+sway_lock_wayland_display: "wayland-1"

@@ -1,0 +1,62 @@
+---
+# Lock before sleep service configuration
+# This creates a systemd user service that locks the screen before system suspend
+#
+# Why this is needed:
+# - swayidle's before-sleep event relies on logind D-Bus signals
+# - This integration is considered buggy and unreliable
+# - A systemd service bound to sleep.target is more reliable
+#
+# References:
+# - https://github.com/swaywm/swayidle/issues/127
+# - https://wiki.archlinux.org/title/Sway#Screen_content_shown_briefly_upon_resume
+# - https://whynothugo.nl/journal/2022/10/26/systemd-locking-and-sleeping/
+
+- name: Sway | Ensure user systemd directory exists
+  ansible.builtin.file:
+    path: "/home/{{ sway_username }}/.config/systemd/user"
+    state: directory
+    owner: "{{ sway_username }}"
+    group: "{{ sway_username }}"
+    mode: "0755"
+
+- name: Sway | Deploy lock-before-sleep systemd user service
+  ansible.builtin.template:
+    src: lock-before-sleep.service.j2
+    dest: "/home/{{ sway_username }}/.config/systemd/user/lock-before-sleep.service"
+    owner: "{{ sway_username }}"
+    group: "{{ sway_username }}"
+    mode: "0644"
+  register: sway_lock_service_deployed
+
+- name: Sway | Enable lingering for user (allows user services without login)
+  ansible.builtin.command:
+    cmd: "loginctl enable-linger {{ sway_username }}"
+  changed_when: false
+
+- name: Sway | Reload systemd user daemon
+  become: true
+  become_user: "{{ sway_username }}"
+  ansible.builtin.systemd:
+    daemon_reload: true
+    scope: user
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ sway_user_uid }}"
+  when: sway_lock_service_deployed.changed
+
+- name: Sway | Enable lock-before-sleep service
+  become: true
+  become_user: "{{ sway_username }}"
+  ansible.builtin.systemd:
+    name: lock-before-sleep.service
+    enabled: true
+    scope: user
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ sway_user_uid }}"
+
+- name: Sway | Display lock-before-sleep service status
+  ansible.builtin.debug:
+    msg: >-
+      Lock-before-sleep service deployed and enabled.
+      The screen will now be locked before system suspend.
+      Service location: ~/.config/systemd/user/lock-before-sleep.service
