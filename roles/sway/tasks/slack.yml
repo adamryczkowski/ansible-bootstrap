@@ -1,0 +1,29 @@
+---
+# Slack Wayland compatibility tasks
+#
+# Deploys a desktop entry override for Slack to fix GPU/EGL initialization
+# issues on Sway/Wayland. See docs/slack-sway-compatibility-report.md for details.
+#
+# The fix adds command-line flags to:
+# - Disable GPU acceleration (--disable-gpu)
+# - Enable Wayland/Ozone platform support
+# - Enable Wayland window decorations
+
+- name: Slack | Ensure user applications directory exists
+  ansible.builtin.file:
+    path: "/home/{{ sway_username }}/.local/share/applications"
+    state: directory
+    owner: "{{ sway_username }}"
+    group: "{{ sway_username }}"
+    mode: "0755"
+  become: true
+
+- name: Slack | Deploy Wayland-compatible desktop entry override
+  ansible.builtin.template:
+    src: slack.desktop.j2
+    dest: "/home/{{ sway_username }}/.local/share/applications/slack.desktop"
+    owner: "{{ sway_username }}"
+    group: "{{ sway_username }}"
+    mode: "0644"
+  become: true
+  notify: Sway | Update desktop database

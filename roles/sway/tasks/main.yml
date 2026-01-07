@@ -58,3 +58,7 @@
 - name: Sway | Include session setup
   ansible.builtin.include_tasks: session.yml
   when: sway_create_desktop_entry | bool
+
+- name: Sway | Include Slack Wayland compatibility
+  ansible.builtin.include_tasks: slack.yml
+  when: sway_configure_slack_wayland | bool

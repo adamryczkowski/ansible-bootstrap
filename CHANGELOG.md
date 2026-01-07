@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Sway role: Slack Wayland compatibility fix (desktop entry override with GPU/EGL workaround flags)
 - ComfyUI role for installing and configuring ComfyUI backend for krita-ai-diffusion
 - LXD container role for creating and managing LXD containers with GPU passthrough
 - Sway role for installing Sway window manager via Nix with nixGL support

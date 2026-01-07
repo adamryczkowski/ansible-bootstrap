@@ -1,0 +1,19 @@
+# Slack desktop entry override for Sway/Wayland compatibility
+# See docs/slack-sway-compatibility-report.md for details
+#
+# This file overrides the system desktop entry to add Wayland flags
+# that fix GPU/EGL initialization issues on Sway.
+#
+# Managed by Ansible - do not edit manually
+
+[Desktop Entry]
+Name=Slack
+StartupWMClass=Slack
+Comment=Slack Desktop
+GenericName=Slack Client for Linux
+Exec={{ sway_slack_binary_path }} --disable-gpu --enable-features=UseOzonePlatform,WaylandWindowDecorations --ozone-platform=wayland %U
+Icon={{ sway_slack_icon_path }}
+Type=Application
+StartupNotify=true
+Categories=GNOME;GTK;Network;InstantMessaging;
+MimeType=x-scheme-handler/slack;

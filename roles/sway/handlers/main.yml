@@ -21,3 +21,10 @@
     cmd: fc-cache -fv
   become: false
   listen: Update font cache
+
+- name: Sway | Update desktop database
+  ansible.builtin.command:
+    cmd: update-desktop-database "/home/{{ sway_username }}/.local/share/applications"
+  become: true
+  become_user: "{{ sway_username }}"
+  listen: Sway | Update desktop database

@@ -119,3 +119,12 @@ sway_lock_command: "/usr/bin/swaylock -f -c 000000"
 # Wayland display to use for the lock command
 # This is typically wayland-1 for the first Wayland session
 sway_lock_wayland_display: "wayland-1"
+
+# Slack Wayland compatibility
+# Deploy desktop entry override to fix GPU/EGL issues on Sway
+# See docs/slack-sway-compatibility-report.md for details
+sway_configure_slack_wayland: true
+
+# Slack binary and icon paths (for desktop entry override)
+sway_slack_binary_path: "/usr/lib/slack/slack"
+sway_slack_icon_path: "/usr/share/pixmaps/slack.png"
