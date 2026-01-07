@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Sway role: iotop configuration for disk traffic monitoring in waybar (installs iotop-c with capabilities)
+- Sway role: usbmon configuration for USB traffic monitoring in waybar (kernel module, udev rules, sudoers)
 - Sway role: Slack Wayland compatibility fix (desktop entry override with GPU/EGL workaround flags)
 - ComfyUI role for installing and configuring ComfyUI backend for krita-ai-diffusion
 - LXD container role for creating and managing LXD containers with GPU passthrough
@@ -34,6 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Sway playbook: Added python3-cffi pre-task for hosts with pyenv (fixes cryptography module import)
+- Sway role: iotop task now resolves symlinks before setting capabilities (fixes "Not a regular file" error)
 - Removed deprecated `parseable` option from .ansible-lint configuration
 - Pre-commit configuration file patterns (removed incorrect path prefix)
 - ansible-lint hook now uses local installation to avoid version conflicts

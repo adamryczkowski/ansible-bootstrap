@@ -46,6 +46,16 @@ sway_apt_packages:
 # Allows the user to run nethogs without password for waybar network traffic display
 sway_configure_nethogs_sudoers: true
 
+# Iotop configuration for disk traffic monitoring
+# Installs iotop-c and sets capabilities for non-root disk I/O monitoring
+# Required for waybar disk-traffic module
+sway_configure_iotop: true
+
+# Usbmon configuration for USB traffic monitoring
+# Configures usbmon kernel module and udev rules for USB bandwidth monitoring
+# Required for waybar usb-traffic module
+sway_configure_usbmon: true
+
 # Foot terminal installation (from source for latest version)
 sway_install_foot_from_source: true
 sway_foot_version: "1.25.0"

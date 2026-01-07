@@ -1,0 +1,50 @@
+---
+# Sway role - Configure usbmon for USB traffic monitoring
+#
+# This task configures the usbmon kernel module and udev rules to allow
+# the user to monitor USB traffic without root privileges.
+#
+# The usb-traffic waybar script uses usbmon to monitor USB bandwidth.
+# Requirements:
+# 1. usbmon kernel module loaded
+# 2. udev rules to grant read access to /dev/usbmon* devices
+# 3. sudoers entry for the load-usbmon helper script
+
+- name: Sway | Ensure usbmon kernel module is loaded
+  community.general.modprobe:
+    name: usbmon
+    state: present
+  become: true
+
+- name: Sway | Ensure usbmon module loads at boot
+  ansible.builtin.lineinfile:
+    path: /etc/modules-load.d/usbmon.conf
+    line: usbmon
+    create: true
+    mode: "0644"
+    owner: root
+    group: root
+  become: true
+
+- name: Sway | Deploy udev rules for usbmon access
+  ansible.builtin.template:
+    src: 99-usbmon.rules.j2
+    dest: /etc/udev/rules.d/99-usbmon.rules
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  notify: Sway | Reload udev rules
+
+- name: Sway | Create sudoers file for load-usbmon script (with validation)
+  ansible.builtin.copy:
+    dest: /etc/sudoers.d/usbmon-{{ sway_username }}
+    content: |
+      # Allow {{ sway_username }} to run load-usbmon without password
+      # This is required for waybar USB traffic display to load the usbmon module
+      {{ sway_username }} ALL=(root) NOPASSWD: {{ sway_config_dest }}/waybar/scripts/load-usbmon
+    owner: root
+    group: root
+    mode: "0440"
+    validate: /usr/sbin/visudo -cf %s
+  become: true

@@ -51,6 +51,14 @@
   ansible.builtin.include_tasks: nethogs.yml
   when: sway_configure_nethogs_sudoers | bool
 
+- name: Sway | Include iotop configuration for disk traffic monitoring
+  ansible.builtin.include_tasks: iotop.yml
+  when: sway_configure_iotop | bool
+
+- name: Sway | Include usbmon configuration for USB traffic monitoring
+  ansible.builtin.include_tasks: usbmon.yml
+  when: sway_configure_usbmon | bool
+
 - name: Sway | Include lock-before-sleep service configuration
   ansible.builtin.include_tasks: lock_before_sleep.yml
   when: sway_configure_lock_before_sleep | bool

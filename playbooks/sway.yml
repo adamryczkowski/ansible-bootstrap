@@ -22,6 +22,11 @@
     target_user: "{{ ansible_user | default('adam') }}"
 
   pre_tasks:
+    - name: Ensure python3-cffi is installed (required for cryptography module)
+      ansible.builtin.raw: |
+        dpkg -s python3-cffi >/dev/null 2>&1 || apt-get update && apt-get install -y python3-cffi
+      changed_when: false
+
     - name: Update apt cache
       ansible.builtin.apt:
         update_cache: true

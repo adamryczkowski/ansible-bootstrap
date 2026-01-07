@@ -1,0 +1,27 @@
+---
+# Sway role - Configure iotop for disk traffic monitoring
+#
+# This task installs iotop-c and sets capabilities to allow the user to
+# run iotop without sudo, which is required for waybar's disk traffic display.
+#
+# The disk-traffic waybar script uses iotop to monitor per-process disk I/O.
+# Setting capabilities is preferred over sudoers for security.
+
+- name: Sway | Install iotop-c package
+  ansible.builtin.apt:
+    name: iotop-c
+    state: present
+  become: true
+
+- name: Sway | Get full path to iotop binary (resolve symlinks)
+  ansible.builtin.command:
+    cmd: readlink -f /usr/sbin/iotop
+  register: sway_iotop_path
+  changed_when: false
+
+- name: Sway | Set capabilities on iotop for non-root disk I/O monitoring
+  community.general.capabilities:
+    path: "{{ sway_iotop_path.stdout }}"
+    capability: cap_net_admin,cap_dac_read_search,cap_sys_ptrace+ep
+    state: present
+  become: true

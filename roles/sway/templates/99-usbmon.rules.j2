@@ -1,0 +1,9 @@
+# Udev rule to grant read access to usbmon devices for USB traffic monitoring
+#
+# This file is managed by Ansible - do not edit manually
+#
+# The usbmon kernel module provides USB traffic monitoring via /dev/usbmon*
+# This rule grants read access to the specified user for waybar USB traffic display
+
+# Grant read access to usbmon devices for user {{ sway_username }}
+KERNEL=="usbmon[0-9]*", OWNER="{{ sway_username }}", MODE="0400"
