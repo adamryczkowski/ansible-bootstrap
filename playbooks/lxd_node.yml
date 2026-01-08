@@ -1,6 +1,17 @@
 ---
 # LXD Node playbook - Configure LXD host and provision containers
 # Replaces make-lxd-node.sh
+#
+# This playbook supports two CLI profiles for container configuration:
+#   - minimal: Basic CLI tools for a functional command-line experience
+#   - full: Enhanced CLI experience equivalent to --cli-improved flag
+#
+# Usage examples:
+#   # Minimal profile (default)
+#   ansible-playbook playbooks/lxd_node.yml -i inventory/lxd.yml
+#
+#   # Full profile (--cli-improved equivalent)
+#   ansible-playbook playbooks/lxd_node.yml -i inventory/lxd.yml -e cli_tools_profile=full
 
 - name: Configure LXD host
   hosts: lxd_hosts
@@ -69,19 +80,59 @@
   vars:
     target_user: ubuntu
 
+    # CLI profile: 'minimal' or 'full'
+    # - minimal: Basic tools (htop, tmux, jq, etc.)
+    # - full: All tools including Rust-based replacements (equivalent to --cli-improved)
+    cli_tools_profile: minimal
+
+  pre_tasks:
+    - name: Display container configuration
+      ansible.builtin.debug:
+        msg: |
+          LXD Container Configuration:
+          - Target user: {{ target_user }}
+          - CLI profile: {{ cli_tools_profile }}
+          - OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+
   roles:
+    # Base system configuration
     - role: common
-      tags: [common]
+      tags: [common, base]
 
+    # Package management
     - role: packages
-      tags: [packages]
+      tags: [packages, base]
 
+    # User setup
     - role: user_setup
       vars:
         user_setup_username: "{{ target_user }}"
-      tags: [user]
+      tags: [user, base]
 
+    # Shell configuration
     - role: bashrc
       vars:
         bashrc_username: "{{ target_user }}"
-      tags: [bashrc]
+      tags: [bashrc, base]
+
+    # Rust toolchain (required for full profile)
+    - role: rust
+      vars:
+        rust_username: "{{ target_user }}"
+        rust_packages: "{{ cli_tools_rust_packages | default([]) }}"
+      when: cli_tools_profile == 'full'
+      tags: [rust, cli]
+
+    # CLI tools (mise, fzf, and profile-specific tools)
+    - role: cli_tools
+      vars:
+        cli_tools_username: "{{ target_user }}"
+      tags: [cli_tools, cli]
+
+  post_tasks:
+    - name: Display completion message
+      ansible.builtin.debug:
+        msg: |
+          LXD container configuration complete!
+          - User: {{ target_user }}
+          - CLI profile: {{ cli_tools_profile }}

@@ -8,7 +8,7 @@
 # - User setup (user_setup role)
 # - Shell configuration (bashrc role)
 # - Rust toolchain (rust role)
-# - CLI tools (cli_tools role) - equivalent to --cli-improved
+# - CLI tools (cli_tools role) - with 'full' profile (equivalent to --cli-improved)
 
 - name: Converge - Full LXD node configuration
   hosts: all
@@ -18,9 +18,8 @@
   vars:
     target_user: testuser
 
-    # Enable all CLI tools (--cli-improved equivalent)
-    install_cli_tools: true
-    install_rust: true
+    # Use 'full' profile for E2E testing (--cli-improved equivalent)
+    cli_tools_profile: full
 
     # Packages role configuration
     packages_apt_packages:
@@ -40,25 +39,13 @@
 
     # Bashrc configuration
     bashrc_username: "{{ target_user }}"
-    bashrc_install_starship: true
 
     # Rust configuration
     rust_username: "{{ target_user }}"
     rust_install_binstall: true
-    rust_packages: []
 
-    # CLI tools configuration (--cli-improved equivalent)
+    # CLI tools configuration
     cli_tools_username: "{{ target_user }}"
-    cli_tools_install_mise: true
-    cli_tools_install_fzf: true
-    cli_tools_install_starship: true
-    cli_tools_install_bat: true
-    cli_tools_install_eza: true
-    cli_tools_install_fd: true
-    cli_tools_install_ripgrep: true
-    cli_tools_install_delta: true
-    cli_tools_install_zoxide: true
-    cli_tools_install_btop: true
 
   pre_tasks:
     - name: Display test configuration
@@ -66,8 +53,7 @@
         msg: |
           LXD E2E Test Configuration:
           - Target user: {{ target_user }}
-          - Install CLI tools: {{ install_cli_tools }}
-          - Install Rust: {{ install_rust }}
+          - CLI profile: {{ cli_tools_profile }}
           - OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
 
     - name: Update apt cache
@@ -96,18 +82,18 @@
         bashrc_username: "{{ target_user }}"
       tags: [bashrc, base]
 
-    # Rust toolchain
+    # Rust toolchain (required for full profile)
     - role: rust
       vars:
         rust_username: "{{ target_user }}"
-      when: install_rust | default(true) | bool
+        rust_packages: "{{ cli_tools_rust_packages | default([]) }}"
+      when: cli_tools_profile == 'full'
       tags: [rust, cli]
 
-    # CLI tools (--cli-improved equivalent)
+    # CLI tools (--cli-improved equivalent with full profile)
     - role: cli_tools
       vars:
         cli_tools_username: "{{ target_user }}"
-      when: install_cli_tools | default(true) | bool
       tags: [cli_tools, cli]
 
   post_tasks:
@@ -120,5 +106,14 @@
           - APT packages
           - User: {{ target_user }}
           - Bash configuration with bashrc.d
+          {% if cli_tools_profile == 'full' %}
           - Rust toolchain with cargo-binstall
-          - CLI tools (bat, eza, fd, ripgrep, fzf, etc.)
+          - CLI tools (bat, eza, fd, ripgrep, zoxide, atuin, etc.)
+          - Improved aliases (cat=bat, ls=eza, find=fd, grep=rg, etc.)
+          - liquidprompt for adaptive shell prompt
+          - Nerd Fonts for terminal icons
+          {% else %}
+          - Basic CLI tools (htop, tmux, jq, etc.)
+          - mise (polyglot runtime manager)
+          - fzf (fuzzy finder)
+          {% endif %}

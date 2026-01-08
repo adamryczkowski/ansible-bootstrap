@@ -1,5 +1,12 @@
 ---
 # CLI Tools role metadata
+#
+# This role supports two profiles:
+#   - minimal: Basic CLI tools for a functional command-line experience
+#   - full: Enhanced CLI experience equivalent to --cli-improved flag
+#
+# The 'full' profile requires the rust role to be applied first for
+# installing Rust-based CLI tools via cargo-binstall.
 
 galaxy_info:
   author: Adam
@@ -15,3 +22,5 @@ galaxy_info:
 
 dependencies:
   - role: bashrc
+  # Note: rust role is NOT a hard dependency because it's only needed for 'full' profile
+  # The playbook should include rust role conditionally before cli_tools when using full profile

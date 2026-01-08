@@ -1,5 +1,11 @@
 ---
 # Default variables for rust role
+#
+# This role installs the Rust toolchain and optionally installs
+# Rust-based CLI tools via cargo-binstall.
+#
+# The rust_packages list can be customized based on the cli_tools_profile
+# when used together with the cli_tools role.
 
 # Username to install Rust for
 rust_username: "{{ target_user | default(ansible_user) | default('adam') }}"
@@ -8,11 +14,12 @@ rust_username: "{{ target_user | default(ansible_user) | default('adam') }}"
 rust_install_binstall: true
 
 # Rust packages to install
-# Note: starship removed in favor of liquidprompt (APT package)
+# This list is typically overridden by the cli_tools role based on profile
+# Default includes common tools for the 'full' CLI profile
 rust_packages:
-  - atuin
-  - zoxide
-  - eza
-  - bat
-  - fd-find
-  - ripgrep
+  - atuin       # Shell history replacement
+  - zoxide      # Smarter cd command
+  - eza         # Modern ls replacement
+  - bat         # Cat with syntax highlighting
+  - fd-find     # Modern find replacement
+  - ripgrep     # Fast grep replacement

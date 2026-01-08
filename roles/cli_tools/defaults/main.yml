@@ -1,21 +1,32 @@
 ---
 # CLI Tools role defaults
+#
+# This role supports two profiles:
+#   - minimal: Basic CLI tools for a functional command-line experience
+#   - full: Enhanced CLI experience equivalent to --cli-improved flag
+#
+# The 'full' profile includes all tools from 'minimal' plus additional
+# productivity tools like atuin, zoxide, eza, difftastic, etc.
+
+# CLI profile: 'minimal' or 'full'
+# - minimal: Basic tools (htop, tmux, jq, etc.)
+# - full: All tools including Rust-based replacements (equivalent to --cli-improved)
+cli_tools_profile: minimal
 
 # Username for tool installation
 # Uses target_user if defined (from inventory), otherwise falls back to ansible_user
 cli_tools_username: "{{ target_user | default(ansible_user) | default('adam') }}"
 
-# APT-based CLI tools to install
-# Note: ripgrep, fd-find, bat, eza are installed via cargo-binstall in rust role
-# Note: exa was renamed to eza in Ubuntu 24.04+
-cli_tools_apt:
+# =============================================================================
+# APT Packages Configuration
+# =============================================================================
+
+# Base APT packages (installed for both profiles)
+cli_tools_apt_base:
   - jq
   - htop
-  - btop
-  - ncdu
   - tree
   - tmux
-  - neovim
   - curl
   - wget
   - unzip
@@ -24,24 +35,88 @@ cli_tools_apt:
   - git-lfs
   - make
   - build-essential
+
+# Additional APT packages for 'full' profile
+cli_tools_apt_full:
+  - btop
+  - ncdu
   - prettyping
   - liquidprompt
+  - byobu
+  - mc
+  - aptitude
+  - entr
+  - dtrx
+  - neovim
+  - magic-wormhole
 
-# Whether to install mise (formerly rtx) - polyglot runtime manager
+# Combined APT packages based on profile
+cli_tools_apt: >-
+  {{
+    cli_tools_apt_base +
+    (cli_tools_apt_full if cli_tools_profile == 'full' else [])
+  }}
+
+# =============================================================================
+# Tool Installation Flags
+# =============================================================================
+
+# mise (polyglot runtime manager) - both profiles
 cli_tools_install_mise: true
 
-# Whether to install fzf - fuzzy finder
+# fzf (fuzzy finder) - both profiles
 cli_tools_install_fzf: true
 
-# Whether to configure liquidprompt (installed via APT)
-# This replaces starship for a more traditional prompt experience
-cli_tools_install_liquidprompt: true
+# liquidprompt - full profile only (replaces starship)
+cli_tools_install_liquidprompt: "{{ cli_tools_profile == 'full' }}"
 
-# Whether to configure zoxide (assumes installed via cargo-binstall)
-cli_tools_install_zoxide: true
+# zoxide (smarter cd) - full profile only (requires rust role)
+cli_tools_install_zoxide: "{{ cli_tools_profile == 'full' }}"
 
-# Whether to configure atuin (assumes installed via cargo-binstall)
-cli_tools_install_atuin: true
+# atuin (shell history) - full profile only (requires rust role)
+cli_tools_install_atuin: "{{ cli_tools_profile == 'full' }}"
 
-# Whether to add CLI improved aliases (cat=bat, ping=prettyping, du=ncdu, preview=fzf+bat)
-cli_tools_install_aliases: true
+# CLI improved aliases (cat=bat, ping=prettyping, du=ncdu, etc.) - full profile only
+cli_tools_install_aliases: "{{ cli_tools_profile == 'full' }}"
+
+# eza aliases (ls replacement) - full profile only
+cli_tools_install_eza_aliases: "{{ cli_tools_profile == 'full' }}"
+
+# =============================================================================
+# Rust-based Tools (requires rust role to be applied first)
+# =============================================================================
+
+# Rust packages for 'minimal' profile (none by default)
+cli_tools_rust_packages_minimal: []
+
+# Rust packages for 'full' profile (--cli-improved equivalent)
+cli_tools_rust_packages_full:
+  - atuin      # Shell history replacement
+  - zoxide     # Smarter cd command
+  - eza        # Modern ls replacement
+  - bat        # Cat with syntax highlighting
+  - fd-find    # Modern find replacement
+  - ripgrep    # Fast grep replacement
+  - difftastic # Structural diff tool
+  - dust       # Intuitive du replacement
+  - bandwhich  # Bandwidth utilization tool
+  - hexyl      # Hex viewer
+  - tldr       # Simplified man pages
+
+# Combined Rust packages based on profile
+cli_tools_rust_packages: >-
+  {{
+    cli_tools_rust_packages_minimal +
+    (cli_tools_rust_packages_full if cli_tools_profile == 'full' else [])
+  }}
+
+# =============================================================================
+# Font Configuration (for eza/terminal icons)
+# =============================================================================
+
+# Install Nerd Fonts for terminal icons (full profile)
+cli_tools_install_nerd_fonts: "{{ cli_tools_profile == 'full' }}"
+
+# Nerd Font to install
+cli_tools_nerd_font_name: FiraCode
+cli_tools_nerd_font_url: https://github.com/ryanoasis/nerd-fonts/releases/latest/download/FiraCode.tar.xz

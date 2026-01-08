@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- CLI tools role: Profile-based CLI experience with `minimal` and `full` settings
+- CLI tools role: `full` profile equivalent to puppet-bootstrap `--cli-improved` flag
+- CLI tools role: Nerd Fonts installation (FiraCode) for terminal icons
+- CLI tools role: Enhanced shell aliases (cat=bat, ls=eza, find=fd, grep=rg, etc.)
+- CLI tools role: eza aliases with icons and git integration
+- Playbooks: Updated prepare_ubuntu.yml and lxd_node.yml with cli_tools_profile support
 - Sway role: PCManFM file manager with automatic dark/light theme switching via gsettings
 - Sway role: GTK theme configuration task (gtk_theme.yml) for dconf-based theme management
 - Documentation: GTK theme switching guide (docs/gtk-theme-switching.md)

@@ -6,25 +6,38 @@
 #   runtime manager), fzf (fuzzy finder), liquidprompt, zoxide, atuin, and CLI aliases.
 #   Configures shell integration via .bashrc.d scripts.
 #
+# Profiles:
+#   - minimal: Basic CLI tools for a functional command-line experience
+#   - full: Enhanced CLI experience equivalent to --cli-improved flag
+#
 # Key Variables:
+#   - cli_tools_profile: Profile to use ('minimal' or 'full')
 #   - cli_tools_username: User to configure tools for (default: target_user or ansible_user)
-#   - cli_tools_apt: List of APT packages to install (default: jq, htop, btop, etc.)
+#   - cli_tools_apt: List of APT packages to install (computed from profile)
 #   - cli_tools_install_mise: Install mise runtime manager (default: true)
 #   - cli_tools_install_fzf: Install fzf fuzzy finder (default: true)
-#   - cli_tools_install_liquidprompt: Configure liquidprompt (default: true)
-#   - cli_tools_install_zoxide: Configure zoxide (default: true)
-#   - cli_tools_install_atuin: Configure atuin shell history (default: true)
-#   - cli_tools_install_aliases: Add improved CLI aliases (default: true)
+#   - cli_tools_install_liquidprompt: Configure liquidprompt (full profile)
+#   - cli_tools_install_zoxide: Configure zoxide (full profile)
+#   - cli_tools_install_atuin: Configure atuin shell history (full profile)
+#   - cli_tools_install_aliases: Add improved CLI aliases (full profile)
 #
 # Dependencies:
 #   - bashrc role (for .bashrc.d directory)
-#   - rust role (for zoxide, atuin, bat, etc. installed via cargo-binstall)
+#   - rust role (for zoxide, atuin, bat, etc. installed via cargo-binstall) - full profile only
 #
 # Example Usage:
 #   - role: cli_tools
 #     vars:
-#       cli_tools_install_mise: true
-#       cli_tools_install_aliases: true
+#       cli_tools_profile: full
+#       cli_tools_username: myuser
+
+- name: CLI Tools | Display profile information
+  ansible.builtin.debug:
+    msg: "Installing CLI tools with profile: {{ cli_tools_profile }}"
+
+# =============================================================================
+# APT Package Installation
+# =============================================================================
 
 - name: CLI Tools | Install APT-based CLI tools
   ansible.builtin.apt:
@@ -32,6 +45,66 @@
     state: present
   become: true
   when: cli_tools_apt | length > 0
+
+# =============================================================================
+# Nerd Fonts Installation (full profile)
+# =============================================================================
+
+- name: CLI Tools | Install Nerd Fonts
+  when: cli_tools_install_nerd_fonts | bool
+  block:
+    - name: CLI Tools | Ensure fontconfig is installed
+      ansible.builtin.apt:
+        name: fontconfig
+        state: present
+      become: true
+
+    - name: CLI Tools | Check if Nerd Font is installed
+      ansible.builtin.shell: fc-list | grep -q "{{ cli_tools_nerd_font_name }} Nerd Font"
+      register: cli_tools_nerd_font_check
+      changed_when: false
+      failed_when: false
+
+    - name: CLI Tools | Create fonts directory
+      ansible.builtin.file:
+        path: /usr/local/share/fonts/{{ cli_tools_nerd_font_name }}
+        state: directory
+        mode: "0755"
+        owner: root
+        group: root
+      become: true
+      when: cli_tools_nerd_font_check.rc != 0
+
+    - name: CLI Tools | Download Nerd Font
+      ansible.builtin.get_url:
+        url: "{{ cli_tools_nerd_font_url }}"
+        dest: /tmp/{{ cli_tools_nerd_font_name }}.tar.xz
+        mode: "0644"
+      when: cli_tools_nerd_font_check.rc != 0
+
+    - name: CLI Tools | Extract Nerd Font
+      ansible.builtin.unarchive:
+        src: /tmp/{{ cli_tools_nerd_font_name }}.tar.xz
+        dest: /usr/local/share/fonts/{{ cli_tools_nerd_font_name }}
+        remote_src: true
+      become: true
+      when: cli_tools_nerd_font_check.rc != 0
+
+    - name: CLI Tools | Update font cache
+      ansible.builtin.command: fc-cache -f
+      become: true
+      when: cli_tools_nerd_font_check.rc != 0
+      changed_when: true
+
+    - name: CLI Tools | Clean up font archive
+      ansible.builtin.file:
+        path: /tmp/{{ cli_tools_nerd_font_name }}.tar.xz
+        state: absent
+      when: cli_tools_nerd_font_check.rc != 0
+
+# =============================================================================
+# mise Installation
+# =============================================================================
 
 - name: CLI Tools | Install mise (formerly rtx)
   when: cli_tools_install_mise | bool
@@ -72,6 +145,10 @@
         group: "{{ cli_tools_username }}"
       become: true
 
+# =============================================================================
+# fzf Installation
+# =============================================================================
+
 - name: CLI Tools | Install fzf
   when: cli_tools_install_fzf | bool
   block:
@@ -107,9 +184,19 @@
         group: "{{ cli_tools_username }}"
       become: true
 
+# =============================================================================
+# liquidprompt Configuration (full profile)
+# =============================================================================
+
 - name: CLI Tools | Configure liquidprompt
   when: cli_tools_install_liquidprompt | bool
   block:
+    - name: CLI Tools | Activate liquidprompt system-wide
+      ansible.builtin.command: liquidprompt_activate
+      become: true
+      changed_when: true
+      failed_when: false
+
     - name: CLI Tools | Add liquidprompt to bashrc.d
       ansible.builtin.copy:
         content: |
@@ -128,6 +215,10 @@
         state: absent
       become: true
 
+# =============================================================================
+# zoxide Configuration (full profile)
+# =============================================================================
+
 - name: CLI Tools | Configure zoxide
   when: cli_tools_install_zoxide | bool
   block:
@@ -143,6 +234,10 @@
         owner: "{{ cli_tools_username }}"
         group: "{{ cli_tools_username }}"
       become: true
+
+# =============================================================================
+# atuin Configuration (full profile)
+# =============================================================================
 
 - name: CLI Tools | Configure atuin
   when: cli_tools_install_atuin | bool
@@ -160,13 +255,18 @@
         group: "{{ cli_tools_username }}"
       become: true
 
+# =============================================================================
+# CLI Improved Aliases (full profile)
+# =============================================================================
+
 - name: CLI Tools | Configure CLI improved aliases
   when: cli_tools_install_aliases | bool
   block:
     - name: CLI Tools | Add CLI improved aliases to bashrc.d
       ansible.builtin.copy:
         content: |
-          # CLI improved aliases
+          # CLI improved aliases (--cli-improved equivalent)
+
           # bat replaces cat with syntax highlighting
           if command -v bat &> /dev/null; then
               alias cat="bat"
@@ -182,11 +282,61 @@
               alias du="ncdu --color dark -rr -x --exclude .git --exclude node_modules"
           fi
 
+          # dust as alternative to du (non-interactive)
+          if command -v dust &> /dev/null; then
+              alias duf="dust"
+          fi
+
+          # fd replaces find
+          if command -v fd &> /dev/null; then
+              alias find="fd"
+          fi
+
+          # ripgrep replaces grep for code search
+          if command -v rg &> /dev/null; then
+              alias grep="rg"
+          fi
+
+          # difft for better diffs
+          if command -v difft &> /dev/null; then
+              export GIT_EXTERNAL_DIFF="difft"
+          fi
+
           # fzf preview with bat
           if command -v fzf &> /dev/null && command -v bat &> /dev/null; then
               alias preview="fzf --preview 'bat --color \"always\" {}'"
           fi
+
+          # btop replaces htop
+          if command -v btop &> /dev/null; then
+              alias htop="btop"
+          fi
         dest: "/home/{{ cli_tools_username }}/.bashrc.d/21_cli_aliases.sh"
+        mode: "0644"
+        owner: "{{ cli_tools_username }}"
+        group: "{{ cli_tools_username }}"
+      become: true
+
+# =============================================================================
+# eza Aliases (full profile)
+# =============================================================================
+
+- name: CLI Tools | Configure eza aliases
+  when: cli_tools_install_eza_aliases | bool
+  block:
+    - name: CLI Tools | Add eza aliases to bashrc.d
+      ansible.builtin.copy:
+        content: |
+          # eza (modern ls replacement) aliases
+          if command -v eza &> /dev/null; then
+              alias ls="eza --icons"
+              alias ll="eza -la --icons --git"
+              alias la="eza -a --icons"
+              alias l="eza --icons"
+              alias lt="eza --tree --icons --level=2"
+              alias lta="eza --tree --icons -a --level=2"
+          fi
+        dest: "/home/{{ cli_tools_username }}/.bashrc.d/22_eza_aliases.sh"
         mode: "0644"
         owner: "{{ cli_tools_username }}"
         group: "{{ cli_tools_username }}"
