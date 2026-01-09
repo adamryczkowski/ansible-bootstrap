@@ -98,10 +98,10 @@ cli_tools_rust_packages_full:
   - fd-find    # Modern find replacement
   - ripgrep    # Fast grep replacement
   - difftastic # Structural diff tool
-  - dust       # Intuitive du replacement
+  - du-dust    # Intuitive du replacement (binary: dust)
   - bandwhich  # Bandwidth utilization tool
   - hexyl      # Hex viewer
-  - tldr       # Simplified man pages
+  - tealdeer   # Simplified man pages (binary: tldr)
 
 # Combined Rust packages based on profile
 cli_tools_rust_packages: >-

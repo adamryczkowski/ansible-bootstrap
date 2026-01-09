@@ -45,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- CLI tools role: Fixed Rust package names for cargo-binstall (`dust` → `du-dust`, `tldr` → `tealdeer`)
 - Sway playbook: Added python3-cffi pre-task for hosts with pyenv (fixes cryptography module import)
 - Sway role: iotop task now resolves symlinks before setting capabilities (fixes "Not a regular file" error)
 - Sway role: lock-before-sleep service now works correctly (changed from user service to system service, since sleep.target is system-level only; removed StopWhenUnneeded=yes to prevent swaylock from being killed on resume)

@@ -787,3 +787,118 @@ The service is:
 2. **Solution implemented**: systemd user service bound to sleep.target
 3. **Service deployed and enabled** via Ansible playbook
 4. **No manual intervention required** - the fix is now part of the sway role
+
+---
+
+## Session 8: CLI Tools Full Profile Installation on WSL2
+
+### Session 8 Host Information
+
+- **Host**: 192.168.42.118 (Legion9i)
+- **User**: adam
+- **OS**: Ubuntu 24.04 on WSL2 (Kernel 6.6.87.2-microsoft-standard-WSL2)
+- **Purpose**: Install full CLI experience using Ansible prepare_ubuntu.yml playbook
+
+### Session 8 Ansible Playbook Execution
+
+#### Command
+
+```bash
+ansible-playbook playbooks/prepare_ubuntu.yml -i "192.168.42.118," -u adam \
+  -e "target_user=adam cli_tools_profile=full" --become --ask-become-pass
+```
+
+#### First Run - Failed
+
+**Issue**: Two Rust packages had incorrect names for cargo-binstall:
+
+- `dust` - should be `du-dust`
+- `tldr` - should be `tealdeer`
+
+**Error**:
+
+```text
+failed: [192.168.42.118] (item=dust) =>
+    msg: non-zero return code
+    rc: 86
+    stdout: |
+        INFO resolve: Resolving package: 'dust'
+        ERROR Fatal error:
+          × For crate dust: no binaries specified nor inferred
+
+failed: [192.168.42.118] (item=tldr) =>
+    msg: non-zero return code
+    rc: 76
+    stdout: |
+        INFO resolve: Resolving package: 'tldr'
+        ERROR Fatal error:
+          × For crate tldr: no version matching requirement '*'
+```
+
+**Fix Applied**: Updated `roles/cli_tools/defaults/main.yml`:
+
+- Changed `dust` to `du-dust`
+- Changed `tldr` to `tealdeer`
+
+#### Second Run - Success
+
+```text
+PLAY RECAP *********************************************************************
+192.168.42.118             : ok=48   changed=11   unreachable=0    failed=0    skipped=27   rescued=0    ignored=0
+```
+
+### Session 8 What Was Installed
+
+#### APT Packages (Full Profile)
+
+- btop, ncdu, prettyping, liquidprompt, byobu, mc, aptitude
+- entr, dtrx, neovim, magic-wormhole
+- Base packages: jq, htop, tree, tmux, curl, wget, unzip, zip, git, git-lfs, make, build-essential
+
+#### Rust Packages (via cargo-binstall)
+
+- atuin (shell history replacement)
+- zoxide (smarter cd command)
+- eza (modern ls replacement)
+- bat (cat with syntax highlighting)
+- fd-find (modern find replacement)
+- ripgrep (fast grep replacement)
+- difftastic (structural diff tool)
+- du-dust (intuitive du replacement, binary: dust)
+- bandwhich (bandwidth utilization tool)
+- hexyl (hex viewer)
+- tealdeer (simplified man pages, binary: tldr)
+
+#### Shell Configuration
+
+- **fzf** installed from git repository
+- **liquidprompt** activated system-wide
+- **mise** (polyglot runtime manager) configured
+- **zoxide** shell integration added
+- **atuin** shell history integration added
+
+#### Bashrc.d Scripts Created
+
+- `05_cargo.sh` - Rust/Cargo PATH
+- `21_cli_aliases.sh` - CLI improved aliases (cat=bat, ping=prettyping, du=ncdu, find=fd, grep=rg, htop=btop)
+- `22_eza_aliases.sh` - eza aliases (ls=eza --icons, ll, la, lt, lta)
+- `70_preexec.sh` - bash-preexec for atuin
+- `85_fzf.sh` - fzf configuration
+- `86_zoxide.sh` - zoxide integration
+- `87_atuin.sh` - atuin integration
+- `90_mise.sh` - mise activation
+- `99_liquidprompt.sh` - liquidprompt activation
+
+### Session 8 Files Modified
+
+1. **`roles/cli_tools/defaults/main.yml`** - Fixed Rust package names:
+    - `dust` → `du-dust`
+    - `tldr` → `tealdeer`
+
+### Session 8 Conclusions
+
+1. **Full CLI profile successfully installed** on WSL2 Ubuntu 24.04
+2. **Package name fix applied** for cargo-binstall compatibility
+3. **All 11 Rust tools installed** via cargo-binstall
+4. **Shell configuration complete** with aliases and integrations
+5. **User needs to start a new shell** to activate all changes
