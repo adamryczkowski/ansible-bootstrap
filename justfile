@@ -109,9 +109,18 @@ syntax-check:
 list-roles:
 	@ls -1 roles/
 
-# List all available playbooks
+# List all available playbooks (simple list)
 list-playbooks:
 	@ls -1 playbooks/
+
+# List all playbooks with their descriptions
+playbooks:
+	@./scripts/list-playbooks.sh
+
+# Interactive playbook selector using fzf with live filtering, preview, and execution options
+# Supports: local/remote execution, sudo password prompts, dry-run mode
+select-playbook:
+	@./scripts/select-playbook.sh playbooks
 
 # Run a specific playbook against production inventory
 run playbook inventory="inventory/production/hosts.yml":

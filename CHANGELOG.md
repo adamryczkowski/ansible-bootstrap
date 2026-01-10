@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Justfile: `playbooks` action to list all playbooks with their descriptions
+- Justfile: `select-playbook` action for interactive fzf-based playbook selection with preview, local/remote execution, sudo password prompts, and dry-run mode
+- Scripts: `scripts/list-playbooks.sh` helper for extracting playbook descriptions
+- Scripts: `scripts/select-playbook.sh` interactive playbook selector with full workflow support
 - CLI tools role: Profile-based CLI experience with `minimal` and `full` settings
 - CLI tools role: `full` profile equivalent to puppet-bootstrap `--cli-improved` flag
 - CLI tools role: Nerd Fonts installation (FiraCode) for terminal icons
