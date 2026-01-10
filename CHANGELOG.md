@@ -62,6 +62,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - LXD preseed template syntax for storage pool configuration
 - Rust role error handling for already-installed packages
 - Sway role: variable name typo in config.yml (`i3_config_repo` → `sway_i3_config_repo`)
+- Sway role: changed default config branch from `sway` to `main` (branch no longer exists)
 
 ## [0.1.0] - 2025-12-25
 
