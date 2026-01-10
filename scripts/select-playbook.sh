@@ -2,6 +2,7 @@
 # Interactive playbook selector using fzf
 # Allows user to select a playbook with live filtering and preview
 # Supports local and remote execution with sudo password handling
+# Includes Python interpreter detection for local execution
 
 set -euo pipefail
 
@@ -22,6 +23,142 @@ if ! command -v fzf &> /dev/null; then
     echo "Install with: sudo apt install fzf"
     exit 1
 fi
+
+# Function to check if a Python interpreter has working cffi_backend
+check_python_cffi() {
+    local python_path="$1"
+    "$python_path" -c "import _cffi_backend" 2>/dev/null
+}
+
+# Function to find all available Python interpreters
+find_python_interpreters() {
+    local interpreters=()
+
+    # Check common Python paths
+    for py in python3 python python3.12 python3.11 python3.10 python3.9; do
+        if command -v "$py" &> /dev/null; then
+            local path
+            path=$(command -v "$py")
+            # Avoid duplicates by resolving symlinks
+            local real_path
+            real_path=$(readlink -f "$path" 2>/dev/null || echo "$path")
+            if [[ ! " ${interpreters[*]:-} " =~ " ${real_path} " ]]; then
+                interpreters+=("$path")
+            fi
+        fi
+    done
+
+    # Check pyenv versions if available
+    if command -v pyenv &> /dev/null; then
+        while IFS= read -r version; do
+            local pyenv_python
+            pyenv_python="$(pyenv root)/versions/$version/bin/python"
+            if [[ -x "$pyenv_python" ]]; then
+                interpreters+=("$pyenv_python")
+            fi
+        done < <(pyenv versions --bare 2>/dev/null || true)
+    fi
+
+    # Check mise/asdf Python versions
+    if [[ -d "$HOME/.local/share/mise/installs/python" ]]; then
+        for version_dir in "$HOME/.local/share/mise/installs/python"/*; do
+            if [[ -x "$version_dir/bin/python" ]]; then
+                interpreters+=("$version_dir/bin/python")
+            fi
+        done
+    fi
+
+    # Check system Python locations
+    for py in /usr/bin/python3 /usr/bin/python /usr/local/bin/python3; do
+        if [[ -x "$py" ]] && [[ ! " ${interpreters[*]:-} " =~ " ${py} " ]]; then
+            interpreters+=("$py")
+        fi
+    done
+
+    printf '%s\n' "${interpreters[@]}"
+}
+
+# Function to select a working Python interpreter for local execution
+select_python_interpreter() {
+    local default_python
+    default_python=$(command -v python3 || command -v python || echo "")
+
+    if [[ -z "$default_python" ]]; then
+        echo -e "${RED}Error: No Python interpreter found.${RESET}"
+        return 1
+    fi
+
+    # Check if default Python has working cffi
+    if check_python_cffi "$default_python"; then
+        echo "$default_python"
+        return 0
+    fi
+
+    echo -e "${YELLOW}Warning: Default Python ($default_python) has broken cffi_backend module.${RESET}"
+    echo -e "${CYAN}Searching for working Python interpreters...${RESET}"
+    echo ""
+
+    # Find all interpreters and check which ones work
+    local working_interpreters=()
+    local broken_interpreters=()
+
+    while IFS= read -r interpreter; do
+        if [[ -n "$interpreter" ]]; then
+            if check_python_cffi "$interpreter"; then
+                local version
+                version=$("$interpreter" --version 2>&1 | head -1)
+                working_interpreters+=("$interpreter ($version)")
+            else
+                broken_interpreters+=("$interpreter")
+            fi
+        fi
+    done < <(find_python_interpreters)
+
+    if [[ ${#working_interpreters[@]} -eq 0 ]]; then
+        echo -e "${RED}Error: No Python interpreter with working cffi_backend found.${RESET}"
+        echo ""
+        echo "Broken interpreters found:"
+        for interp in "${broken_interpreters[@]}"; do
+            echo "  - $interp"
+        done
+        echo ""
+        echo "To fix this, try one of:"
+        echo "  1. Install python3-cffi: sudo apt install python3-cffi"
+        echo "  2. Reinstall cryptography: pip install --force-reinstall cryptography"
+        echo "  3. Use a different Python version via pyenv or mise"
+        return 1
+    fi
+
+    if [[ ${#working_interpreters[@]} -eq 1 ]]; then
+        # Only one working interpreter, use it
+        local selected="${working_interpreters[0]}"
+        local python_path="${selected%% (*}"
+        echo -e "${GREEN}Found working Python: $selected${RESET}"
+        echo "$python_path"
+        return 0
+    fi
+
+    # Multiple working interpreters, let user choose
+    echo -e "${CYAN}Select a Python interpreter:${RESET}"
+    echo ""
+
+    local selected
+    selected=$(printf '%s\n' "${working_interpreters[@]}" | fzf \
+        --header="Select a working Python interpreter" \
+        --height=40% \
+        --border=rounded \
+        --prompt="Python> " \
+        || echo "")
+
+    if [[ -z "$selected" ]]; then
+        echo -e "${RED}No interpreter selected.${RESET}"
+        return 1
+    fi
+
+    # Extract path from "path (version)" format
+    local python_path="${selected%% (*}"
+    echo "$python_path"
+}
 
 # Build the list of playbooks with descriptions
 get_playbook_list() {
@@ -90,16 +227,20 @@ case "$choice" in
         echo -e "${YELLOW}Running against localhost...${RESET}"
         echo ""
 
+        # Check Python interpreter for local execution
+        python_interpreter=$(select_python_interpreter) || exit 1
+
         # Ask about sudo password
+        echo ""
         echo -e "${CYAN}Does this playbook require sudo privileges?${RESET}"
         echo "  1) Yes, ask for sudo password (--ask-become-pass)"
         echo "  2) No, passwordless sudo is configured"
         echo ""
         read -rp "Select option [1-2]: " sudo_choice
 
-        extra_args=""
+        extra_args="-e ansible_python_interpreter=$python_interpreter"
         if [[ "$sudo_choice" == "1" ]]; then
-            extra_args="--ask-become-pass"
+            extra_args="$extra_args --ask-become-pass"
         fi
 
         echo ""
@@ -218,6 +359,9 @@ case "$choice" in
         echo ""
         echo "  # Run against localhost with sudo password:"
         echo "  ansible-playbook playbooks/${playbook_name}.yml -i localhost, --connection=local --ask-become-pass"
+        echo ""
+        echo "  # Run against localhost with specific Python interpreter:"
+        echo "  ansible-playbook playbooks/${playbook_name}.yml -i localhost, --connection=local -e ansible_python_interpreter=/usr/bin/python3"
         echo ""
         echo "  # Run against remote hosts:"
         echo "  ansible-playbook playbooks/${playbook_name}.yml -i inventory/production/hosts.yml"
