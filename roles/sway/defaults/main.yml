@@ -63,7 +63,7 @@ sway_foot_version: "1.25.0"
 
 # i3-config repository for Sway configuration
 sway_config_repo: "https://gitlab.com/adamwam/i3-config.git"
-sway_config_branch: "main"  # Branch containing Sway configuration
+sway_config_branch: "master"  # Branch containing Sway configuration
 sway_config_dest: "/home/{{ sway_username }}/.config/i3-config"
 
 # Create symlinks for Sway configuration

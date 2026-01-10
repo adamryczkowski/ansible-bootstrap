@@ -62,7 +62,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - LXD preseed template syntax for storage pool configuration
 - Rust role error handling for already-installed packages
 - Sway role: variable name typo in config.yml (`i3_config_repo` → `sway_i3_config_repo`)
-- Sway role: changed default config branch from `sway` to `main` (branch no longer exists)
+- Sway role: git update task now fetches all remote branches before checkout (fixes branch not found error when switching branches)
+- Sway role: changed default config branch from `main` to `master` (correct branch name in i3-config repository)
+- Sway role: fixed symlink creation to properly detect and remove existing directories (replaced broken lookup-based condition with stat module)
+- Sway role: fixed XKB symlink creation logic to check source existence and remove existing directories before creating symlinks
 
 ## [0.1.0] - 2025-12-25
 
