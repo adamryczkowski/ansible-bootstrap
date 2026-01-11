@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Justfile: `playbooks` action to list all playbooks with their descriptions
 - Justfile: `select-playbook` action for interactive fzf-based playbook selection with preview, local/remote execution, sudo password prompts, dry-run mode, and Python interpreter detection
 - Scripts: `select-playbook.sh` option to run against manually specified remote hosts with SSH parameter collection and optional inventory addition
+- Scripts: `select-playbook.sh` tree-view host selection - shows all inventories with their hosts in a unified tree, select inventory (all hosts) or specific host
 - Scripts: `scripts/list-playbooks.sh` helper for extracting playbook descriptions
 - Scripts: `scripts/select-playbook.sh` interactive playbook selector with full workflow support and automatic detection of working Python interpreters for local execution
 - CLI tools role: Profile-based CLI experience with `minimal` and `full` settings
@@ -26,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Sway role: iotop configuration for disk traffic monitoring in waybar (installs iotop-c with capabilities)
 - Sway role: usbmon configuration for USB traffic monitoring in waybar (kernel module, udev rules, sudoers)
 - Sway role: Slack Wayland compatibility fix (desktop entry override with GPU/EGL workaround flags)
+- Sway role: Enable Wayland in GDM configuration (fixes Sway not appearing in session list)
+- Sway role: TryExec directive in desktop entry for proper display manager detection
+- Sway role: bright CLI tool for extended monitor brightness control (via pipx from GitHub)
 - ComfyUI role for installing and configuring ComfyUI backend for krita-ai-diffusion
 - LXD container role for creating and managing LXD containers with GPU passthrough
 - Sway role for installing Sway window manager via Nix with nixGL support

@@ -24,6 +24,29 @@ if ! command -v fzf &> /dev/null; then
     exit 1
 fi
 
+# Check if jq is available (needed for parsing ansible-inventory output)
+if ! command -v jq &> /dev/null; then
+    echo -e "${RED}Error: jq is required for parsing inventory data but not installed.${RESET}"
+    echo "Install with: sudo apt install jq"
+    exit 1
+fi
+
+# Function to validate host name for Ansible inventory
+# Ansible host names should only contain alphanumeric characters, hyphens, and underscores
+# Spaces and special characters are not allowed (Ansible's --limit flag treats spaces as separators)
+validate_host_name() {
+    local name="$1"
+    if [[ -z "$name" ]]; then
+        return 1
+    fi
+    # Check if name matches valid pattern: starts with letter/number, contains only alphanumeric, hyphen, underscore
+    if [[ "$name" =~ ^[a-zA-Z0-9][a-zA-Z0-9_-]*$ ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
 # Function to check if a Python interpreter has working cffi_backend
 check_python_cffi() {
     local python_path="$1"
@@ -253,33 +276,82 @@ case "$choice" in
         ansible-playbook "playbooks/${playbook_name}.yml" -i "localhost," --connection=local $extra_args
         ;;
     2)
-        # Remote execution with inventory
+        # Remote execution with inventory - tree view of inventories and hosts
         echo ""
-        echo -e "${CYAN}Available inventories:${RESET}"
+        echo -e "${CYAN}Select target (inventory or specific host):${RESET}"
         echo ""
 
-        # List available inventories
-        inventory_list=$(find inventory -name "hosts.yml" -o -name "hosts" 2>/dev/null | sort)
+        # Build tree-view list of all inventories and their hosts
+        tree_list=""
 
-        if [[ -z "$inventory_list" ]]; then
+        # Find all inventory files
+        while IFS= read -r inv_file; do
+            if [[ -n "$inv_file" ]]; then
+                # Add inventory file as a selectable item
+                tree_list="${tree_list}📁 ${inv_file}"$'\n'
+
+                # Get inventory JSON once and extract hosts with their IPs
+                inv_json=$(ansible-inventory -i "$inv_file" --list 2>/dev/null)
+                while IFS= read -r host_name; do
+                    if [[ -n "$host_name" ]]; then
+                        # Use jq to extract ansible_host from the cached JSON
+                        host_ip=$(echo "$inv_json" | jq -r "._meta.hostvars[\"$host_name\"].ansible_host // empty" 2>/dev/null || echo "")
+                        if [[ -n "$host_ip" ]]; then
+                            tree_list="${tree_list}  └─ ${host_name} (${host_ip}) [${inv_file}]"$'\n'
+                        else
+                            tree_list="${tree_list}  └─ ${host_name} [${inv_file}]"$'\n'
+                        fi
+                    fi
+                done < <(ansible-inventory -i "$inv_file" --graph 2>/dev/null | grep -v '@' | sed 's/.*|--//' | sed 's/^[[:space:]]*//' | sort -u)
+            fi
+        done < <(find inventory -name "hosts.yml" -o -name "hosts" 2>/dev/null | sort)
+
+        if [[ -z "$tree_list" ]]; then
             echo "No inventory files found in inventory/"
             exit 1
         fi
 
-        # Use fzf to select inventory
-        selected_inventory=$(echo "$inventory_list" | fzf \
-            --header="Select inventory file" \
-            --height=40% \
+        # Use fzf to select from tree view
+        selected_item=$(echo -e "$tree_list" | grep -v '^$' | fzf \
+            --header="Select inventory (all hosts) or specific host" \
+            --height=60% \
             --border=rounded \
-            --prompt="Inventory> " \
-            || echo "$DEFAULT_INVENTORY")
+            --prompt="Target> " \
+            --ansi \
+            || echo "")
 
-        if [[ -z "$selected_inventory" ]]; then
-            selected_inventory="$DEFAULT_INVENTORY"
+        if [[ -z "$selected_item" ]]; then
+            echo "No target selected. Cancelled."
+            exit 0
+        fi
+
+        # Parse the selection
+        selected_inventory=""
+        limit_host=""
+        limit_ip=""
+        target_display=""
+
+        if [[ "$selected_item" == "📁 "* ]]; then
+            # Selected an inventory file - run against all hosts in it
+            selected_inventory=$(echo "$selected_item" | sed 's/📁 //')
+            target_display="all hosts in ${selected_inventory}"
+        elif [[ "$selected_item" == "  └─ "* ]]; then
+            # Selected a specific host - extract host name, IP, and inventory
+            # Format: "  └─ hostname (IP) [inventory/path/hosts.yml]"
+            host_part=$(echo "$selected_item" | sed 's/  └─ //')
+            # Extract inventory path from [...]
+            selected_inventory=$(echo "$host_part" | grep -o '\[.*\]' | tr -d '[]')
+            # Extract host name (before the IP or inventory bracket)
+            limit_host=$(echo "$host_part" | sed 's/ (.*//' | sed 's/ \[.*//')
+            # Extract IP address if present (inside parentheses)
+            if [[ "$host_part" =~ \(([0-9.]+)\) ]]; then
+                limit_ip="${BASH_REMATCH[1]}"
+            fi
+            target_display="host: ${limit_host}"
         fi
 
         echo ""
-        echo -e "${YELLOW}Running against: ${selected_inventory}${RESET}"
+        echo -e "${YELLOW}Running against: ${target_display}${RESET}"
         echo ""
 
         # Ask about sudo password
@@ -296,11 +368,21 @@ case "$choice" in
 
         echo ""
         echo -e "${GREEN}Executing:${RESET}"
-        echo "  ansible-playbook playbooks/${playbook_name}.yml -i ${selected_inventory} $extra_args"
-        echo ""
-
-        # shellcheck disable=SC2086
-        ansible-playbook "playbooks/${playbook_name}.yml" -i "${selected_inventory}" $extra_args
+        if [[ -n "$limit_host" ]]; then
+            # Use host name for --limit (must match inventory host name, not ansible_host IP)
+            echo "  ansible-playbook playbooks/${playbook_name}.yml -i ${selected_inventory} --limit '${limit_host}' $extra_args"
+            if [[ -n "$limit_ip" ]]; then
+                echo "  (host ${limit_host} -> ${limit_ip})"
+            fi
+            echo ""
+            # shellcheck disable=SC2086
+            ansible-playbook "playbooks/${playbook_name}.yml" -i "${selected_inventory}" --limit "${limit_host}" $extra_args
+        else
+            echo "  ansible-playbook playbooks/${playbook_name}.yml -i ${selected_inventory} $extra_args"
+            echo ""
+            # shellcheck disable=SC2086
+            ansible-playbook "playbooks/${playbook_name}.yml" -i "${selected_inventory}" $extra_args
+        fi
         ;;
     3)
         # Remote execution with manually specified host
@@ -378,13 +460,26 @@ case "$choice" in
         read -rp "Select option [1-2]: " add_to_inventory
 
         if [[ "$add_to_inventory" == "1" ]]; then
-            # Get host name for inventory
+            # Get host name for inventory with validation
             echo ""
-            read -rp "Enter a name for this host in the inventory: " host_name
-            if [[ -z "$host_name" ]]; then
-                echo -e "${RED}Error: Host name is required.${RESET}"
-                exit 1
-            fi
+            echo -e "${CYAN}Host name requirements:${RESET}"
+            echo "  - Must start with a letter or number"
+            echo "  - Can only contain letters, numbers, hyphens (-), and underscores (_)"
+            echo "  - No spaces or special characters allowed"
+            echo ""
+            while true; do
+                read -rp "Enter a name for this host in the inventory: " host_name
+                if [[ -z "$host_name" ]]; then
+                    echo -e "${RED}Error: Host name is required.${RESET}"
+                    continue
+                fi
+                if ! validate_host_name "$host_name"; then
+                    echo -e "${RED}Error: Invalid host name '$host_name'.${RESET}"
+                    echo "Host names must start with a letter/number and contain only alphanumeric characters, hyphens, and underscores."
+                    continue
+                fi
+                break
+            done
 
             # Select inventory file
             echo ""
@@ -474,31 +569,73 @@ case "$choice" in
         fi
         ;;
     4)
-        # Dry run (check mode)
+        # Dry run (check mode) - tree view of inventories and hosts
         echo ""
-        echo -e "${CYAN}Available inventories:${RESET}"
+        echo -e "${CYAN}Select target (inventory or specific host):${RESET}"
         echo ""
 
-        inventory_list=$(find inventory -name "hosts.yml" -o -name "hosts" 2>/dev/null | sort)
+        # Build tree-view list of all inventories and their hosts
+        tree_list=""
 
-        if [[ -z "$inventory_list" ]]; then
+        while IFS= read -r inv_file; do
+            if [[ -n "$inv_file" ]]; then
+                tree_list="${tree_list}📁 ${inv_file}"$'\n'
+
+                # Get inventory JSON once and extract hosts with their IPs
+                inv_json=$(ansible-inventory -i "$inv_file" --list 2>/dev/null)
+                while IFS= read -r host_name; do
+                    if [[ -n "$host_name" ]]; then
+                        # Use jq to extract ansible_host from the cached JSON
+                        host_ip=$(echo "$inv_json" | jq -r "._meta.hostvars[\"$host_name\"].ansible_host // empty" 2>/dev/null || echo "")
+                        if [[ -n "$host_ip" ]]; then
+                            tree_list="${tree_list}  └─ ${host_name} (${host_ip}) [${inv_file}]"$'\n'
+                        else
+                            tree_list="${tree_list}  └─ ${host_name} [${inv_file}]"$'\n'
+                        fi
+                    fi
+                done < <(ansible-inventory -i "$inv_file" --graph 2>/dev/null | grep -v '@' | sed 's/.*|--//' | sed 's/^[[:space:]]*//' | sort -u)
+            fi
+        done < <(find inventory -name "hosts.yml" -o -name "hosts" 2>/dev/null | sort)
+
+        if [[ -z "$tree_list" ]]; then
             echo "No inventory files found in inventory/"
             exit 1
         fi
 
-        selected_inventory=$(echo "$inventory_list" | fzf \
-            --header="Select inventory file" \
-            --height=40% \
+        selected_item=$(echo -e "$tree_list" | grep -v '^$' | fzf \
+            --header="Select inventory (all hosts) or specific host for dry run" \
+            --height=60% \
             --border=rounded \
-            --prompt="Inventory> " \
-            || echo "$DEFAULT_INVENTORY")
+            --prompt="Target> " \
+            --ansi \
+            || echo "")
 
-        if [[ -z "$selected_inventory" ]]; then
-            selected_inventory="$DEFAULT_INVENTORY"
+        if [[ -z "$selected_item" ]]; then
+            echo "No target selected. Cancelled."
+            exit 0
+        fi
+
+        selected_inventory=""
+        limit_host=""
+        limit_ip=""
+        target_display=""
+
+        if [[ "$selected_item" == "📁 "* ]]; then
+            selected_inventory=$(echo "$selected_item" | sed 's/📁 //')
+            target_display="all hosts in ${selected_inventory}"
+        elif [[ "$selected_item" == "  └─ "* ]]; then
+            host_part=$(echo "$selected_item" | sed 's/  └─ //')
+            selected_inventory=$(echo "$host_part" | grep -o '\[.*\]' | tr -d '[]')
+            limit_host=$(echo "$host_part" | sed 's/ (.*//' | sed 's/ \[.*//')
+            # Extract IP address if present (inside parentheses)
+            if [[ "$host_part" =~ \(([0-9.]+)\) ]]; then
+                limit_ip="${BASH_REMATCH[1]}"
+            fi
+            target_display="host: ${limit_host}"
         fi
 
         echo ""
-        echo -e "${YELLOW}Dry run against: ${selected_inventory}${RESET}"
+        echo -e "${YELLOW}Dry run against: ${target_display}${RESET}"
         echo ""
 
         # Ask about sudo password
@@ -515,11 +652,21 @@ case "$choice" in
 
         echo ""
         echo -e "${GREEN}Executing:${RESET}"
-        echo "  ansible-playbook playbooks/${playbook_name}.yml -i ${selected_inventory} $extra_args"
-        echo ""
-
-        # shellcheck disable=SC2086
-        ansible-playbook "playbooks/${playbook_name}.yml" -i "${selected_inventory}" $extra_args
+        if [[ -n "$limit_host" ]]; then
+            # Use host name for --limit (must match inventory host name, not ansible_host IP)
+            echo "  ansible-playbook playbooks/${playbook_name}.yml -i ${selected_inventory} --limit '${limit_host}' $extra_args"
+            if [[ -n "$limit_ip" ]]; then
+                echo "  (host ${limit_host} -> ${limit_ip})"
+            fi
+            echo ""
+            # shellcheck disable=SC2086
+            ansible-playbook "playbooks/${playbook_name}.yml" -i "${selected_inventory}" --limit "${limit_host}" $extra_args
+        else
+            echo "  ansible-playbook playbooks/${playbook_name}.yml -i ${selected_inventory} $extra_args"
+            echo ""
+            # shellcheck disable=SC2086
+            ansible-playbook "playbooks/${playbook_name}.yml" -i "${selected_inventory}" $extra_args
+        fi
         ;;
     5)
         # Show command only

@@ -1,6 +1,16 @@
 ---
 # Sway role - Create desktop session entry for display manager
 
+- name: Sway | Enable Wayland in GDM configuration
+  ansible.builtin.lineinfile:
+    path: /etc/gdm3/custom.conf
+    regexp: '^#?WaylandEnable='
+    line: 'WaylandEnable=true'
+    insertafter: '^\[daemon\]'
+    state: present
+  become: true
+  when: sway_enable_wayland_in_gdm | default(true) | bool
+
 - name: Sway | Ensure wayland-sessions directory exists
   ansible.builtin.file:
     path: /usr/share/wayland-sessions

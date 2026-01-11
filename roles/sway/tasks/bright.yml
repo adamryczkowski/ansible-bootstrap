@@ -1,0 +1,55 @@
+---
+# Sway role - Install bright CLI tool for monitor brightness control
+#
+# This task installs the 'bright' tool from GitHub using pipx.
+# The tool provides extended brightness control with:
+# - Hardware backlight control via sysfs
+# - Software gamma correction for extended brightness range
+# - Wayland support via wl-gammarelay-rs (already installed via Nix)
+# - Keyboard backlight integration
+#
+# Repository: https://github.com/adamryczkowski/bright
+
+- name: Sway | Ensure pipx is installed
+  ansible.builtin.apt:
+    name: pipx
+    state: present
+  become: true
+
+- name: Sway | Ensure pipx path is configured for user
+  ansible.builtin.command:
+    cmd: pipx ensurepath
+  become: true
+  become_user: "{{ sway_username }}"
+  register: sway_pipx_ensurepath
+  changed_when: "'added' in sway_pipx_ensurepath.stdout"
+
+- name: Sway | Install bright from GitHub via pipx
+  ansible.builtin.command:
+    cmd: pipx install git+https://github.com/adamryczkowski/bright --force
+  become: true
+  become_user: "{{ sway_username }}"
+  register: sway_bright_install
+  changed_when: "'installed package' in sway_bright_install.stdout"
+
+- name: Sway | Configure backlight permissions via udev rule
+  ansible.builtin.copy:
+    dest: /etc/udev/rules.d/90-backlight.rules
+    content: |
+      # Allow video group to control backlight brightness
+      # Required for bright CLI tool
+      ACTION=="add", SUBSYSTEM=="backlight", RUN+="/bin/chgrp video /sys/class/backlight/%k/brightness", RUN+="/bin/chmod g+w /sys/class/backlight/%k/brightness"
+    mode: "0644"
+    owner: root
+    group: root
+  become: true
+  notify: Sway | Reload udev rules
+  when: sway_bright_configure_udev | bool
+
+- name: Sway | Ensure user is in video group for backlight control
+  ansible.builtin.user:
+    name: "{{ sway_username }}"
+    groups: video
+    append: true
+  become: true
+  when: sway_bright_add_to_video_group | bool

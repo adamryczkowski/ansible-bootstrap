@@ -74,3 +74,7 @@
 - name: Sway | Include Slack Wayland compatibility
   ansible.builtin.include_tasks: slack.yml
   when: sway_configure_slack_wayland | bool
+
+- name: Sway | Include bright CLI tool installation
+  ansible.builtin.include_tasks: bright.yml
+  when: sway_install_bright | bool

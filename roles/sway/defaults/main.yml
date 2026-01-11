@@ -95,6 +95,12 @@ sway_fusuma_packages:
 # Session configuration
 sway_create_desktop_entry: true
 
+# Enable Wayland in GDM display manager
+# GDM has WaylandEnable=false by default on some systems, which prevents
+# Wayland sessions (including Sway) from appearing in the session list.
+# This setting ensures WaylandEnable=true is set in /etc/gdm3/custom.conf
+sway_enable_wayland_in_gdm: true
+
 # Environment variables for Sway session
 sway_environment_vars:
   XDG_CURRENT_DESKTOP: "sway:wlroots"
@@ -157,3 +163,15 @@ sway_gtk_font_name: "Sans 10"
 # Color scheme preference: 'prefer-dark', 'prefer-light', or 'default'
 # This controls GTK4 apps and is used by the theme switching scripts
 sway_gtk_color_scheme: "prefer-dark"
+
+# Bright CLI tool for extended brightness control
+# Repository: https://github.com/adamryczkowski/bright
+# Provides hardware backlight + software gamma correction for extended range
+sway_install_bright: true
+
+# Configure udev rules for backlight permissions
+# Creates /etc/udev/rules.d/90-backlight.rules to allow video group access
+sway_bright_configure_udev: true
+
+# Add user to video group for backlight control
+sway_bright_add_to_video_group: true
