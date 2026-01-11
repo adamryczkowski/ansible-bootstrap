@@ -33,6 +33,7 @@
     cmd: fc-cache -fv
   become: false
   listen: Update font cache
+  ignore_errors: true  # May fail due to corrupted font directories on target system
 
 - name: Sway | Update desktop database
   ansible.builtin.command:

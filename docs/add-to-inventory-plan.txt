@@ -1,0 +1,283 @@
+# Plan: Adding Manually Specified Hosts to Ansible Inventory
+
+## Date: 2026-01-11
+
+## Problem Statement
+
+When a user selects option 3 ("Run against remote hosts (specified manually)") in the
+select-playbook script, they manually enter host details (IP, username, port, target user).
+After the playbook runs successfully, we should ask the user if they want to add this host
+to the inventory for future use.
+
+## Current Implementation Analysis
+
+### Existing Code (lines 372-474 in scripts/select-playbook.sh)
+
+**The add-to-inventory functionality already exists!** After the ansible-playbook command
+executes (line 370), the script:
+
+1. Asks if user wants to add the host to inventory (lines 372-378)
+2. Prompts for a host name/alias (lines 381-387)
+3. Uses fzf to select an inventory file (lines 389-404)
+4. Parses groups from the inventory using grep (line 414)
+5. Uses fzf to select a group (lines 421-426)
+6. Inserts the host entry using head/tail/echo (lines 462-469)
+
+### Why It May Not Be Triggered
+
+The script uses `set -euo pipefail` (line 7), which means:
+- If the ansible-playbook command fails (non-zero exit code), the script exits immediately
+- The add-to-inventory code (lines 372-474) is never reached
+
+Based on the user's terminal output, the playbook was running successfully, but the output
+was truncated. If the playbook completed successfully, the add-to-inventory prompt should
+have appeared.
+
+### Current Implementation Issues
+
+1. **Fragile YAML Manipulation**: Uses head/tail/echo with line number calculations
+  - Relies on exact indentation (8 spaces for host, 10 spaces for properties)
+  - Uses `echo -e` for newlines which may behave differently across systems
+  - Doesn't validate YAML structure after modification
+
+2. **Group Parsing Regex**: `grep -E "^    [a-zA-Z_][a-zA-Z0-9_-]*:$"`
+  - Assumes exactly 4 spaces of indentation
+  - May miss groups with different indentation or inline comments
+
+3. **No Backup**: Modifies inventory file directly without creating a backup
+
+4. **No Validation**: Doesn't run `ansible-inventory --list` to validate the result
+
+5. **No Duplicate Check**: Doesn't check if host name already exists
+
+## Inventory Structure Analysis
+
+All inventory files follow the same YAML structure:
+
+```yaml
+---
+# Comment
+all:
+  children:
+    workstations:
+      hosts:
+        hostname:
+          ansible_host: 192.168.x.x
+          ansible_user: username
+          target_user: username
+    servers:
+      hosts:
+        # hosts here
+```
+
+### Inventory Files Found
+
+- `inventory/production/hosts.yml` - Has one real host (sk-pf3d0a9t)
+- `inventory/staging/hosts.yml` - Empty hosts sections
+- `inventory/lxd-test/hosts.yml` - Has lxd_test_container
+- `inventory/comfyui/hosts.yml` - Has comfyui_host
+- `inventory/virtualbox-test/` - Directory exists (no hosts.yml found)
+
+## Research Findings
+
+### 1. Ansible Inventory YAML Format (Official Documentation)
+
+The official Ansible documentation specifies the YAML inventory format:
+- Top-level key is typically `all` with `children` containing groups
+- Each group has a `hosts` section containing host definitions
+- Host variables are nested under the host name
+- Common variables: `ansible_host`, `ansible_user`, `ansible_port`, `target_user`
+
+**Source:** https://docs.ansible.com/projects/ansible/latest/inventory_guide/intro_inventory.html
+
+### 2. No Built-in Command for Adding Hosts
+
+There is NO built-in Ansible command to programmatically add hosts to inventory files.
+The inventory is simply a YAML file that must be edited directly.
+
+**Source:** https://serverfault.com/questions/1094316/ansible-add-hosts-to-inventory-by-script
+
+### 3. yq Tool Analysis
+
+`yq` (Mike Farah's Go version) is already installed on the system (v4.50.1).
+
+**Tested Command:**
+```bash
+yq '.all.children.workstations.hosts.test_host = {
+  "ansible_host": "192.168.1.100",
+  "ansible_user": "testuser",
+  "target_user": "testuser"
+}' inventory/production/hosts.yml
+```
+
+**Result:** Successfully adds host while preserving comments and structure.
+
+**Key Features:**
+- In-place editing with `-i` flag
+- Preserves YAML comments
+- Handles nested structures correctly
+- Environment variable support with `strenv()`
+
+**Sources:**
+- https://mikefarah.gitbook.io/yq/
+- https://www.baeldung.com/linux/yq-utility-processing-yaml
+
+## Comparison: Current Shell Approach vs yq
+
+| Aspect | Current Shell (head/tail/echo) | yq |
+|--------|-------------------------------|-----|
+| Robustness | Fragile, relies on line numbers | Robust, works with YAML structure |
+| Comments | May break comments | Preserves comments |
+| Validation | None | Can validate structure |
+| Indentation | Hardcoded (8/10 spaces) | Automatic |
+| Edge cases | Fails on empty hosts section | Handles correctly |
+| Dependency | None (bash built-ins) | Requires yq (already installed) |
+| Maintainability | Hard to modify | Easy to modify |
+
+## Recommended Implementation
+
+### Option A: Refactor to Use yq (Recommended)
+
+Replace lines 436-469 with yq-based implementation:
+
+```bash
+# Check if yq is available
+if ! command -v yq &> /dev/null; then
+    echo -e "${RED}Error: yq is required but not installed.${RESET}"
+    echo "Install with: sudo snap install yq"
+    exit 1
+fi
+
+# Check if host already exists
+if yq ".all.children.${selected_group}.hosts.${host_name}" "$selected_inventory" | grep -q "ansible_host"; then
+    echo -e "${YELLOW}Warning: Host ${host_name} already exists in ${selected_group}.${RESET}"
+    read -rp "Overwrite? [y/N]: " overwrite
+    if [[ "$overwrite" != "y" && "$overwrite" != "Y" ]]; then
+        echo "Skipping."
+        exit 0
+    fi
+fi
+
+# Create backup
+cp "$selected_inventory" "${selected_inventory}.bak"
+
+# Add host using yq
+yq -i ".all.children.${selected_group}.hosts.${host_name}.ansible_host = \"${remote_host}\"" "$selected_inventory"
+yq -i ".all.children.${selected_group}.hosts.${host_name}.ansible_user = \"${remote_user}\"" "$selected_inventory"
+yq -i ".all.children.${selected_group}.hosts.${host_name}.target_user = \"${target_user}\"" "$selected_inventory"
+
+if [[ "$remote_port" != "22" ]]; then
+    yq -i ".all.children.${selected_group}.hosts.${host_name}.ansible_port = ${remote_port}" "$selected_inventory"
+fi
+
+# Validate the result
+if ansible-inventory -i "$selected_inventory" --list > /dev/null 2>&1; then
+    echo -e "${GREEN}Host ${host_name} added successfully to ${selected_inventory} in group ${selected_group}.${RESET}"
+    rm -f "${selected_inventory}.bak"
+else
+    echo -e "${RED}Error: Invalid inventory after modification. Restoring backup.${RESET}"
+    mv "${selected_inventory}.bak" "$selected_inventory"
+    exit 1
+fi
+```
+
+### Option B: Fix Current Shell Implementation
+
+If yq dependency is not desired, fix the current implementation:
+
+1. Add duplicate host check before insertion
+2. Create backup before modification
+3. Validate YAML after modification using `python3 -c "import yaml; yaml.safe_load(open('file'))"`
+4. Handle edge cases (empty hosts section, different indentation)
+
+### Option C: Create Helper Script
+
+Create `scripts/add-host-to-inventory.sh` that:
+- Takes all parameters as command-line arguments
+- Uses yq for YAML manipulation
+- Validates inputs and outputs
+- Can be called from select-playbook.sh or directly
+
+This provides a reusable tool and keeps select-playbook.sh cleaner.
+
+## Implementation Plan
+
+### Phase 1: Immediate Fix (Option A)
+
+1. Replace lines 436-469 in select-playbook.sh with yq-based implementation
+2. Add yq availability check at script start
+3. Add duplicate host detection
+4. Add backup/restore mechanism
+5. Add validation with ansible-inventory
+
+### Phase 2: Helper Script (Optional Enhancement)
+
+1. Create `scripts/add-host-to-inventory.sh` with full functionality
+2. Add `just add-host` action to justfile
+3. Update select-playbook.sh to call the helper script
+4. Add documentation
+
+### Phase 3: Testing
+
+1. Test adding host to empty group
+2. Test adding host to group with existing hosts
+3. Test duplicate host detection
+4. Test with non-standard port
+5. Test backup/restore on validation failure
+6. Run `just validate` to ensure no regressions
+
+## Dependencies
+
+- `yq` v4.x (Mike Farah's Go version) - Already installed (v4.50.1)
+- `fzf` - Already required by select-playbook.sh
+- `ansible-inventory` - Part of Ansible installation
+
+## Sources Used
+
+1. **Ansible Official Documentation - Building an Inventory**
+  https://docs.ansible.com/projects/ansible/latest/getting_started/get_started_inventory.html
+  (Accessed: 2026-01-11)
+
+2. **Ansible Official Documentation - How to Build Your Inventory**
+  https://docs.ansible.com/projects/ansible/latest/inventory_guide/intro_inventory.html
+  (Accessed: 2026-01-11)
+
+3. **Server Fault - Ansible; add hosts to inventory by script**
+  https://serverfault.com/questions/1094316/ansible-add-hosts-to-inventory-by-script
+  (Accessed: 2026-01-11)
+
+4. **yq Documentation (Mike Farah)**
+  https://mikefarah.gitbook.io/yq/
+  (Accessed: 2026-01-11)
+
+5. **Baeldung - Processing YAML Content With yq**
+  https://www.baeldung.com/linux/yq-utility-processing-yaml
+  (Accessed: 2026-01-11)
+
+6. **Spacelift - Working with Ansible Inventory – Basics and Examples**
+  https://spacelift.io/blog/ansible-inventory
+  (Accessed: 2026-01-11)
+
+7. **Local Code Analysis**
+  - scripts/select-playbook.sh (lines 305-474)
+  - inventory/production/hosts.yml
+  - inventory/staging/hosts.yml
+  - inventory/lxd-test/hosts.yml
+  - inventory/comfyui/hosts.yml
+
+## Conclusion
+
+The add-to-inventory functionality already exists in the codebase but uses a fragile
+shell-based approach. The recommended path forward is to refactor it to use `yq`,
+which is already installed on the system and provides robust YAML manipulation with
+comment preservation.
+
+Key improvements needed:
+1. Replace head/tail/echo with yq commands
+2. Add duplicate host detection
+3. Add backup/restore mechanism
+4. Add validation with ansible-inventory
+5. Consider extracting to a helper script for reusability
+
+The implementation is straightforward since yq is already available and the inventory
+structure is consistent across all environments.

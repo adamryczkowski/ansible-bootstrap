@@ -50,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Sway playbook: Added robust handling for broken third-party apt repositories (block/rescue pattern with automatic detection and disabling of problematic repos)
 - CLI tools role: Fixed Rust package names for cargo-binstall (`dust` → `du-dust`, `tldr` → `tealdeer`)
 - Sway playbook: Added python3-cffi pre-task for hosts with pyenv (fixes cryptography module import)
 - Sway role: iotop task now resolves symlinks before setting capabilities (fixes "Not a regular file" error)

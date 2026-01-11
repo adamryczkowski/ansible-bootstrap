@@ -27,10 +27,66 @@
         dpkg -s python3-cffi >/dev/null 2>&1 || apt-get update && apt-get install -y python3-cffi
       changed_when: false
 
-    - name: Update apt cache
-      ansible.builtin.apt:
-        update_cache: true
-        cache_valid_time: 3600
+    - name: Update apt cache with broken repository handling
+      block:
+        - name: Update apt cache
+          ansible.builtin.apt:
+            update_cache: true
+            cache_valid_time: 3600
+      rescue:
+        - name: Display warning about broken repositories
+          ansible.builtin.debug:
+            msg: |
+              WARNING: apt cache update failed, likely due to broken third-party repositories.
+              Common causes include expired GPG keys, unreachable servers, or weak signatures.
+              Attempting to identify and disable problematic repositories...
+
+        - name: Identify and disable broken repositories
+          ansible.builtin.shell: |
+            #!/bin/bash
+            set -e
+            DISABLED_REPOS=""
+            APT_OPTS="-o Dir::Etc::sourceparts=/dev/null -o APT::Get::List-Cleanup=0"
+            ERROR_PATTERN="(NO_PUBKEY|not signed|weak algorithm|Could not connect)"
+
+            # Check .list files in sources.list.d
+            for repo_file in /etc/apt/sources.list.d/*.list; do
+              [ -f "$repo_file" ] || continue
+              repo_name=$(basename "$repo_file" .list)
+              if apt-get update -o Dir::Etc::sourcelist="$repo_file" $APT_OPTS 2>&1 | grep -qE "$ERROR_PATTERN"; then
+                mv "$repo_file" "${repo_file}.disabled"
+                DISABLED_REPOS="$DISABLED_REPOS $repo_name"
+              fi
+            done
+
+            # Check .sources files (DEB822 format) in sources.list.d
+            for repo_file in /etc/apt/sources.list.d/*.sources; do
+              [ -f "$repo_file" ] || continue
+              repo_name=$(basename "$repo_file" .sources)
+              if apt-get update -o Dir::Etc::sourcelist="$repo_file" $APT_OPTS 2>&1 | grep -qE "$ERROR_PATTERN"; then
+                mv "$repo_file" "${repo_file}.disabled"
+                DISABLED_REPOS="$DISABLED_REPOS $repo_name"
+              fi
+            done
+
+            if [ -n "$DISABLED_REPOS" ]; then
+              echo "Disabled broken repositories:$DISABLED_REPOS"
+            else
+              echo "No broken repositories found to disable"
+            fi
+          args:
+            executable: /bin/bash
+          register: disable_repos_result
+          changed_when: "'Disabled broken repositories' in disable_repos_result.stdout"
+
+        - name: Show disabled repositories
+          ansible.builtin.debug:
+            msg: "{{ disable_repos_result.stdout }}"
+
+        - name: Retry apt cache update after disabling broken repos
+          ansible.builtin.apt:
+            update_cache: true
+            cache_valid_time: 0
 
     - name: Install essential packages
       ansible.builtin.apt:
