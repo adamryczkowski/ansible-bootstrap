@@ -213,12 +213,13 @@ echo -e "${CYAN}What would you like to do?${RESET}"
 echo ""
 echo "  1) Run against local machine (localhost)"
 echo "  2) Run against remote hosts (using inventory)"
-echo "  3) Dry run (check mode) against remote hosts"
-echo "  4) Show command only (don't execute)"
-echo "  5) Cancel"
+echo "  3) Run against remote hosts (specified manually)"
+echo "  4) Dry run (check mode) against remote hosts"
+echo "  5) Show command only (don't execute)"
+echo "  6) Cancel"
 echo ""
 
-read -rp "Select option [1-5]: " choice
+read -rp "Select option [1-6]: " choice
 
 case "$choice" in
     1)
@@ -302,6 +303,177 @@ case "$choice" in
         ansible-playbook "playbooks/${playbook_name}.yml" -i "${selected_inventory}" $extra_args
         ;;
     3)
+        # Remote execution with manually specified host
+        echo ""
+        echo -e "${CYAN}Enter remote host details:${RESET}"
+        echo ""
+
+        # Get host address
+        read -rp "Host address (IP or hostname): " remote_host
+        if [[ -z "$remote_host" ]]; then
+            echo -e "${RED}Error: Host address is required.${RESET}"
+            exit 1
+        fi
+
+        # Get SSH user
+        read -rp "SSH username [$(whoami)]: " remote_user
+        if [[ -z "$remote_user" ]]; then
+            remote_user=$(whoami)
+        fi
+
+        # Get SSH port
+        read -rp "SSH port [22]: " remote_port
+        if [[ -z "$remote_port" ]]; then
+            remote_port="22"
+        fi
+
+        # Get target user (user to configure on the remote host)
+        read -rp "Target user (user to configure) [$remote_user]: " target_user
+        if [[ -z "$target_user" ]]; then
+            target_user="$remote_user"
+        fi
+
+        # Ask about SSH key or password authentication
+        echo ""
+        echo -e "${CYAN}SSH authentication method:${RESET}"
+        echo "  1) Use SSH key (default)"
+        echo "  2) Ask for SSH password"
+        echo ""
+        read -rp "Select option [1-2]: " auth_choice
+
+        # Ask about sudo password
+        echo ""
+        echo -e "${CYAN}Does this playbook require sudo privileges?${RESET}"
+        echo "  1) Yes, ask for sudo password (--ask-become-pass)"
+        echo "  2) No, passwordless sudo is configured"
+        echo ""
+        read -rp "Select option [1-2]: " sudo_choice
+
+        # Build extra args
+        extra_args="-e target_user=$target_user -e ansible_port=$remote_port"
+        if [[ "$auth_choice" == "2" ]]; then
+            extra_args="$extra_args --ask-pass"
+        fi
+        if [[ "$sudo_choice" == "1" ]]; then
+            extra_args="$extra_args --ask-become-pass"
+        fi
+
+        echo ""
+        echo -e "${YELLOW}Running against: ${remote_user}@${remote_host}:${remote_port}${RESET}"
+        echo ""
+
+        echo -e "${GREEN}Executing:${RESET}"
+        echo "  ansible-playbook playbooks/${playbook_name}.yml -i ${remote_host}, -u ${remote_user} $extra_args"
+        echo ""
+
+        # shellcheck disable=SC2086
+        ansible-playbook "playbooks/${playbook_name}.yml" -i "${remote_host}," -u "${remote_user}" $extra_args
+
+        # Ask if user wants to add this host to inventory
+        echo ""
+        echo -e "${CYAN}Would you like to add this host to the inventory?${RESET}"
+        echo "  1) Yes"
+        echo "  2) No"
+        echo ""
+        read -rp "Select option [1-2]: " add_to_inventory
+
+        if [[ "$add_to_inventory" == "1" ]]; then
+            # Get host name for inventory
+            echo ""
+            read -rp "Enter a name for this host in the inventory: " host_name
+            if [[ -z "$host_name" ]]; then
+                echo -e "${RED}Error: Host name is required.${RESET}"
+                exit 1
+            fi
+
+            # Select inventory file
+            echo ""
+            echo -e "${CYAN}Select inventory file:${RESET}"
+            inventory_list=$(find inventory -name "hosts.yml" 2>/dev/null | sort)
+
+            if [[ -z "$inventory_list" ]]; then
+                echo "No inventory files found in inventory/"
+                exit 1
+            fi
+
+            selected_inventory=$(echo "$inventory_list" | fzf \
+                --header="Select inventory file to add host to" \
+                --height=40% \
+                --border=rounded \
+                --prompt="Inventory> " \
+                || echo "")
+
+            if [[ -z "$selected_inventory" ]]; then
+                echo "No inventory selected. Skipping."
+            else
+                # Extract groups from the inventory file
+                echo ""
+                echo -e "${CYAN}Select group to add host to:${RESET}"
+
+                # Parse groups from the inventory file (children of 'all')
+                groups=$(grep -E "^    [a-zA-Z_][a-zA-Z0-9_-]*:$" "$selected_inventory" | sed 's/://g' | xargs)
+
+                if [[ -z "$groups" ]]; then
+                    echo "No groups found in inventory file."
+                    exit 1
+                fi
+
+                selected_group=$(echo "$groups" | tr ' ' '\n' | fzf \
+                    --header="Select group" \
+                    --height=40% \
+                    --border=rounded \
+                    --prompt="Group> " \
+                    || echo "")
+
+                if [[ -z "$selected_group" ]]; then
+                    echo "No group selected. Skipping."
+                else
+                    # Add host to the inventory file
+                    # Find the line with the group's hosts: section and add the new host
+                    echo ""
+                    echo -e "${YELLOW}Adding host to ${selected_inventory} in group ${selected_group}...${RESET}"
+
+                    # Create the host entry
+                    host_entry="        ${host_name}:\n          ansible_host: ${remote_host}\n          ansible_user: ${remote_user}\n          target_user: ${target_user}"
+                    if [[ "$remote_port" != "22" ]]; then
+                        host_entry="${host_entry}\n          ansible_port: ${remote_port}"
+                    fi
+
+                    # Find the line number of the group's hosts: section
+                    # We need to find the pattern "    groupname:\n      hosts:" and insert after "hosts:"
+                    group_line=$(grep -n "^    ${selected_group}:$" "$selected_inventory" | cut -d: -f1)
+
+                    if [[ -z "$group_line" ]]; then
+                        echo -e "${RED}Error: Could not find group ${selected_group} in inventory.${RESET}"
+                        exit 1
+                    fi
+
+                    # Find the hosts: line after the group
+                    hosts_line=$(tail -n +"$group_line" "$selected_inventory" | grep -n "^      hosts:$" | head -1 | cut -d: -f1)
+
+                    if [[ -z "$hosts_line" ]]; then
+                        echo -e "${RED}Error: Could not find hosts section for group ${selected_group}.${RESET}"
+                        exit 1
+                    fi
+
+                    # Calculate the actual line number
+                    insert_line=$((group_line + hosts_line - 1))
+
+                    # Create a temporary file with the new content
+                    {
+                        head -n "$insert_line" "$selected_inventory"
+                        echo -e "$host_entry"
+                        tail -n +"$((insert_line + 1))" "$selected_inventory"
+                    } > "${selected_inventory}.tmp"
+
+                    mv "${selected_inventory}.tmp" "$selected_inventory"
+
+                    echo -e "${GREEN}Host ${host_name} added to ${selected_inventory} in group ${selected_group}.${RESET}"
+                fi
+            fi
+        fi
+        ;;
+    4)
         # Dry run (check mode)
         echo ""
         echo -e "${CYAN}Available inventories:${RESET}"
@@ -349,7 +521,7 @@ case "$choice" in
         # shellcheck disable=SC2086
         ansible-playbook "playbooks/${playbook_name}.yml" -i "${selected_inventory}" $extra_args
         ;;
-    4)
+    5)
         # Show command only
         echo ""
         echo -e "${CYAN}Commands to run this playbook:${RESET}"
@@ -369,6 +541,9 @@ case "$choice" in
         echo "  # Run against remote hosts with sudo password:"
         echo "  ansible-playbook playbooks/${playbook_name}.yml -i inventory/production/hosts.yml --ask-become-pass"
         echo ""
+        echo "  # Run against manually specified host:"
+        echo "  ansible-playbook playbooks/${playbook_name}.yml -i <host>, -u <user> -e target_user=<user>"
+        echo ""
         echo "  # Dry run (check mode):"
         echo "  ansible-playbook playbooks/${playbook_name}.yml -i inventory/production/hosts.yml --check --diff"
         echo ""
@@ -377,7 +552,7 @@ case "$choice" in
         echo "  just check ${playbook_name}"
         echo ""
         ;;
-    5|*)
+    6|*)
         echo "Cancelled."
         exit 0
         ;;

@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Justfile: `playbooks` action to list all playbooks with their descriptions
 - Justfile: `select-playbook` action for interactive fzf-based playbook selection with preview, local/remote execution, sudo password prompts, dry-run mode, and Python interpreter detection
+- Scripts: `select-playbook.sh` option to run against manually specified remote hosts with SSH parameter collection and optional inventory addition
 - Scripts: `scripts/list-playbooks.sh` helper for extracting playbook descriptions
 - Scripts: `scripts/select-playbook.sh` interactive playbook selector with full workflow support and automatic detection of working Python interpreters for local execution
 - CLI tools role: Profile-based CLI experience with `minimal` and `full` settings
