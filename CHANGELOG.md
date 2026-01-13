@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- ZSwap role: Configure ZSwap compressed swap cache for improved system performance on Ubuntu 24.04 LTS
+- ZSwap role: Configurable compressor (zstd, lz4, lzo, etc.), zpool (zsmalloc, z3fold, zbud), and pool size
+- ZSwap role: Automatic GRUB configuration with kernel boot parameters
+- ZSwap role: Initramfs module configuration for compression algorithms
+- ZSwap role: Verification tasks to confirm ZSwap configuration after applying
+- Playbooks: `zswap.yml` for deploying ZSwap configuration to Ubuntu systems
 - Justfile: `playbooks` action to list all playbooks with their descriptions
 - Justfile: `select-playbook` action for interactive fzf-based playbook selection with preview, local/remote execution, sudo password prompts, dry-run mode, and Python interpreter detection
 - Scripts: `select-playbook.sh` option to run against manually specified remote hosts with SSH parameter collection and optional inventory addition
@@ -54,6 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Sway role: Fixed brightness key bindings not working for non-adam users (hardcoded /home/adam/ paths in i3-config repository are now replaced with the actual user's home directory via `sway_fix_hardcoded_paths` variable)
 - Sway playbook: Added robust handling for broken third-party apt repositories (block/rescue pattern with automatic detection and disabling of problematic repos)
 - CLI tools role: Fixed Rust package names for cargo-binstall (`dust` → `du-dust`, `tldr` → `tealdeer`)
 - Sway playbook: Added python3-cffi pre-task for hosts with pyenv (fixes cryptography module import)

@@ -1,0 +1,94 @@
+---
+# ZSwap role - Configure compressed swap cache for improved performance
+#
+# This role configures ZSwap on Ubuntu 24.04 LTS systems by:
+# 1. Verifying swap space is available (required for ZSwap)
+# 2. Configuring GRUB with ZSwap kernel parameters
+# 3. Adding compression modules to initramfs (if needed)
+# 4. Updating GRUB configuration
+
+- name: ZSwap | Check if swap is enabled
+  ansible.builtin.command:
+    cmd: swapon --show --noheadings
+  register: zswap_swap_check
+  changed_when: false
+  failed_when: false
+
+- name: ZSwap | Fail if no swap is configured
+  ansible.builtin.fail:
+    msg: >
+      ZSwap requires swap space to be configured. No swap partition or swap file was found.
+      Please configure swap before enabling ZSwap.
+  when: zswap_swap_check.stdout | length == 0
+
+- name: ZSwap | Display current swap configuration
+  ansible.builtin.debug:
+    msg: "Swap configuration found: {{ zswap_swap_check.stdout_lines }}"
+  when: zswap_swap_check.stdout | length > 0
+
+- name: ZSwap | Build kernel parameters string
+  ansible.builtin.set_fact:
+    zswap_kernel_params: >-
+      zswap.enabled={{ '1' if zswap_enabled else '0' }}
+      zswap.compressor={{ zswap_compressor }}
+      zswap.zpool={{ zswap_zpool }}
+      zswap.max_pool_percent={{ zswap_max_pool_percent }}
+      zswap.shrinker_enabled={{ '1' if zswap_shrinker_enabled else '0' }}
+      zswap.accept_threshold_percent={{ zswap_accept_threshold_percent }}
+
+- name: ZSwap | Display kernel parameters to be configured
+  ansible.builtin.debug:
+    msg: "ZSwap kernel parameters: {{ zswap_kernel_params }}"
+
+- name: ZSwap | Read current GRUB configuration
+  ansible.builtin.slurp:
+    src: /etc/default/grub
+  register: zswap_grub_content
+  become: true
+
+- name: ZSwap | Parse current GRUB_CMDLINE_LINUX_DEFAULT
+  ansible.builtin.set_fact:
+    zswap_current_cmdline: >-
+      {{ (zswap_grub_content.content | b64decode | regex_search('GRUB_CMDLINE_LINUX_DEFAULT="([^"]*)"', '\1')) | default([''], true) | first }}
+
+- name: ZSwap | Remove existing zswap parameters from cmdline
+  ansible.builtin.set_fact:
+    zswap_clean_cmdline: >-
+      {{ zswap_current_cmdline | regex_replace('zswap\.[a-z_]+=\S*\s*', '') | trim }}
+
+- name: ZSwap | Build new GRUB_CMDLINE_LINUX_DEFAULT
+  ansible.builtin.set_fact:
+    zswap_new_cmdline: "{{ zswap_clean_cmdline }} {{ zswap_kernel_params | trim }}"
+
+- name: ZSwap | Update GRUB_CMDLINE_LINUX_DEFAULT
+  ansible.builtin.lineinfile:
+    path: /etc/default/grub
+    regexp: '^GRUB_CMDLINE_LINUX_DEFAULT='
+    line: 'GRUB_CMDLINE_LINUX_DEFAULT="{{ zswap_new_cmdline | trim }}"'
+    backup: true
+  become: true
+  notify:
+    - ZSwap | Update GRUB
+    - ZSwap | Display reboot notice
+
+- name: ZSwap | Add compression modules to initramfs
+  ansible.builtin.lineinfile:
+    path: /etc/initramfs-tools/modules
+    line: "{{ item }}"
+    create: true
+    mode: "0644"
+  loop: "{{ zswap_initramfs_modules[zswap_compressor] | default([]) }}"
+  become: true
+  when:
+    - zswap_update_initramfs
+    - zswap_compressor in zswap_initramfs_modules
+  notify:
+    - ZSwap | Update initramfs
+
+- name: ZSwap | Flush handlers to apply GRUB and initramfs changes
+  ansible.builtin.meta: flush_handlers
+
+- name: ZSwap | Include verification tasks
+  ansible.builtin.include_tasks: verify.yml
+  tags:
+    - zswap_verify

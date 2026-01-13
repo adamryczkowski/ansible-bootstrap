@@ -175,3 +175,9 @@ sway_bright_configure_udev: true
 
 # Add user to video group for backlight control
 sway_bright_add_to_video_group: true
+
+# Fix hardcoded paths in i3-config repository
+# The i3-config repository contains hardcoded /home/adam/ paths that need to be
+# replaced with the actual user's home directory for brightness controls to work
+# This replaces /home/adam/ with /home/{{ sway_username }}/ in config files
+sway_fix_hardcoded_paths: true

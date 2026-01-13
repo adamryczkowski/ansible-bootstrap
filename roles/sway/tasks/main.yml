@@ -39,6 +39,10 @@
 - name: Sway | Include configuration setup
   ansible.builtin.include_tasks: config.yml
 
+- name: Sway | Include hardcoded path fixes for i3-config repository
+  ansible.builtin.include_tasks: fix_hardcoded_paths.yml
+  when: sway_fix_hardcoded_paths | bool
+
 - name: Sway | Include GTK theme configuration for automatic dark/light mode
   ansible.builtin.include_tasks: gtk_theme.yml
   when: sway_configure_gtk_theme | bool

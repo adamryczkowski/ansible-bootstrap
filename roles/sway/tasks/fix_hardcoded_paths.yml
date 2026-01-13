@@ -1,0 +1,36 @@
+---
+# Sway role - Fix hardcoded paths in i3-config repository
+#
+# The i3-config repository (https://gitlab.com/adamwam/i3-config.git) contains
+# hardcoded paths to /home/adam/ which need to be replaced with the actual
+# user's home directory for the configuration to work correctly.
+#
+# This task replaces /home/adam/ with /home/{{ sway_username }}/ in the
+# sway and i3 configuration files after cloning the repository.
+
+- name: Sway | Fix hardcoded home directory paths in sway config
+  ansible.builtin.replace:
+    path: "{{ sway_config_dest }}/sway/config"
+    regexp: '/home/adam/'
+    replace: '/home/{{ sway_username }}/'
+  become: true
+  become_user: "{{ sway_username }}"
+  register: sway_fix_sway_config
+
+- name: Sway | Fix hardcoded home directory paths in i3 config
+  ansible.builtin.replace:
+    path: "{{ sway_config_dest }}/i3/config"
+    regexp: '/home/adam/'
+    replace: '/home/{{ sway_username }}/'
+  become: true
+  become_user: "{{ sway_username }}"
+  register: sway_fix_i3_config
+  failed_when: false  # i3 config may not exist in all setups
+
+- name: Sway | Report path fixes applied
+  ansible.builtin.debug:
+    msg: >-
+      Hardcoded path fixes applied:
+      sway/config={{ sway_fix_sway_config.changed | default(false) }},
+      i3/config={{ sway_fix_i3_config.changed | default(false) }}
+  when: sway_fix_sway_config.changed or (sway_fix_i3_config.changed | default(false))

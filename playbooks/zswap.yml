@@ -1,0 +1,87 @@
+---
+# ZSwap playbook - Install and configure ZSwap compressed swap cache
+#
+# This playbook configures ZSwap on Ubuntu 24.04 LTS systems to improve
+# system performance and responsiveness by compressing swap pages in RAM.
+#
+# Usage:
+#   ansible-playbook -i inventory/production/hosts.yml playbooks/zswap.yml
+#   ansible-playbook -i inventory/production/hosts.yml playbooks/zswap.yml --limit hostname
+#
+# Requirements:
+#   - Ubuntu 24.04 LTS (Noble Numbat)
+#   - Swap space must be configured (swap partition or swap file)
+#   - Sudo access on target hosts
+#
+# What this playbook does:
+#   1. Verifies swap space is available
+#   2. Configures GRUB with ZSwap kernel parameters
+#   3. Adds compression modules to initramfs
+#   4. Updates GRUB and initramfs
+#   5. Verifies the configuration
+#
+# After running this playbook, a REBOOT is required for changes to take effect.
+#
+# Default settings (can be overridden in inventory or command line):
+#   - Compressor: zstd (good balance of speed and compression)
+#   - ZPool: zsmalloc (efficient memory allocator)
+#   - Max pool: 20% of RAM
+#   - Shrinker: enabled (proactive memory reclaim)
+#
+# Example with custom settings:
+#   ansible-playbook -i inventory/production/hosts.yml playbooks/zswap.yml \
+#     -e zswap_compressor=lz4 \
+#     -e zswap_max_pool_percent=25
+
+- name: Configure ZSwap compressed swap cache
+  hosts: all
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Check if running Ubuntu
+      ansible.builtin.assert:
+        that:
+          - ansible_distribution == "Ubuntu"
+        fail_msg: "This playbook is designed for Ubuntu systems only"
+        success_msg: "Running on Ubuntu {{ ansible_distribution_version }}"
+
+    - name: Check Ubuntu version
+      ansible.builtin.debug:
+        msg: >-
+          Running on Ubuntu {{ ansible_distribution_version }}
+          ({{ ansible_distribution_release }}).
+          {% if ansible_distribution_version is version('24.04', '<') %}
+          WARNING: This playbook is optimized for Ubuntu 24.04 LTS.
+          Some features may not work on older versions.
+          {% endif %}
+
+  roles:
+    - role: zswap
+      tags: [zswap]
+
+  post_tasks:
+    - name: Display completion message
+      ansible.builtin.debug:
+        msg: |
+          ============================================
+          ZSwap Configuration Complete!
+          ============================================
+
+          ZSwap has been configured with the following settings:
+          - Enabled: {{ zswap_enabled }}
+          - Compressor: {{ zswap_compressor }}
+          - ZPool: {{ zswap_zpool }}
+          - Max pool percent: {{ zswap_max_pool_percent }}%
+          - Shrinker enabled: {{ zswap_shrinker_enabled }}
+
+          IMPORTANT: A REBOOT is required for changes to take effect.
+
+          After reboot, verify ZSwap is working:
+            grep -r . /sys/module/zswap/parameters/
+            dmesg | grep zswap
+
+          To monitor ZSwap statistics (requires root):
+            sudo grep -r . /sys/kernel/debug/zswap/
+
+          ============================================

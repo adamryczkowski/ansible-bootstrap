@@ -1,0 +1,114 @@
+---
+# ZSwap verification tasks
+# These tasks verify the ZSwap configuration after applying the playbook
+
+- name: ZSwap Verify | Check if ZSwap module is loaded
+  ansible.builtin.stat:
+    path: /sys/module/zswap
+  register: zswap_module_check
+
+- name: ZSwap Verify | Display ZSwap module status
+  ansible.builtin.debug:
+    msg: "ZSwap kernel module is {{ 'loaded' if zswap_module_check.stat.exists else 'NOT loaded' }}"
+
+- name: ZSwap Verify | Read current ZSwap parameters
+  ansible.builtin.command:
+    cmd: grep -r . /sys/module/zswap/parameters/
+  register: zswap_current_params
+  changed_when: false
+  failed_when: false
+  when: zswap_module_check.stat.exists
+
+- name: ZSwap Verify | Display current ZSwap parameters
+  ansible.builtin.debug:
+    msg: "{{ zswap_current_params.stdout_lines }}"
+  when:
+    - zswap_module_check.stat.exists
+    - zswap_current_params.stdout_lines is defined
+
+- name: ZSwap Verify | Check ZSwap enabled status
+  ansible.builtin.slurp:
+    src: /sys/module/zswap/parameters/enabled
+  register: zswap_enabled_check
+  when: zswap_module_check.stat.exists
+
+- name: ZSwap Verify | Display ZSwap enabled status
+  ansible.builtin.debug:
+    msg: >-
+      ZSwap is currently {{ 'ENABLED' if (zswap_enabled_check.content | b64decode | trim) in ['Y', '1'] else 'DISABLED' }}
+      (value: {{ zswap_enabled_check.content | b64decode | trim }})
+  when:
+    - zswap_module_check.stat.exists
+    - zswap_enabled_check is defined
+
+- name: ZSwap Verify | Check GRUB configuration
+  ansible.builtin.command:
+    cmd: grep GRUB_CMDLINE_LINUX_DEFAULT /etc/default/grub
+  register: zswap_grub_check
+  changed_when: false
+
+- name: ZSwap Verify | Display GRUB configuration
+  ansible.builtin.debug:
+    msg: "GRUB configuration: {{ zswap_grub_check.stdout }}"
+
+- name: ZSwap Verify | Check if zswap parameters are in GRUB
+  ansible.builtin.assert:
+    that:
+      - "'zswap.enabled=' in zswap_grub_check.stdout"
+      - "'zswap.compressor=' in zswap_grub_check.stdout"
+      - "'zswap.zpool=' in zswap_grub_check.stdout"
+    fail_msg: "ZSwap parameters are not properly configured in GRUB"
+    success_msg: "ZSwap parameters are correctly configured in GRUB"
+
+- name: ZSwap Verify | Check initramfs modules file
+  ansible.builtin.command:
+    cmd: cat /etc/initramfs-tools/modules
+  register: zswap_initramfs_check
+  changed_when: false
+  failed_when: false
+  when: zswap_update_initramfs
+
+- name: ZSwap Verify | Display initramfs modules
+  ansible.builtin.debug:
+    msg: "Initramfs modules: {{ zswap_initramfs_check.stdout_lines | default([]) }}"
+  when: zswap_update_initramfs
+
+- name: ZSwap Verify | Check boot messages for ZSwap
+  ansible.builtin.command:
+    cmd: dmesg
+  register: zswap_dmesg_raw
+  changed_when: false
+  failed_when: false
+  become: true
+
+- name: ZSwap Verify | Filter ZSwap boot messages
+  ansible.builtin.set_fact:
+    zswap_boot_messages: "{{ zswap_dmesg_raw.stdout_lines | select('search', 'zswap') | list }}"
+
+- name: ZSwap Verify | Display ZSwap boot messages
+  ansible.builtin.debug:
+    msg: "ZSwap boot messages: {{ zswap_boot_messages }}"
+  when: zswap_boot_messages | length > 0
+
+- name: ZSwap Verify | Summary
+  ansible.builtin.debug:
+    msg: |
+      ============================================
+      ZSwap Configuration Summary
+      ============================================
+      Module loaded: {{ 'Yes' if zswap_module_check.stat.exists else 'No' }}
+      Currently enabled: {{ (zswap_enabled_check.content | b64decode | trim) if zswap_module_check.stat.exists else 'N/A' }}
+
+      Configured settings (will apply after reboot):
+      - Enabled: {{ zswap_enabled }}
+      - Compressor: {{ zswap_compressor }}
+      - ZPool: {{ zswap_zpool }}
+      - Max pool percent: {{ zswap_max_pool_percent }}%
+      - Shrinker enabled: {{ zswap_shrinker_enabled }}
+      - Accept threshold: {{ zswap_accept_threshold_percent }}%
+
+      {% if zswap_module_check.stat.exists and (zswap_enabled_check.content | b64decode | trim) not in ['Y', '1'] %}
+      NOTE: ZSwap is configured but not currently active.
+      A REBOOT is required to apply the new configuration.
+      {% endif %}
+      ============================================

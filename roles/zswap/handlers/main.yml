@@ -1,0 +1,29 @@
+---
+# ZSwap role handlers
+
+- name: ZSwap | Update GRUB
+  ansible.builtin.command:
+    cmd: update-grub
+  become: true
+  listen: "ZSwap | Update GRUB"
+
+- name: ZSwap | Update initramfs
+  ansible.builtin.command:
+    cmd: update-initramfs -u
+  become: true
+  listen: "ZSwap | Update initramfs"
+
+- name: ZSwap | Display reboot notice
+  ansible.builtin.debug:
+    msg: |
+      ============================================
+      IMPORTANT: REBOOT REQUIRED
+      ============================================
+      ZSwap configuration has been updated in GRUB.
+      A system reboot is required for the changes to take effect.
+
+      After reboot, verify ZSwap is working with:
+        grep -r . /sys/module/zswap/parameters/
+        dmesg | grep zswap
+      ============================================
+  listen: "ZSwap | Display reboot notice"

@@ -1,0 +1,60 @@
+---
+# Default variables for zswap role
+#
+# ZSwap is a lightweight compressed cache for swap pages.
+# It compresses pages in RAM before writing to swap, reducing I/O
+# and improving performance on systems with limited RAM or slow storage.
+
+# Enable or disable ZSwap
+zswap_enabled: true
+
+# Compression algorithm
+# Options: lz4, lzo, zstd, deflate, 842, lz4hc
+# - lz4: Fast compression/decompression, lower CPU usage, good for performance-critical systems
+# - zstd: Better compression ratio, slightly higher CPU usage, good balance
+# - lzo: Legacy option, moderate speed and compression
+zswap_compressor: zstd
+
+# Memory pool allocator
+# Options: zsmalloc, z3fold, zbud
+# - zsmalloc: Most efficient, recommended for kernel 6.3+
+# - z3fold: Good compression ratio (3:1 or less)
+# - zbud: Simple, 2:1 compression ratio
+zswap_zpool: zsmalloc
+
+# Maximum pool size as percentage of total RAM
+# Default is 20%, increase for systems with more RAM pressure
+zswap_max_pool_percent: 20
+
+# Enable shrinker to proactively write cold pages to swap
+# Helps reclaim memory when pool is under pressure
+zswap_shrinker_enabled: true
+
+# Accept threshold percent (hysteresis)
+# When pool is full, start accepting pages again when it drops below this threshold
+# Set to 100 to disable hysteresis
+zswap_accept_threshold_percent: 90
+
+# Whether to add compression modules to initramfs
+# Required for lz4 compressor to work from boot
+zswap_update_initramfs: true
+
+# Modules to add to initramfs for the selected compressor
+# This is automatically set based on zswap_compressor
+zswap_initramfs_modules:
+  lz4:
+    - lz4
+    - lz4_compress
+  lzo:
+    - lzo
+    - lzo_compress
+  zstd:
+    - zstd
+    - zstd_compress
+  deflate:
+    - deflate
+  842:
+    - 842
+  lz4hc:
+    - lz4hc
+    - lz4hc_compress
