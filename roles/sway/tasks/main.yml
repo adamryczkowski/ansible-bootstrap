@@ -1,12 +1,12 @@
 ---
 # Sway role - Install and configure Sway window manager (Wayland compositor)
 #
-# This role installs Sway using Nix for the latest version (1.11+) and
-# configures it with the i3-config repository containing Sway configuration.
+# This role supports both Debian/Ubuntu and Arch Linux:
+# - On Debian/Ubuntu: Uses Nix for Sway 1.11+ (Ubuntu 24.04 only has 1.9)
+# - On Arch Linux: Uses native pacman packages (latest versions available)
 #
-# The setup mirrors the local development environment with:
-# - Sway 1.11 via Nix (with nixGL wrapper for OpenGL)
-# - Supporting tools (waybar, wofi, mako, etc.) via apt
+# The setup includes:
+# - Sway compositor with supporting tools (waybar, wofi, mako, etc.)
 # - Configuration from https://gitlab.com/adamwam/i3-config.git
 
 - name: Sway | Get user UID for systemd user services
@@ -19,8 +19,14 @@
   ansible.builtin.set_fact:
     sway_user_uid: "{{ sway_user_info.ansible_facts.getent_passwd[sway_username][1] }}"
 
-- name: Sway | Include apt packages installation
+# Package installation - distro-specific
+- name: Sway | Include apt packages installation (Debian/Ubuntu)
   ansible.builtin.include_tasks: apt_packages.yml
+  when: ansible_os_family == "Debian"
+
+- name: Sway | Include pacman packages installation (Arch Linux)
+  ansible.builtin.include_tasks: pacman_packages.yml
+  when: ansible_os_family == "Archlinux"
 
 - name: Sway | Include fonts installation
   ansible.builtin.include_tasks: fonts.yml
@@ -28,13 +34,20 @@
 - name: Sway | Include XDG Desktop Portal configuration
   ansible.builtin.include_tasks: portal.yml
 
+# Nix installation - only needed on Debian/Ubuntu for latest Sway
 - name: Sway | Include Nix installation
   ansible.builtin.include_tasks: nix.yml
-  when: sway_install_method == 'nix'
+  when:
+    - sway_install_method == 'nix'
+    - ansible_os_family == "Debian"
 
-- name: Sway | Include Foot terminal installation
+# Foot terminal from source - only needed on Debian/Ubuntu
+# On Arch, foot is already installed via pacman with latest version
+- name: Sway | Include Foot terminal installation (from source)
   ansible.builtin.include_tasks: foot.yml
-  when: sway_install_foot_from_source | bool
+  when:
+    - sway_install_foot_from_source | bool
+    - ansible_os_family == "Debian"
 
 - name: Sway | Include configuration setup
   ansible.builtin.include_tasks: config.yml
@@ -74,6 +87,12 @@
 - name: Sway | Include session setup
   ansible.builtin.include_tasks: session.yml
   when: sway_create_desktop_entry | bool
+
+- name: Sway | Include greetd display manager configuration (Arch Linux)
+  ansible.builtin.include_tasks: greetd.yml
+  when:
+    - sway_install_greetd | bool
+    - ansible_os_family == "Archlinux"
 
 - name: Sway | Include Slack Wayland compatibility
   ansible.builtin.include_tasks: slack.yml

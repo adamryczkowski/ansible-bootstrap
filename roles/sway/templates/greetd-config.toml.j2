@@ -1,0 +1,24 @@
+# greetd configuration for Sway
+# Managed by Ansible - do not edit manually
+#
+# Reference: https://wiki.archlinux.org/title/Greetd
+
+[terminal]
+# The VT to run the greeter on. Can be "next", "current" or a number
+# designating the VT.
+vt = {{ sway_greetd_vt }}
+
+[default_session]
+# The command to run for the default session.
+# tuigreet provides a console UI greeter that launches Sway.
+# --time: Show current time
+# --remember: Remember last logged in user
+# --remember-session: Remember last session
+# --asterisks: Show asterisks for password input
+# --cmd: Default command to run (Sway)
+command = "{{ sway_greetd_command }}"
+
+# The user to run the command as. The privileges this user must have depends
+# on the greeter. A graphical greeter may for example require the user to be
+# in the `video` group.
+user = "{{ sway_greetd_user }}"

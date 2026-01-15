@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Sway role: Full Arch Linux support - native pacman installation with 32 packages including sway, waybar, wofi, mako, foot, and all ecosystem tools
+- Sway role: Arch Linux support for fonts.yml - added pacman package installation with equivalent font packages (noto-fonts, noto-fonts-emoji, otf-font-awesome, ttf-fira-code)
+- Sway role: Added unzip, python-psutil, and dconf to Arch Linux packages for font extraction and GTK theme configuration
 - ZSwap role: Configure ZSwap compressed swap cache for improved system performance on Ubuntu 24.04 LTS
 - ZSwap role: Configurable compressor (zstd, lz4, lzo, etc.), zpool (zsmalloc, z3fold, zbud), and pool size
 - ZSwap role: Automatic GRUB configuration with kernel boot parameters

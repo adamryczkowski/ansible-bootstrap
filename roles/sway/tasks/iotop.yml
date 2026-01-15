@@ -1,17 +1,27 @@
 ---
 # Sway role - Configure iotop for disk traffic monitoring
 #
-# This task installs iotop-c and sets capabilities to allow the user to
+# This task installs iotop and sets capabilities to allow the user to
 # run iotop without sudo, which is required for waybar's disk traffic display.
 #
 # The disk-traffic waybar script uses iotop to monitor per-process disk I/O.
 # Setting capabilities is preferred over sudoers for security.
+#
+# Note: Debian/Ubuntu uses 'iotop-c', Arch uses 'iotop'
 
-- name: Sway | Install iotop-c package
+- name: Sway | Install iotop-c package (Debian/Ubuntu)
   ansible.builtin.apt:
     name: iotop-c
     state: present
   become: true
+  when: ansible_os_family == "Debian"
+
+- name: Sway | Install iotop package (Arch Linux)
+  community.general.pacman:
+    name: iotop
+    state: present
+  become: true
+  when: ansible_os_family == "Archlinux"
 
 - name: Sway | Get full path to iotop binary (resolve symlinks)
   ansible.builtin.command:

@@ -1,12 +1,20 @@
 ---
 # Sway role - Install Fusuma for touchpad gestures
 
-- name: Sway | Install Fusuma dependencies
+- name: Sway | Install Fusuma dependencies (Debian/Ubuntu)
   ansible.builtin.apt:
-    name: "{{ sway_fusuma_packages }}"
+    name: "{{ sway_fusuma_packages_debian }}"
     state: present
     update_cache: true
   become: true
+  when: ansible_os_family == "Debian"
+
+- name: Sway | Install Fusuma dependencies (Arch Linux)
+  community.general.pacman:
+    name: "{{ sway_fusuma_packages_arch }}"
+    state: present
+  become: true
+  when: ansible_os_family == "Archlinux"
 
 - name: Sway | Check if Fusuma is installed
   ansible.builtin.command:
@@ -58,8 +66,9 @@
   become: true
   notify: Reload udev rules
 
-- name: Sway | Ensure libinput-gestures is not conflicting
+- name: Sway | Ensure libinput-gestures is not conflicting (Debian/Ubuntu only)
   ansible.builtin.apt:
     name: libinput-gestures
     state: absent
   become: true
+  when: ansible_os_family == "Debian"

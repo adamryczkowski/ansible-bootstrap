@@ -1,0 +1,21 @@
+---
+# Sway role - Install packages for Sway ecosystem on Arch Linux
+#
+# On Arch Linux, Sway and all ecosystem tools are available directly from
+# the official repositories with the latest versions. No need for Nix.
+
+- name: Sway | Install Sway and ecosystem packages from pacman
+  community.general.pacman:
+    name: "{{ sway_pacman_packages }}"
+    state: present
+    update_cache: true
+  become: true
+
+- name: Sway | Ensure Pictures/Screenshots directory exists
+  ansible.builtin.file:
+    path: "/home/{{ sway_username }}/Pictures/Screenshots"
+    state: directory
+    mode: "0755"
+    owner: "{{ sway_username }}"
+    group: "{{ sway_username }}"
+  become: true

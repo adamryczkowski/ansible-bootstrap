@@ -2,7 +2,7 @@
 # Sway role - Install fonts for waybar and other applications
 # This includes Nerd Fonts for icon glyphs
 
-- name: Sway | Install font packages from apt
+- name: Sway | Install font packages from apt (Debian/Ubuntu)
   become: true
   ansible.builtin.apt:
     name:
@@ -13,6 +13,18 @@
     state: present
     update_cache: true
     cache_valid_time: 3600
+  when: ansible_os_family == "Debian"
+
+- name: Sway | Install font packages from pacman (Arch Linux)
+  become: true
+  community.general.pacman:
+    name:
+      - noto-fonts
+      - noto-fonts-emoji
+      - otf-font-awesome
+      - ttf-fira-code
+    state: present
+  when: ansible_os_family == "Archlinux"
 
 - name: Sway | Ensure user fonts directory exists
   ansible.builtin.file:

@@ -5,16 +5,24 @@
 # The tool provides extended brightness control with:
 # - Hardware backlight control via sysfs
 # - Software gamma correction for extended brightness range
-# - Wayland support via wl-gammarelay-rs (already installed via Nix)
+# - Wayland support via wl-gammarelay-rs (already installed via Nix or pacman)
 # - Keyboard backlight integration
 #
 # Repository: https://github.com/adamryczkowski/bright
 
-- name: Sway | Ensure pipx is installed
+- name: Sway | Ensure pipx is installed (Debian/Ubuntu)
   ansible.builtin.apt:
     name: pipx
     state: present
   become: true
+  when: ansible_os_family == "Debian"
+
+- name: Sway | Ensure pipx is installed (Arch Linux)
+  community.general.pacman:
+    name: python-pipx
+    state: present
+  become: true
+  when: ansible_os_family == "Archlinux"
 
 - name: Sway | Ensure pipx path is configured for user
   ansible.builtin.command:

@@ -1,7 +1,8 @@
 ---
 # Sway role - Create desktop session entry for display manager
 
-- name: Sway | Enable Wayland in GDM configuration
+# GDM configuration - Debian/Ubuntu uses /etc/gdm3, Arch uses /etc/gdm
+- name: Sway | Enable Wayland in GDM configuration (Debian/Ubuntu)
   ansible.builtin.lineinfile:
     path: /etc/gdm3/custom.conf
     regexp: '^#?WaylandEnable='
@@ -9,7 +10,23 @@
     insertafter: '^\[daemon\]'
     state: present
   become: true
-  when: sway_enable_wayland_in_gdm | default(true) | bool
+  when:
+    - sway_enable_wayland_in_gdm | default(true) | bool
+    - ansible_os_family == "Debian"
+  failed_when: false  # GDM may not be installed
+
+- name: Sway | Enable Wayland in GDM configuration (Arch Linux)
+  ansible.builtin.lineinfile:
+    path: /etc/gdm/custom.conf
+    regexp: '^#?WaylandEnable='
+    line: 'WaylandEnable=true'
+    insertafter: '^\[daemon\]'
+    state: present
+  become: true
+  when:
+    - sway_enable_wayland_in_gdm | default(true) | bool
+    - ansible_os_family == "Archlinux"
+  failed_when: false  # GDM may not be installed
 
 - name: Sway | Ensure wayland-sessions directory exists
   ansible.builtin.file:
@@ -20,7 +37,8 @@
     group: root
   become: true
 
-- name: Sway | Create Sway desktop entry for display manager
+# Desktop entry name depends on install method
+- name: Sway | Create Sway desktop entry for display manager (Nix)
   ansible.builtin.template:
     src: sway.desktop.j2
     dest: /usr/share/wayland-sessions/sway-nix.desktop
@@ -28,6 +46,17 @@
     owner: root
     group: root
   become: true
+  when: sway_install_method == 'nix'
+
+- name: Sway | Create Sway desktop entry for display manager (Native)
+  ansible.builtin.template:
+    src: sway.desktop.j2
+    dest: /usr/share/wayland-sessions/sway.desktop
+    mode: "0644"
+    owner: root
+    group: root
+  become: true
+  when: sway_install_method == 'native'
 
 - name: Sway | Create environment file for Sway session
   ansible.builtin.template:

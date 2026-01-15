@@ -7,11 +7,19 @@
 # IMPORTANT: This uses /etc/sudoers.d/ which is the safest way to extend
 # sudoers configuration. The file is validated before being written.
 
-- name: Sway | Install nethogs package
+- name: Sway | Install nethogs package (Debian/Ubuntu)
   ansible.builtin.apt:
     name: nethogs
     state: present
   become: true
+  when: ansible_os_family == "Debian"
+
+- name: Sway | Install nethogs package (Arch Linux)
+  community.general.pacman:
+    name: nethogs
+    state: present
+  become: true
+  when: ansible_os_family == "Archlinux"
 
 - name: Sway | Get full path to nethogs binary
   ansible.builtin.command:

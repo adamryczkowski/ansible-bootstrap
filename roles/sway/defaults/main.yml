@@ -4,9 +4,10 @@
 # Username for sway configuration
 sway_username: "{{ target_user | default(ansible_user) | default('adam') }}"
 
-# Installation method: 'nix' (recommended for latest version) or 'apt' (Ubuntu repo)
-# Note: Ubuntu 24.04 has Sway 1.9, but Nix provides 1.11+ with better features
-sway_install_method: nix
+# Installation method: 'nix' for Ubuntu (latest version), 'native' for Arch
+# On Arch Linux, Sway is installed directly from pacman (latest version available)
+# On Ubuntu/Debian, Nix is used to get Sway 1.11+ (Ubuntu 24.04 only has 1.9)
+sway_install_method: "{{ 'native' if ansible_os_family == 'Archlinux' else 'nix' }}"
 
 # Nix packages to install (when sway_install_method is 'nix')
 # These provide the core Sway experience with latest versions
@@ -18,7 +19,7 @@ sway_nix_packages:
   - wdisplays        # GUI for display configuration
   - nixGL            # OpenGL wrapper for Nix on non-NixOS
 
-# APT packages to install (Sway ecosystem tools)
+# APT packages to install (Sway ecosystem tools for Debian/Ubuntu)
 # These work well from Ubuntu repos and complement the Nix-installed Sway
 sway_apt_packages:
   - waybar           # Status bar
@@ -42,6 +43,39 @@ sway_apt_packages:
   - xwayland         # X11 compatibility layer
   - nethogs          # Network traffic monitor (for waybar)
   - pcmanfm          # Lightweight file manager with GTK theme support
+
+# Arch Linux packages (native Sway from repos - includes latest version)
+# On Arch, Sway and all ecosystem tools are available directly from pacman
+# Note: wl-gammarelay-rs and wdisplays are AUR/testing-only, not included here
+sway_pacman_packages:
+  - sway             # Wayland compositor (latest version in Arch repos)
+  - foot             # Fast terminal emulator (no need to build from source)
+  - waybar           # Status bar
+  - wofi             # Application launcher (rofi alternative)
+  - mako             # Notification daemon (different package name than Ubuntu)
+  - grim             # Screenshot utility
+  - slurp            # Region selection for screenshots
+  - swayidle         # Idle management daemon
+  - swaylock         # Screen locker
+  - wl-clipboard     # Clipboard utilities
+  - swaybg           # Wallpaper utility
+  - xdg-desktop-portal-wlr  # Screen sharing support
+  - xdg-desktop-portal-gtk  # GTK portal backend
+  - libnotify        # notify-send command (different package name)
+  - brightnessctl    # Brightness control
+  - playerctl        # Media player control
+  - network-manager-applet  # nm-applet (different package name)
+  - blueman          # Bluetooth manager
+  - pasystray        # PulseAudio system tray
+  - pavucontrol      # PulseAudio volume control
+  - xorg-xwayland    # X11 compatibility layer (different package name)
+  - nethogs          # Network traffic monitor (for waybar)
+  - pcmanfm          # Lightweight file manager with GTK theme support
+  - kanshi           # Dynamic display configuration
+  - wlr-randr        # xrandr-like tool for wlroots compositors
+  - unzip            # Required for extracting Nerd Fonts zip files
+  - python-psutil    # Required for Ansible dconf module (GTK theme config)
+  - dconf            # Required for GTK theme configuration via gsettings
 
 # Nethogs sudoers configuration
 # Allows the user to run nethogs without password for waybar network traffic display
@@ -85,12 +119,18 @@ sway_config_symlinks:
 # Optional components
 sway_install_fusuma: true  # Touchpad gestures
 
-# Fusuma dependencies
-sway_fusuma_packages:
+# Fusuma dependencies (Debian/Ubuntu)
+sway_fusuma_packages_debian:
   - ruby
   - ruby-dev
   - libevdev-dev
   - build-essential
+
+# Fusuma dependencies (Arch Linux)
+sway_fusuma_packages_arch:
+  - ruby
+  - libevdev
+  - base-devel
 
 # Session configuration
 sway_create_desktop_entry: true
@@ -181,3 +221,30 @@ sway_bright_add_to_video_group: true
 # replaced with the actual user's home directory for brightness controls to work
 # This replaces /home/adam/ with /home/{{ sway_username }}/ in config files
 sway_fix_hardcoded_paths: true
+
+# greetd display manager configuration (Arch Linux only)
+# greetd is a minimal, agnostic login manager daemon for Wayland compositors
+# On Arch Linux, we use greetd instead of GDM for a lightweight login experience
+# Reference: https://wiki.archlinux.org/title/Greetd
+sway_install_greetd: "{{ ansible_os_family == 'Archlinux' }}"
+
+# greetd packages to install
+sway_greetd_packages:
+  - greetd
+  - greetd-tuigreet
+
+# greetd configuration
+# VT to run the greeter on (1 is the default console)
+sway_greetd_vt: 1
+
+# User to run the greeter as
+sway_greetd_user: "greeter"
+
+# Command to run for the greeter
+# tuigreet options:
+#   --time: Show current time
+#   --remember: Remember last logged in user
+#   --remember-session: Remember last session
+#   --asterisks: Show asterisks for password input
+#   --cmd: Default command to run (Sway)
+sway_greetd_command: "tuigreet --time --remember --remember-session --asterisks --cmd sway"

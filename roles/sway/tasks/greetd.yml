@@ -1,0 +1,58 @@
+---
+# Sway role - Configure greetd display manager for Arch Linux
+#
+# greetd is a minimal, agnostic login manager daemon for Wayland compositors.
+# tuigreet provides a console UI greeter that works well with Sway.
+#
+# This task file:
+# - Installs greetd and tuigreet packages
+# - Configures greetd to launch Sway via tuigreet
+# - Enables the greetd service
+#
+# Reference: https://wiki.archlinux.org/title/Greetd
+
+- name: Sway | Install greetd and tuigreet packages
+  community.general.pacman:
+    name: "{{ sway_greetd_packages }}"
+    state: present
+  become: true
+
+- name: Sway | Ensure greetd configuration directory exists
+  ansible.builtin.file:
+    path: /etc/greetd
+    state: directory
+    mode: "0755"
+    owner: root
+    group: root
+  become: true
+
+- name: Sway | Configure greetd for Sway with tuigreet
+  ansible.builtin.template:
+    src: greetd-config.toml.j2
+    dest: /etc/greetd/config.toml
+    mode: "0644"
+    owner: root
+    group: root
+    backup: true
+  become: true
+  notify: Restart greetd
+
+- name: Sway | Ensure greetd environments file exists
+  ansible.builtin.copy:
+    dest: /etc/greetd/environments
+    content: |
+      sway
+      bash
+    mode: "0644"
+    owner: root
+    group: root
+  become: true
+
+- name: Sway | Enable greetd service
+  ansible.builtin.systemd:
+    name: greetd
+    enabled: true
+    state: started
+  become: true
+  # Don't fail if we're running in a container or without systemd
+  failed_when: false

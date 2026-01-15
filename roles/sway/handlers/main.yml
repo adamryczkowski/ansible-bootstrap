@@ -41,3 +41,12 @@
   become: true
   become_user: "{{ sway_username }}"
   listen: Sway | Update desktop database
+
+- name: Restart greetd
+  ansible.builtin.systemd:
+    name: greetd
+    state: restarted
+  become: true
+  listen: Restart greetd
+  # Don't fail if greetd is not running (e.g., during initial setup)
+  failed_when: false

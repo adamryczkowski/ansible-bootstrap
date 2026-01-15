@@ -1,7 +1,14 @@
 [Desktop Entry]
+{% if sway_install_method == 'nix' %}
 Name=Sway (Nix)
 Comment=An i3-compatible Wayland compositor (installed via Nix)
 Exec=/usr/local/bin/sway-session
 TryExec=/usr/local/bin/sway-session
+{% else %}
+Name=Sway
+Comment=An i3-compatible Wayland compositor
+Exec=sway
+TryExec=/usr/bin/sway
+{% endif %}
 Type=Application
 DesktopNames=sway;wlroots

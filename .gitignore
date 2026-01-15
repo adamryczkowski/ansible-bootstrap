@@ -39,3 +39,6 @@ vault.yml
 # Temporary files
 tmp/
 temp/
+
+# Work logs with sensitive info
+remote-work-log.md
