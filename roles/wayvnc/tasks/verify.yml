@@ -1,0 +1,133 @@
+---
+# wayVNC verification tasks
+#
+# Verifies that wayVNC is properly installed and configured.
+
+- name: WayVNC | Get user home directory (if not already set)
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ wayvnc_username }}"
+  register: wayvnc_user_info
+  when: wayvnc_user_home is not defined
+
+- name: WayVNC | Set user home path (if not already set)
+  ansible.builtin.set_fact:
+    wayvnc_user_home: "{{ ansible_facts.getent_passwd[wayvnc_username][4] }}"
+  when: wayvnc_user_home is not defined
+
+- name: WayVNC | Verify wayVNC binary exists
+  ansible.builtin.stat:
+    path: /usr/bin/wayvnc
+  register: wayvnc_binary_stat
+
+- name: WayVNC | Assert wayVNC binary exists
+  ansible.builtin.assert:
+    that:
+      - wayvnc_binary_stat.stat.exists
+    fail_msg: "wayVNC binary not found at /usr/bin/wayvnc"
+    success_msg: "wayVNC binary found"
+
+- name: WayVNC | Verify config file exists
+  ansible.builtin.stat:
+    path: "{{ wayvnc_user_home }}/{{ wayvnc_config_dir }}/config"
+  register: wayvnc_config_stat
+
+- name: WayVNC | Assert config file exists
+  ansible.builtin.assert:
+    that:
+      - wayvnc_config_stat.stat.exists
+    fail_msg: "wayVNC config file not found"
+    success_msg: "wayVNC config file found"
+
+- name: WayVNC | Verify TLS certificate exists
+  ansible.builtin.stat:
+    path: "{{ wayvnc_user_home }}/{{ wayvnc_config_dir }}/cert.pem"
+  register: wayvnc_cert_verify_stat
+  when: wayvnc_tls_enabled
+
+- name: WayVNC | Assert TLS certificate exists
+  ansible.builtin.assert:
+    that:
+      - wayvnc_cert_verify_stat.stat.exists
+    fail_msg: "TLS certificate not found"
+    success_msg: "TLS certificate found"
+  when: wayvnc_tls_enabled
+
+- name: WayVNC | Verify TLS private key exists
+  ansible.builtin.stat:
+    path: "{{ wayvnc_user_home }}/{{ wayvnc_config_dir }}/key.pem"
+  register: wayvnc_key_verify_stat
+  when: wayvnc_tls_enabled
+
+- name: WayVNC | Assert TLS private key exists
+  ansible.builtin.assert:
+    that:
+      - wayvnc_key_verify_stat.stat.exists
+    fail_msg: "TLS private key not found"
+    success_msg: "TLS private key found"
+  when: wayvnc_tls_enabled
+
+- name: WayVNC | Verify RSA key exists
+  ansible.builtin.stat:
+    path: "{{ wayvnc_user_home }}/{{ wayvnc_config_dir }}/rsa_key.pem"
+  register: wayvnc_rsa_verify_stat
+  when: wayvnc_tls_enabled
+
+- name: WayVNC | Assert RSA key exists
+  ansible.builtin.assert:
+    that:
+      - wayvnc_rsa_verify_stat.stat.exists
+    fail_msg: "RSA key not found"
+    success_msg: "RSA key found"
+  when: wayvnc_tls_enabled
+
+- name: WayVNC | Verify systemd service file exists
+  ansible.builtin.stat:
+    path: "{{ wayvnc_user_home }}/.config/systemd/user/wayvnc.service"
+  register: wayvnc_service_stat
+
+- name: WayVNC | Assert systemd service file exists
+  ansible.builtin.assert:
+    that:
+      - wayvnc_service_stat.stat.exists
+    fail_msg: "systemd user service file not found"
+    success_msg: "systemd user service file found"
+
+- name: WayVNC | Get user UID for service check
+  ansible.builtin.command:
+    cmd: id -u {{ wayvnc_username }}
+  register: wayvnc_verify_uid
+  changed_when: false
+
+- name: WayVNC | Check systemd service status
+  ansible.builtin.systemd:
+    name: wayvnc.service
+    scope: user
+  become: true
+  become_user: "{{ wayvnc_username }}"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ wayvnc_verify_uid.stdout }}"
+  register: wayvnc_service_status
+  failed_when: false
+
+- name: WayVNC | Display service status
+  ansible.builtin.debug:
+    msg: >
+      wayVNC service status:
+      - Enabled: {{ wayvnc_service_status.status.UnitFileState | default('unknown') }}
+      - Active: {{ wayvnc_service_status.status.ActiveState | default('unknown') }}
+      - SubState: {{ wayvnc_service_status.status.SubState | default('unknown') }}
+
+- name: WayVNC | Display verification summary
+  ansible.builtin.debug:
+    msg: |
+      ============================================
+      wayVNC Verification Complete
+      ============================================
+      Binary: {{ 'OK' if wayvnc_binary_stat.stat.exists else 'MISSING' }}
+      Config: {{ 'OK' if wayvnc_config_stat.stat.exists else 'MISSING' }}
+      TLS Cert: {{ 'OK' if (wayvnc_cert_verify_stat.stat.exists | default(false)) else ('SKIPPED' if not wayvnc_tls_enabled else 'MISSING') }}
+      TLS Key: {{ 'OK' if (wayvnc_key_verify_stat.stat.exists | default(false)) else ('SKIPPED' if not wayvnc_tls_enabled else 'MISSING') }}
+      RSA Key: {{ 'OK' if (wayvnc_rsa_verify_stat.stat.exists | default(false)) else ('SKIPPED' if not wayvnc_tls_enabled else 'MISSING') }}
+      Service: {{ 'OK' if wayvnc_service_stat.stat.exists else 'MISSING' }}
+      ============================================

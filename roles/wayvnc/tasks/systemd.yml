@@ -1,0 +1,85 @@
+---
+# wayVNC systemd user service setup tasks
+#
+# Creates and enables a systemd user service for wayVNC autostart.
+# The service binds to sway-session.target for proper lifecycle management.
+
+- name: WayVNC | Get user home directory (if not already set)
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ wayvnc_username }}"
+  register: wayvnc_user_info
+  when: wayvnc_user_home is not defined
+
+- name: WayVNC | Set user home path (if not already set)
+  ansible.builtin.set_fact:
+    wayvnc_user_home: "{{ ansible_facts.getent_passwd[wayvnc_username][4] }}"
+  when: wayvnc_user_home is not defined
+
+- name: WayVNC | Create systemd user directory
+  ansible.builtin.file:
+    path: "{{ wayvnc_user_home }}/.config/systemd/user"
+    state: directory
+    owner: "{{ wayvnc_username }}"
+    group: "{{ wayvnc_username }}"
+    mode: "0755"
+  become: true
+
+- name: WayVNC | Deploy systemd user service
+  ansible.builtin.template:
+    src: wayvnc.service.j2
+    dest: "{{ wayvnc_user_home }}/.config/systemd/user/wayvnc.service"
+    owner: "{{ wayvnc_username }}"
+    group: "{{ wayvnc_username }}"
+    mode: "0644"
+  become: true
+  notify:
+    - WayVNC | Reload systemd user daemon
+    - WayVNC | Restart service
+
+- name: WayVNC | Get user UID for lingering
+  ansible.builtin.command:
+    cmd: id -u {{ wayvnc_username }}
+  register: wayvnc_user_uid
+  changed_when: false
+
+- name: WayVNC | Enable lingering for user
+  ansible.builtin.command:
+    cmd: loginctl enable-linger {{ wayvnc_username }}
+  become: true
+  register: wayvnc_linger_result
+  changed_when: wayvnc_linger_result.rc == 0
+  failed_when: false
+
+- name: WayVNC | Flush handlers before enabling service
+  ansible.builtin.meta: flush_handlers
+
+- name: WayVNC | Enable systemd user service
+  ansible.builtin.systemd:
+    name: wayvnc.service
+    enabled: "{{ wayvnc_enable_service }}"
+    scope: user
+  become: true
+  become_user: "{{ wayvnc_username }}"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ wayvnc_user_uid.stdout }}"
+
+- name: WayVNC | Start systemd user service
+  ansible.builtin.systemd:
+    name: wayvnc.service
+    state: started
+    scope: user
+  become: true
+  become_user: "{{ wayvnc_username }}"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ wayvnc_user_uid.stdout }}"
+  when: wayvnc_start_service
+  failed_when: false
+  register: wayvnc_service_start
+
+- name: WayVNC | Note about service start
+  ansible.builtin.debug:
+    msg: >
+      Note: wayVNC service may fail to start if Sway is not running.
+      The service will automatically start when Sway session begins.
+  when: wayvnc_service_start is defined and wayvnc_service_start.failed | default(false)

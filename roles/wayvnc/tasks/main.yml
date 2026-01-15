@@ -1,0 +1,42 @@
+---
+# wayVNC role - Install and configure VNC server for Wayland/Sway
+#
+# This role installs and configures wayVNC on Ubuntu 24.04 LTS systems by:
+# 1. Installing wayVNC package from Ubuntu universe repository
+# 2. Generating TLS certificates for secure connections
+# 3. Deploying configuration with authentication
+# 4. Setting up systemd user service for autostart
+
+- name: WayVNC | Validate Ubuntu version
+  ansible.builtin.assert:
+    that:
+      - ansible_facts['distribution'] == "Ubuntu"
+      - ansible_facts['distribution_version'] is version('24.04', '>=')
+    fail_msg: "wayVNC role requires Ubuntu 24.04 or later"
+    success_msg: "Running on Ubuntu {{ ansible_facts['distribution_version'] }}"
+
+- name: WayVNC | Include installation tasks
+  ansible.builtin.include_tasks: install.yml
+  tags:
+    - wayvnc_install
+
+- name: WayVNC | Include certificate generation tasks
+  ansible.builtin.include_tasks: certificates.yml
+  tags:
+    - wayvnc_certificates
+  when: wayvnc_tls_enabled
+
+- name: WayVNC | Include configuration tasks
+  ansible.builtin.include_tasks: config.yml
+  tags:
+    - wayvnc_config
+
+- name: WayVNC | Include systemd service tasks
+  ansible.builtin.include_tasks: systemd.yml
+  tags:
+    - wayvnc_systemd
+
+- name: WayVNC | Include verification tasks
+  ansible.builtin.include_tasks: verify.yml
+  tags:
+    - wayvnc_verify

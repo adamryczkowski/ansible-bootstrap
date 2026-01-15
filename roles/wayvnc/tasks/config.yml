@@ -1,0 +1,64 @@
+---
+# wayVNC configuration tasks
+#
+# Detects bind address and deploys configuration file.
+
+- name: WayVNC | Get user home directory (if not already set)
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ wayvnc_username }}"
+  register: wayvnc_user_info
+  when: wayvnc_user_home is not defined
+
+- name: WayVNC | Set user home path (if not already set)
+  ansible.builtin.set_fact:
+    wayvnc_user_home: "{{ ansible_facts.getent_passwd[wayvnc_username][4] }}"
+  when: wayvnc_user_home is not defined
+
+- name: WayVNC | Detect bind address from preferred network
+  ansible.builtin.set_fact:
+    wayvnc_bind_address_resolved: >-
+      {%- if wayvnc_bind_address == 'auto' -%}
+        {%- set found_ip = namespace(value='127.0.0.1') -%}
+        {%- for iface_name, iface_data in ansible_facts.items() -%}
+          {%- if iface_data is mapping and iface_data.ipv4 is defined -%}
+            {%- if iface_data.ipv4.address is defined and iface_data.ipv4.address.startswith(wayvnc_preferred_network) -%}
+              {%- set found_ip.value = iface_data.ipv4.address -%}
+            {%- endif -%}
+          {%- endif -%}
+        {%- endfor -%}
+        {{ found_ip.value }}
+      {%- else -%}
+        {{ wayvnc_bind_address }}
+      {%- endif -%}
+
+- name: WayVNC | Display detected bind address
+  ansible.builtin.debug:
+    msg: "wayVNC will bind to: {{ wayvnc_bind_address_resolved }}:{{ wayvnc_port }}"
+
+- name: WayVNC | Warn if using localhost fallback
+  ansible.builtin.debug:
+    msg: >
+      WARNING: No interface found on {{ wayvnc_preferred_network }}.x network.
+      Falling back to 127.0.0.1 (localhost only).
+      Set wayvnc_bind_address explicitly if needed.
+  when: wayvnc_bind_address_resolved == '127.0.0.1' and wayvnc_bind_address == 'auto'
+
+- name: WayVNC | Ensure config directory exists
+  ansible.builtin.file:
+    path: "{{ wayvnc_user_home }}/{{ wayvnc_config_dir }}"
+    state: directory
+    owner: "{{ wayvnc_username }}"
+    group: "{{ wayvnc_username }}"
+    mode: "0700"
+  become: true
+
+- name: WayVNC | Deploy configuration file
+  ansible.builtin.template:
+    src: config.j2
+    dest: "{{ wayvnc_user_home }}/{{ wayvnc_config_dir }}/config"
+    owner: "{{ wayvnc_username }}"
+    group: "{{ wayvnc_username }}"
+    mode: "0600"
+  become: true
+  notify: WayVNC | Restart service

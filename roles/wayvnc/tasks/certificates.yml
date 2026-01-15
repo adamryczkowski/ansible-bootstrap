@@ -1,0 +1,90 @@
+---
+# wayVNC TLS certificate generation tasks
+#
+# Generates certificates for secure VNC connections:
+# - TLS: EC (Elliptic Curve) key and certificate for VeNCrypt
+# - RSA-AES: RSA key for RSA-AES authentication (generated with ssh-keygen)
+#
+# Based on official wayVNC documentation:
+# https://github.com/any1/wayvnc/blob/master/README.md
+
+- name: WayVNC | Get user home directory
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ wayvnc_username }}"
+  register: wayvnc_user_info
+
+- name: WayVNC | Set user home path
+  ansible.builtin.set_fact:
+    wayvnc_user_home: "{{ ansible_facts.getent_passwd[wayvnc_username][4] }}"
+
+- name: WayVNC | Create wayVNC config directory
+  ansible.builtin.file:
+    path: "{{ wayvnc_user_home }}/{{ wayvnc_config_dir }}"
+    state: directory
+    owner: "{{ wayvnc_username }}"
+    group: "{{ wayvnc_username }}"
+    mode: "0700"
+  become: true
+
+- name: WayVNC | Check if TLS key and certificate exist
+  ansible.builtin.stat:
+    path: "{{ wayvnc_user_home }}/{{ wayvnc_config_dir }}/{{ item }}"
+  register: wayvnc_tls_files
+  loop:
+    - key.pem
+    - cert.pem
+
+- name: WayVNC | Generate TLS EC key and certificate
+  ansible.builtin.command:
+    cmd: >
+      openssl req -x509 -newkey ec
+      -pkeyopt ec_paramgen_curve:secp384r1 -sha384
+      -days {{ wayvnc_cert_days }} -nodes
+      -keyout {{ wayvnc_user_home }}/{{ wayvnc_config_dir }}/key.pem
+      -out {{ wayvnc_user_home }}/{{ wayvnc_config_dir }}/cert.pem
+      -subj "/CN={{ ansible_facts['hostname'] }}"
+      -addext "subjectAltName=DNS:{{ ansible_facts['hostname'] }},DNS:localhost,IP:{{ wayvnc_bind_address_resolved | default('127.0.0.1') }}"
+  become: true
+  become_user: "{{ wayvnc_username }}"
+  when: not (wayvnc_tls_files.results[0].stat.exists and wayvnc_tls_files.results[1].stat.exists)
+
+- name: WayVNC | Check if RSA key exists
+  ansible.builtin.stat:
+    path: "{{ wayvnc_user_home }}/{{ wayvnc_config_dir }}/rsa_key.pem"
+  register: wayvnc_rsa_key_stat
+
+- name: WayVNC | Generate RSA key for RSA-AES authentication
+  ansible.builtin.command:
+    cmd: >
+      ssh-keygen -m pem
+      -f {{ wayvnc_user_home }}/{{ wayvnc_config_dir }}/rsa_key.pem
+      -t rsa -N ""
+  become: true
+  become_user: "{{ wayvnc_username }}"
+  when: not wayvnc_rsa_key_stat.stat.exists
+
+- name: WayVNC | Remove RSA public key (not needed)
+  ansible.builtin.file:
+    path: "{{ wayvnc_user_home }}/{{ wayvnc_config_dir }}/rsa_key.pem.pub"
+    state: absent
+  become: true
+
+- name: WayVNC | Set proper permissions on key files
+  ansible.builtin.file:
+    path: "{{ wayvnc_user_home }}/{{ wayvnc_config_dir }}/{{ item }}"
+    owner: "{{ wayvnc_username }}"
+    group: "{{ wayvnc_username }}"
+    mode: "0600"
+  loop:
+    - key.pem
+    - rsa_key.pem
+  become: true
+
+- name: WayVNC | Set proper permissions on certificate
+  ansible.builtin.file:
+    path: "{{ wayvnc_user_home }}/{{ wayvnc_config_dir }}/cert.pem"
+    owner: "{{ wayvnc_username }}"
+    group: "{{ wayvnc_username }}"
+    mode: "0644"
+  become: true

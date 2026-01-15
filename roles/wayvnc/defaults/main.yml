@@ -1,0 +1,40 @@
+---
+# Default variables for wayvnc role
+#
+# wayVNC is a VNC server for Wayland compositors (Sway, wlroots-based).
+# It allows remote access to the Wayland desktop via VNC protocol.
+
+# Username for wayVNC configuration (user running Sway)
+wayvnc_username: "{{ target_user | default(ansible_user) | default('adam') }}"
+
+# VNC port (default 5900)
+wayvnc_port: 5900
+
+# Bind address configuration
+# - "auto": Auto-detect from preferred network
+# - Specific IP: Use that IP directly
+wayvnc_bind_address: "auto"
+
+# Preferred network prefix for auto-detection (e.g., "192.168.42")
+wayvnc_preferred_network: "192.168.42"
+
+# Authentication settings
+wayvnc_enable_auth: true
+wayvnc_vnc_username: "{{ wayvnc_username }}"
+# Password MUST be set via inventory, extra vars, or vault
+# wayvnc_vnc_password: ""
+
+# TLS certificate settings
+wayvnc_tls_enabled: true
+wayvnc_cert_days: 3650  # 10 years
+wayvnc_cert_key_size: 4096
+
+# Systemd service settings
+wayvnc_enable_service: true
+wayvnc_start_service: true
+
+# Wayland display (usually wayland-1 for active session)
+wayvnc_wayland_display: "wayland-1"
+
+# Config directory path (relative to user home)
+wayvnc_config_dir: ".config/wayvnc"

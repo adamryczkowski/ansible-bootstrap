@@ -1,0 +1,90 @@
+---
+# wayVNC playbook - Install and configure wayVNC server
+#
+# This playbook installs and configures wayVNC on Ubuntu 24.04 LTS systems
+# running Sway window manager for remote desktop access via VNC.
+#
+# Usage:
+#   ansible-playbook -i inventory/production/hosts.yml playbooks/wayvnc.yml
+#   ansible-playbook -i inventory/production/hosts.yml playbooks/wayvnc.yml --limit hostname
+#   ansible-playbook -i inventory/production/hosts.yml playbooks/wayvnc.yml -e wayvnc_vnc_password=<password>
+#
+# Requirements:
+#   - Ubuntu 24.04 LTS (Noble Numbat)
+#   - Sway window manager installed and configured
+#   - wayvnc_vnc_password must be set (via inventory, extra vars, or vault)
+#
+# What this playbook does:
+#   1. Installs wayVNC from Ubuntu universe repository
+#   2. Generates TLS certificates for secure connections
+#   3. Deploys configuration with authentication
+#   4. Sets up systemd user service for autostart
+#   5. Verifies the installation
+#
+# Default settings (can be overridden in inventory or command line):
+#   - Port: 5900
+#   - Bind address: Auto-detect from 192.168.42.0/24 network
+#   - TLS: Enabled with self-signed certificates
+#   - Authentication: Username/password required
+#
+# Example with custom settings:
+#   ansible-playbook -i inventory/production/hosts.yml playbooks/wayvnc.yml \
+#     -e wayvnc_vnc_password=mysecretpassword \
+#     -e wayvnc_port=5901 \
+#     -e wayvnc_bind_address=192.168.1.100
+
+- name: Install and configure wayVNC server
+  hosts: all
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Verify Ubuntu 24.04
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['distribution'] == "Ubuntu"
+          - ansible_facts['distribution_version'] is version('24.04', '>=')
+        fail_msg: "This playbook requires Ubuntu 24.04 or later"
+        success_msg: "Running on Ubuntu {{ ansible_facts['distribution_version'] }}"
+
+    - name: Verify wayvnc_vnc_password is set
+      ansible.builtin.assert:
+        that:
+          - wayvnc_vnc_password is defined
+          - wayvnc_vnc_password | length > 0
+        fail_msg: >
+          wayvnc_vnc_password must be set for authentication.
+          Use -e wayvnc_vnc_password=<password> or set in inventory/vault.
+
+  roles:
+    - role: wayvnc
+      tags: [wayvnc]
+
+  post_tasks:
+    - name: Display connection information
+      vars:
+        _host: "{{ ansible_host | default(inventory_hostname) | default('localhost') }}"
+        _user: "{{ ansible_user | default(wayvnc_username) }}"
+      ansible.builtin.debug:
+        msg: |
+          ============================================
+          wayVNC Installation Complete!
+          ============================================
+
+          Server: {{ wayvnc_bind_address_resolved | default(_host) }}:{{ wayvnc_port }}
+          Username: {{ wayvnc_vnc_username }}
+
+          To connect:
+            1. Use any VNC client (TigerVNC, Remmina, RealVNC)
+            2. Connect to: {{ wayvnc_bind_address_resolved | default(_host) }}:{{ wayvnc_port }}
+            3. Accept the self-signed certificate
+            4. Enter username and password
+
+          For SSH tunneling:
+            ssh -L 5900:localhost:5900 {{ _user }}@{{ _host }}
+            Then connect to: localhost:5900
+
+          Note: wayVNC requires a running Sway session.
+          The service will automatically start when Sway begins.
+
+          ============================================

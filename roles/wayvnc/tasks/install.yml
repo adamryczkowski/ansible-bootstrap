@@ -1,0 +1,42 @@
+---
+# wayVNC installation tasks
+#
+# Installs wayVNC from Ubuntu universe repository.
+# Ubuntu 24.04 provides wayVNC v0.7.2 which is sufficient for this use case.
+
+- name: WayVNC | Ensure universe repository is enabled
+  ansible.builtin.apt_repository:
+    repo: "deb http://archive.ubuntu.com/ubuntu {{ ansible_facts['distribution_release'] }} universe"
+    state: present
+  become: true
+
+- name: WayVNC | Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  become: true
+
+- name: WayVNC | Install wayVNC package
+  ansible.builtin.apt:
+    name:
+      - wayvnc
+    state: present
+  become: true
+
+- name: WayVNC | Verify wayVNC binary is installed
+  ansible.builtin.command:
+    cmd: which wayvnc
+  register: wayvnc_binary_check
+  changed_when: false
+  failed_when: wayvnc_binary_check.rc != 0
+
+- name: WayVNC | Get wayVNC version
+  ansible.builtin.command:
+    cmd: wayvnc --version
+  register: wayvnc_version
+  changed_when: false
+  failed_when: false
+
+- name: WayVNC | Display installed version
+  ansible.builtin.debug:
+    msg: "wayVNC installed: {{ wayvnc_version.stdout | default('version unknown') }}"
