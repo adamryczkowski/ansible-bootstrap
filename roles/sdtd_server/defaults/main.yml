@@ -1,0 +1,178 @@
+---
+# Default variables for 7 Days to Die dedicated server role
+#
+# This role installs and configures a 7 Days to Die dedicated game server
+# using LinuxGSM (Linux Game Server Managers) for simplified management.
+#
+# LinuxGSM handles:
+#   - SteamCMD installation and updates
+#   - Game server installation and updates
+#   - Server management (start, stop, restart, monitor)
+#   - Backup and restore functionality
+#   - Log management
+#
+# Sources:
+#   - https://linuxgsm.com/servers/sdtdserver/
+#   - https://docs.linuxgsm.com/
+#   - https://7daystodie.fandom.com/wiki/Server
+
+# =============================================================================
+# User Configuration
+# =============================================================================
+
+# Username for the game server (will be created if it doesn't exist)
+# Best practice: use a dedicated non-root user for security
+sdtd_server_username: sdtdserver
+
+# Home directory for the game server user
+sdtd_server_home: "/home/{{ sdtd_server_username }}"
+
+# Whether to create the user if it doesn't exist
+sdtd_server_create_user: true
+
+# =============================================================================
+# Server Configuration
+# =============================================================================
+
+# Server name displayed in the server browser
+sdtd_server_name: "7 Days to Die Server"
+
+# Server description shown in the server browser
+sdtd_server_description: "A 7 Days to Die dedicated server"
+
+# Server password (leave empty for no password)
+sdtd_server_password: ""
+
+# Server visibility: 0 = Not Listed, 1 = Friends, 2 = Public
+sdtd_server_visibility: 2
+
+# Server region: NorthAmericaEast, NorthAmericaWest, SouthAmerica,
+#                Europe, Russia, Asia, MiddleEast, Africa, Oceania
+sdtd_server_region: "Europe"
+
+# Primary language for the server
+sdtd_server_language: "English"
+
+# =============================================================================
+# Network Configuration
+# =============================================================================
+
+# Main server port (TCP/UDP)
+# Additional ports used: port+1 to port+5
+sdtd_server_port: 26900
+
+# Web control panel port (0 to disable)
+sdtd_server_control_panel_port: 8080
+
+# Enable/disable web control panel
+sdtd_server_control_panel_enabled: false
+
+# Control panel password (required if control panel is enabled)
+sdtd_server_control_panel_password: ""
+
+# Telnet port for remote console (0 to disable)
+sdtd_server_telnet_port: 8081
+
+# Enable/disable telnet
+sdtd_server_telnet_enabled: false
+
+# Telnet password (required if telnet is enabled)
+sdtd_server_telnet_password: ""
+
+# =============================================================================
+# Game Settings
+# =============================================================================
+
+# Maximum number of players (8 is default, max 30)
+# Note: More players = more server resources needed
+sdtd_server_max_players: 8
+
+# Reserved slots for admins/VIPs
+sdtd_server_reserved_slots: 0
+
+# Permission level required for reserved slots (0-100)
+sdtd_server_reserved_slots_permission: 100
+
+# Admin slots (additional slots beyond max_players for admins)
+sdtd_server_admin_slots: 0
+
+# Permission level required for admin slots (0-100)
+sdtd_server_admin_slots_permission: 0
+
+# Game world: Navezgane, RWG (Random World Generator), or a pregen name
+# Pregens: PREGEN6k, PREGEN8k, PREGEN10k
+sdtd_server_game_world: "Navezgane"
+
+# World generation seed (only used if game_world is RWG)
+sdtd_server_world_gen_seed: "asdf"
+
+# World generation size (only used if game_world is RWG)
+# Options: 4096, 6144, 8192, 10240
+sdtd_server_world_gen_size: 6144
+
+# Game name (save folder name)
+sdtd_server_game_name: "My Game"
+
+# Game difficulty: 0-5 (Scavenger to Insane)
+sdtd_server_game_difficulty: 2
+
+# =============================================================================
+# Anti-Cheat Settings
+# =============================================================================
+
+# Enable Easy Anti-Cheat (EAC)
+# Set to false if using mods
+sdtd_server_eac_enabled: true
+
+# =============================================================================
+# Performance Settings
+# =============================================================================
+
+# Maximum spawned zombies (affects performance)
+sdtd_server_max_spawned_zombies: 64
+
+# Maximum spawned animals (affects performance)
+sdtd_server_max_spawned_animals: 50
+
+# Server max world transfer speed in KiB/s (max ~1300)
+sdtd_server_max_world_transfer_speed: 512
+
+# =============================================================================
+# LinuxGSM Settings
+# =============================================================================
+
+# LinuxGSM script URL
+sdtd_linuxgsm_url: "https://linuxgsm.sh"
+
+# Whether to enable LinuxGSM auto-updates
+sdtd_linuxgsm_auto_update: true
+
+# =============================================================================
+# Systemd Service Settings
+# =============================================================================
+
+# Whether to create and enable a systemd service
+sdtd_server_enable_service: true
+
+# Whether to start the server after installation
+sdtd_server_start_after_install: false
+
+# =============================================================================
+# Firewall Settings
+# =============================================================================
+
+# Whether to configure UFW firewall rules
+sdtd_server_configure_firewall: true
+
+# =============================================================================
+# Backup Settings
+# =============================================================================
+
+# Whether to enable automatic backups via cron
+sdtd_server_enable_backups: false
+
+# Backup schedule (cron format)
+sdtd_server_backup_schedule: "0 4 * * *"  # Daily at 4 AM
+
+# Number of backups to keep
+sdtd_server_backup_keep: 7

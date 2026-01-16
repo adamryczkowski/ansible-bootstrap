@@ -1,0 +1,71 @@
+---
+# Firewall configuration tasks for 7 Days to Die server
+#
+# Purpose:
+#   Configures UFW firewall rules to allow game server traffic.
+#   Opens the required ports for game connections and optional admin interfaces.
+
+- name: SDTD Firewall | Check if UFW is installed
+  ansible.builtin.command:
+    cmd: which ufw
+  register: sdtd_server_ufw_check
+  changed_when: false
+  failed_when: false
+
+- name: SDTD Firewall | Skip firewall configuration if UFW not installed
+  ansible.builtin.debug:
+    msg: "UFW not installed, skipping firewall configuration"
+  when: sdtd_server_ufw_check.rc != 0
+
+- name: SDTD Firewall | Configure firewall rules
+  when: sdtd_server_ufw_check.rc == 0
+  block:
+    - name: SDTD Firewall | Allow game server ports (TCP)
+      community.general.ufw:
+        rule: allow
+        port: "{{ sdtd_server_port }}:{{ sdtd_server_port | int + 5 }}"
+        proto: tcp
+        comment: "7 Days to Die game server TCP"
+      become: true
+
+    - name: SDTD Firewall | Allow game server ports (UDP)
+      community.general.ufw:
+        rule: allow
+        port: "{{ sdtd_server_port }}:{{ sdtd_server_port | int + 5 }}"
+        proto: udp
+        comment: "7 Days to Die game server UDP"
+      become: true
+
+    - name: SDTD Firewall | Allow control panel port
+      community.general.ufw:
+        rule: allow
+        port: "{{ sdtd_server_control_panel_port }}"
+        proto: tcp
+        comment: "7 Days to Die control panel"
+      become: true
+      when:
+        - sdtd_server_control_panel_enabled | bool
+        - sdtd_server_control_panel_port | int > 0
+
+    - name: SDTD Firewall | Allow telnet port
+      community.general.ufw:
+        rule: allow
+        port: "{{ sdtd_server_telnet_port }}"
+        proto: tcp
+        comment: "7 Days to Die telnet console"
+      become: true
+      when:
+        - sdtd_server_telnet_enabled | bool
+        - sdtd_server_telnet_port | int > 0
+
+    - name: SDTD Firewall | Display firewall configuration
+      ansible.builtin.debug:
+        msg: |
+          Firewall rules configured:
+          - Game ports: {{ sdtd_server_port }}-{{ sdtd_server_port | int + 5 }} (TCP/UDP)
+          {% if sdtd_server_control_panel_enabled %}
+          - Control panel: {{ sdtd_server_control_panel_port }} (TCP)
+          {% endif %}
+          {% if sdtd_server_telnet_enabled %}
+          - Telnet: {{ sdtd_server_telnet_port }} (TCP)
+          {% endif %}

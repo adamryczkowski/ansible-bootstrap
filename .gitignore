@@ -42,3 +42,6 @@ temp/
 
 # Work logs with sensitive info
 remote-work-log.md
+
+# Reference source code clones (for research)
+ref/

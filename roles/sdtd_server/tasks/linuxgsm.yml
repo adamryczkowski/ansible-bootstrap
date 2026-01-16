@@ -1,0 +1,60 @@
+---
+# LinuxGSM installation tasks for 7 Days to Die server
+#
+# Purpose:
+#   Downloads and sets up LinuxGSM, which manages the game server installation,
+#   updates, and provides management commands (start, stop, restart, monitor, etc.)
+
+- name: SDTD LinuxGSM | Check if LinuxGSM script exists
+  ansible.builtin.stat:
+    path: "{{ sdtd_server_home }}/linuxgsm.sh"
+  register: sdtd_server_linuxgsm_script
+
+- name: SDTD LinuxGSM | Download LinuxGSM script
+  ansible.builtin.get_url:
+    url: "{{ sdtd_linuxgsm_url }}"
+    dest: "{{ sdtd_server_home }}/linuxgsm.sh"
+    mode: "0755"
+    owner: "{{ sdtd_server_username }}"
+    group: "{{ sdtd_server_username }}"
+  become: true
+  when: not sdtd_server_linuxgsm_script.stat.exists
+
+- name: SDTD LinuxGSM | Check if sdtdserver script exists
+  ansible.builtin.stat:
+    path: "{{ sdtd_server_home }}/sdtdserver"
+  register: sdtd_server_script
+
+- name: SDTD LinuxGSM | Initialize LinuxGSM for 7 Days to Die
+  ansible.builtin.command:
+    cmd: ./linuxgsm.sh sdtdserver
+    chdir: "{{ sdtd_server_home }}"
+    creates: "{{ sdtd_server_home }}/sdtdserver"
+  become: true
+  become_user: "{{ sdtd_server_username }}"
+  environment:
+    HOME: "{{ sdtd_server_home }}"
+  when: not sdtd_server_script.stat.exists
+
+- name: SDTD LinuxGSM | Verify sdtdserver script was created
+  ansible.builtin.stat:
+    path: "{{ sdtd_server_home }}/sdtdserver"
+  register: sdtd_server_script_verify
+
+- name: SDTD LinuxGSM | Fail if sdtdserver script not created
+  ansible.builtin.fail:
+    msg: "LinuxGSM sdtdserver script was not created. Check LinuxGSM installation."
+  when: not sdtd_server_script_verify.stat.exists
+
+- name: SDTD LinuxGSM | Create symlink in .local/bin
+  ansible.builtin.file:
+    src: "{{ sdtd_server_home }}/sdtdserver"
+    dest: "{{ sdtd_server_home }}/.local/bin/sdtdserver"
+    state: link
+    owner: "{{ sdtd_server_username }}"
+    group: "{{ sdtd_server_username }}"
+  become: true
+
+- name: SDTD LinuxGSM | Display LinuxGSM setup completion
+  ansible.builtin.debug:
+    msg: "LinuxGSM installed and configured for 7 Days to Die server"

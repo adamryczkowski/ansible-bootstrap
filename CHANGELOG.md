@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- SDTD Server role: Complete "7 Days to Die" dedicated game server installation and configuration for Ubuntu 24.04 LTS in LXC containers
+- SDTD Server role: LinuxGSM-based installation for simplified server management (start, stop, restart, update, backup, console)
+- SDTD Server role: Comprehensive serverconfig.xml configuration via community.general.xml module
+- SDTD Server role: Systemd service integration with automatic startup on boot
+- SDTD Server role: UFW firewall configuration for game ports (26900-26905 TCP/UDP)
+- SDTD Server role: Dedicated user account creation for security best practices
+- SDTD Server role: Configurable game settings (world type, difficulty, max players, EAC, control panel, telnet)
+- Playbooks: `sdtd_server.yml` for deploying 7 Days to Die server with pre-flight checks (Ubuntu, memory, disk)
+- Playbooks: `sdtd_server_lxd.yml` for complete LXD-based deployment (container creation, cli-improved, game server, port forwarding)
+- Inventory: `sdtd_server` inventory for LXD-based 7D2D server deployment on 192.168.42.5
+- Molecule: `sdtd-server` scenario for LXD-based testing of server role
 - Sway role: Full Arch Linux support - native pacman installation with 32 packages including sway, waybar, wofi, mako, foot, and all ecosystem tools
 - Sway role: Arch Linux support for fonts.yml - added pacman package installation with equivalent font packages (noto-fonts, noto-fonts-emoji, otf-font-awesome, ttf-fira-code)
 - Sway role: Added unzip, python-psutil, and dconf to Arch Linux packages for font extraction and GTK theme configuration

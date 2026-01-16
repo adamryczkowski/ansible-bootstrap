@@ -1,0 +1,49 @@
+---
+# User setup tasks for 7 Days to Die server
+#
+# Purpose:
+#   Creates a dedicated user account for running the game server.
+#   Running game servers as a non-root user is a security best practice.
+
+- name: SDTD User | Create game server user
+  ansible.builtin.user:
+    name: "{{ sdtd_server_username }}"
+    comment: "7 Days to Die Game Server"
+    shell: /bin/bash
+    home: "{{ sdtd_server_home }}"
+    create_home: true
+    system: false
+  become: true
+  when: sdtd_server_create_user | bool
+
+- name: SDTD User | Ensure home directory exists with correct permissions
+  ansible.builtin.file:
+    path: "{{ sdtd_server_home }}"
+    state: directory
+    owner: "{{ sdtd_server_username }}"
+    group: "{{ sdtd_server_username }}"
+    mode: "0755"
+  become: true
+
+- name: SDTD User | Create .local/bin directory for user scripts
+  ansible.builtin.file:
+    path: "{{ sdtd_server_home }}/.local/bin"
+    state: directory
+    owner: "{{ sdtd_server_username }}"
+    group: "{{ sdtd_server_username }}"
+    mode: "0755"
+  become: true
+
+- name: SDTD User | Add .local/bin to PATH in bashrc
+  ansible.builtin.lineinfile:
+    path: "{{ sdtd_server_home }}/.bashrc"
+    line: 'export PATH="$HOME/.local/bin:$PATH"'
+    create: true
+    mode: "0644"
+    owner: "{{ sdtd_server_username }}"
+    group: "{{ sdtd_server_username }}"
+  become: true
+
+- name: SDTD User | Display user setup completion
+  ansible.builtin.debug:
+    msg: "User '{{ sdtd_server_username }}' configured with home directory '{{ sdtd_server_home }}'"

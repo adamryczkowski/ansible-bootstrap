@@ -12,6 +12,7 @@ exclude_paths:
   - .molecule/
   - collections/
   - molecule/
+  - ref/
 
 # Enable specific rules
 enable_list:

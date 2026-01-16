@@ -1,0 +1,63 @@
+---
+# Systemd service tasks for 7 Days to Die server
+#
+# Purpose:
+#   Creates a systemd service for managing the game server.
+#   Enables automatic startup on boot and provides standard service management.
+
+- name: SDTD Service | Create systemd service file
+  ansible.builtin.template:
+    src: sdtdserver.service.j2
+    dest: /etc/systemd/system/sdtdserver.service
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  notify:
+    - SDTD | Reload systemd
+
+- name: SDTD Service | Flush handlers to reload systemd
+  ansible.builtin.meta: flush_handlers
+
+- name: SDTD Service | Enable service to start on boot
+  ansible.builtin.systemd:
+    name: sdtdserver
+    enabled: true
+    daemon_reload: true
+  become: true
+
+- name: SDTD Service | Start server if requested
+  ansible.builtin.systemd:
+    name: sdtdserver
+    state: started
+  become: true
+  when: sdtd_server_start_after_install | bool
+
+- name: SDTD Service | Display service status
+  ansible.builtin.command:
+    cmd: systemctl status sdtdserver --no-pager
+  register: sdtd_server_service_status
+  changed_when: false
+  failed_when: false
+  become: true
+
+- name: SDTD Service | Display service information
+  ansible.builtin.debug:
+    msg: |
+      Systemd service 'sdtdserver' configured.
+
+      Service management commands:
+        sudo systemctl start sdtdserver    # Start the server
+        sudo systemctl stop sdtdserver     # Stop the server
+        sudo systemctl restart sdtdserver  # Restart the server
+        sudo systemctl status sdtdserver   # Check server status
+
+      LinuxGSM commands (as {{ sdtd_server_username }} user):
+        ./sdtdserver start      # Start server
+        ./sdtdserver stop       # Stop server
+        ./sdtdserver restart    # Restart server
+        ./sdtdserver monitor    # Check if server is running
+        ./sdtdserver details    # Show server details
+        ./sdtdserver update     # Update game server
+        ./sdtdserver backup     # Create backup
+        ./sdtdserver console    # Access server console

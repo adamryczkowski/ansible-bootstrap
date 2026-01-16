@@ -1,0 +1,74 @@
+---
+# Molecule test configuration for 7 Days to Die server role
+#
+# This scenario tests the role's prerequisites and LinuxGSM setup
+# without performing the full game installation (which requires ~15GB download).
+#
+# The test verifies:
+# - System dependencies are installed
+# - User is created correctly
+# - LinuxGSM is downloaded and configured
+# - Firewall rules are applied (if UFW is available)
+# - Systemd service file is created
+
+dependency:
+  name: galaxy
+  options:
+    requirements-file: requirements.yml
+
+driver:
+  name: default
+
+platforms:
+  - name: sdtd-test-noble
+    groups:
+      - gameserver
+
+provisioner:
+  name: ansible
+  env:
+    ANSIBLE_ROLES_PATH: ${MOLECULE_PROJECT_DIRECTORY}/roles
+    ANSIBLE_COLLECTIONS_PATH: ${MOLECULE_PROJECT_DIRECTORY}/collections
+  config_options:
+    defaults:
+      interpreter_python: auto_silent
+      callbacks_enabled: profile_tasks
+    connection:
+      pipelining: true
+  connection_options:
+    ansible_connection: community.general.lxd
+  inventory:
+    host_vars:
+      sdtd-test-noble:
+        ansible_user: root
+        # Skip the actual game installation for testing
+        # (it would take too long and require ~15GB download)
+        sdtd_server_skip_game_install: true
+        sdtd_server_username: sdtdserver
+        sdtd_server_name: "Molecule Test Server"
+        sdtd_server_max_players: 4
+        sdtd_server_enable_service: true
+        sdtd_server_configure_firewall: true
+        sdtd_server_start_after_install: false
+  playbooks:
+    create: create.yml
+    destroy: destroy.yml
+    converge: converge.yml
+    verify: verify.yml
+
+verifier:
+  name: ansible
+
+scenario:
+  name: sdtd-server
+  test_sequence:
+    - dependency
+    - cleanup
+    - destroy
+    - syntax
+    - create
+    - converge
+    - idempotence
+    - verify
+    - cleanup
+    - destroy

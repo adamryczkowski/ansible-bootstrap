@@ -1,0 +1,109 @@
+---
+# 7 Days to Die Dedicated Server Role
+#
+# Purpose:
+#   Installs and configures a 7 Days to Die dedicated game server using LinuxGSM.
+#   LinuxGSM simplifies server management by handling SteamCMD, updates, and monitoring.
+#
+# Key Variables:
+#   - sdtd_server_username: User account for the game server
+#   - sdtd_server_name: Server name displayed in browser
+#   - sdtd_server_port: Main server port (default: 26900)
+#   - sdtd_server_max_players: Maximum concurrent players
+#   - sdtd_server_enable_service: Create systemd service
+#
+# Dependencies:
+#   - Ubuntu 24.04 LTS or 22.04 LTS
+#   - Internet access for downloading LinuxGSM and game files
+#   - Sufficient disk space (~15GB for game files)
+#   - Minimum 8GB RAM recommended, 12GB+ for larger servers
+#
+# Example Usage:
+#   - role: sdtd_server
+#     vars:
+#       sdtd_server_name: "My 7D2D Server"
+#       sdtd_server_max_players: 16
+#
+# Sources:
+#   - https://linuxgsm.com/servers/sdtdserver/
+#   - https://docs.linuxgsm.com/
+#   - https://7daystodie.fandom.com/wiki/Server
+#   - https://developer.valvesoftware.com/wiki/SteamCMD
+
+# =============================================================================
+# Prerequisites
+# =============================================================================
+
+- name: SDTD | Include prerequisites tasks
+  ansible.builtin.include_tasks: prerequisites.yml
+  tags:
+    - sdtd_prerequisites
+    - sdtd_install
+
+# =============================================================================
+# User Setup
+# =============================================================================
+
+- name: SDTD | Include user setup tasks
+  ansible.builtin.include_tasks: user.yml
+  tags:
+    - sdtd_user
+    - sdtd_install
+
+# =============================================================================
+# LinuxGSM Installation
+# =============================================================================
+
+- name: SDTD | Include LinuxGSM installation tasks
+  ansible.builtin.include_tasks: linuxgsm.yml
+  tags:
+    - sdtd_linuxgsm
+    - sdtd_install
+
+# =============================================================================
+# Game Server Installation
+# =============================================================================
+
+- name: SDTD | Include game server installation tasks
+  ansible.builtin.include_tasks: install.yml
+  tags:
+    - sdtd_game
+    - sdtd_install
+
+# =============================================================================
+# Server Configuration
+# =============================================================================
+
+- name: SDTD | Include server configuration tasks
+  ansible.builtin.include_tasks: configure.yml
+  tags:
+    - sdtd_configure
+
+# =============================================================================
+# Firewall Configuration
+# =============================================================================
+
+- name: SDTD | Include firewall configuration tasks
+  ansible.builtin.include_tasks: firewall.yml
+  when: sdtd_server_configure_firewall | bool
+  tags:
+    - sdtd_firewall
+
+# =============================================================================
+# Systemd Service
+# =============================================================================
+
+- name: SDTD | Include systemd service tasks
+  ansible.builtin.include_tasks: service.yml
+  when: sdtd_server_enable_service | bool
+  tags:
+    - sdtd_service
+
+# =============================================================================
+# Verification
+# =============================================================================
+
+- name: SDTD | Include verification tasks
+  ansible.builtin.include_tasks: verify.yml
+  tags:
+    - sdtd_verify

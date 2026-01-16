@@ -1,0 +1,40 @@
+# {{ ansible_managed }}
+# Systemd service for 7 Days to Die dedicated server
+# Managed by LinuxGSM
+
+[Unit]
+Description=7 Days to Die Dedicated Server
+Documentation=https://linuxgsm.com/servers/sdtdserver/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=forking
+User={{ sdtd_server_username }}
+Group={{ sdtd_server_username }}
+WorkingDirectory={{ sdtd_server_home }}
+
+# LinuxGSM start/stop commands
+ExecStart={{ sdtd_server_home }}/sdtdserver start
+ExecStop={{ sdtd_server_home }}/sdtdserver stop
+
+# Restart configuration
+Restart=on-failure
+RestartSec=30
+
+# Resource limits
+# Adjust these based on your server's available resources
+LimitNOFILE=100000
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths={{ sdtd_server_home }}
+PrivateTmp=true
+
+# Environment
+Environment="HOME={{ sdtd_server_home }}"
+
+[Install]
+WantedBy=multi-user.target

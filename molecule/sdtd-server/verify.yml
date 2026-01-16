@@ -1,0 +1,143 @@
+---
+# Molecule verify playbook for 7 Days to Die server test
+#
+# Verifies that the prerequisites and LinuxGSM setup completed successfully.
+
+- name: Verify - 7 Days to Die server prerequisites
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    sdtd_server_username: sdtdserver
+    sdtd_server_home: "/home/sdtdserver"
+
+  tasks:
+    # Verify user was created
+    - name: Verify | Check user exists
+      ansible.builtin.getent:
+        database: passwd
+        key: "{{ sdtd_server_username }}"
+      register: verify_user
+
+    - name: Verify | Assert user exists
+      ansible.builtin.assert:
+        that:
+          - verify_user is not failed
+        fail_msg: "User {{ sdtd_server_username }} was not created"
+        success_msg: "User {{ sdtd_server_username }} exists"
+
+    # Verify home directory
+    - name: Verify | Check home directory exists
+      ansible.builtin.stat:
+        path: "{{ sdtd_server_home }}"
+      register: verify_home
+
+    - name: Verify | Assert home directory exists
+      ansible.builtin.assert:
+        that:
+          - verify_home.stat.exists
+          - verify_home.stat.isdir
+        fail_msg: "Home directory {{ sdtd_server_home }} does not exist"
+        success_msg: "Home directory {{ sdtd_server_home }} exists"
+
+    # Verify LinuxGSM script
+    - name: Verify | Check linuxgsm.sh exists
+      ansible.builtin.stat:
+        path: "{{ sdtd_server_home }}/linuxgsm.sh"
+      register: verify_linuxgsm
+
+    - name: Verify | Assert linuxgsm.sh exists
+      ansible.builtin.assert:
+        that:
+          - verify_linuxgsm.stat.exists
+          - verify_linuxgsm.stat.mode == '0755'
+        fail_msg: "LinuxGSM script not found or has wrong permissions"
+        success_msg: "LinuxGSM script exists with correct permissions"
+
+    # Verify sdtdserver script
+    - name: Verify | Check sdtdserver script exists
+      ansible.builtin.stat:
+        path: "{{ sdtd_server_home }}/sdtdserver"
+      register: verify_sdtdserver
+
+    - name: Verify | Assert sdtdserver script exists
+      ansible.builtin.assert:
+        that:
+          - verify_sdtdserver.stat.exists
+        fail_msg: "sdtdserver script not found"
+        success_msg: "sdtdserver script exists"
+
+    # Verify required packages
+    - name: Verify | Check lib32gcc-s1 is installed
+      ansible.builtin.command:
+        cmd: dpkg -l lib32gcc-s1
+      register: verify_lib32gcc
+      changed_when: false
+      failed_when: false
+
+    - name: Verify | Assert lib32gcc-s1 is installed
+      ansible.builtin.assert:
+        that:
+          - verify_lib32gcc.rc == 0
+        fail_msg: "lib32gcc-s1 package is not installed"
+        success_msg: "lib32gcc-s1 package is installed"
+
+    - name: Verify | Check curl is installed
+      ansible.builtin.command:
+        cmd: which curl
+      register: verify_curl
+      changed_when: false
+
+    - name: Verify | Assert curl is installed
+      ansible.builtin.assert:
+        that:
+          - verify_curl.rc == 0
+        fail_msg: "curl is not installed"
+        success_msg: "curl is installed"
+
+    - name: Verify | Check tmux is installed
+      ansible.builtin.command:
+        cmd: which tmux
+      register: verify_tmux
+      changed_when: false
+
+    - name: Verify | Assert tmux is installed
+      ansible.builtin.assert:
+        that:
+          - verify_tmux.rc == 0
+        fail_msg: "tmux is not installed"
+        success_msg: "tmux is installed"
+
+    # Verify i386 architecture
+    - name: Verify | Check i386 architecture is enabled
+      ansible.builtin.command:
+        cmd: dpkg --print-foreign-architectures
+      register: verify_arch
+      changed_when: false
+
+    - name: Verify | Assert i386 architecture is enabled
+      ansible.builtin.assert:
+        that:
+          - "'i386' in verify_arch.stdout"
+        fail_msg: "i386 architecture is not enabled"
+        success_msg: "i386 architecture is enabled"
+
+    # Final summary
+    - name: Verify | Display verification summary
+      ansible.builtin.debug:
+        msg: |
+          ============================================================
+          Molecule Verification Complete!
+          ============================================================
+
+          All checks passed:
+          ✓ User {{ sdtd_server_username }} exists
+          ✓ Home directory {{ sdtd_server_home }} exists
+          ✓ LinuxGSM script installed
+          ✓ sdtdserver script initialized
+          ✓ Required packages installed (lib32gcc-s1, curl, tmux)
+          ✓ i386 architecture enabled
+
+          The role prerequisites are correctly configured.
+          ============================================================

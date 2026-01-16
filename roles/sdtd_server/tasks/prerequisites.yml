@@ -1,0 +1,120 @@
+---
+# Prerequisites tasks for 7 Days to Die server
+#
+# Purpose:
+#   Installs system dependencies required for LinuxGSM and the game server.
+#   These packages are needed for SteamCMD and the 7D2D dedicated server.
+#
+# Reference: LinuxGSM ubuntu-24.04.csv
+#   - Line 1 (all): bc,binutils,bsdmainutils,bzip2,ca-certificates,cpio,curl,
+#     distro-info,file,gzip,hostname,jq,lib32gcc-s1,lib32stdc++6,netcat-openbsd,
+#     pigz,python3,tar,tmux,unzip,util-linux,uuid-runtime,wget,xz-utils
+#   - Line 2 (steamcmd): lib32gcc-s1,lib32stdc++6,libsdl2-2.0-0:i386,steamcmd
+#   - Line 105 (sdtd): telnet,expect,libxml2-utils
+
+- name: SDTD Prerequisites | Enable i386 architecture for 32-bit libraries
+  ansible.builtin.command:
+    cmd: dpkg --add-architecture i386
+  become: true
+  register: sdtd_server_arch_result
+  changed_when: sdtd_server_arch_result.rc == 0
+  failed_when: false
+
+- name: SDTD Prerequisites | Update apt cache (force refresh after i386 added)
+  ansible.builtin.apt:
+    update_cache: true
+  become: true
+
+- name: SDTD Prerequisites | Install required system packages (base)
+  ansible.builtin.apt:
+    name:
+      # Core utilities required by LinuxGSM (from ubuntu-24.04.csv line 1)
+      - bc
+      - binutils
+      - bsdmainutils
+      - bzip2
+      - ca-certificates
+      - cpio
+      - curl
+      - distro-info
+      - file
+      - gzip
+      - hostname
+      - jq
+      - netcat-openbsd
+      - pigz
+      - python3
+      - tar
+      - tmux
+      - unzip
+      - util-linux
+      - uuid-runtime
+      - wget
+      - xz-utils
+      # Networking tools
+      - iproute2
+      # Process management
+      - procps
+      # Cron for scheduled tasks (backups, updates)
+      - cron
+      # Distro detection
+      - lsb-release
+    state: present
+  become: true
+
+- name: SDTD Prerequisites | Install 32-bit libraries for SteamCMD
+  ansible.builtin.apt:
+    name:
+      # Libraries required for SteamCMD (from ubuntu-24.04.csv line 2)
+      - lib32gcc-s1
+      - lib32stdc++6
+      # Note: libsdl2-2.0-0:i386 is installed by LinuxGSM auto-install
+    state: present
+  become: true
+
+- name: SDTD Prerequisites | Install 7D2D specific dependencies
+  ansible.builtin.apt:
+    name:
+      # 7D2D specific packages (from ubuntu-24.04.csv line 105)
+      - telnet
+      - expect
+      - libxml2-utils
+    state: present
+  become: true
+
+- name: SDTD Prerequisites | Check if steamcmd is available in repos
+  ansible.builtin.command:
+    cmd: apt-cache show steamcmd
+  register: sdtd_server_steamcmd_check
+  changed_when: false
+  failed_when: false
+
+- name: SDTD Prerequisites | Add multiverse repository for steamcmd
+  ansible.builtin.apt_repository:
+    repo: "{{ item }}"
+    state: present
+  loop:
+    - "deb http://archive.ubuntu.com/ubuntu {{ ansible_facts['distribution_release'] }} multiverse"
+    - "deb http://archive.ubuntu.com/ubuntu {{ ansible_facts['distribution_release'] }}-updates multiverse"
+  become: true
+  when: sdtd_server_steamcmd_check.rc != 0
+
+- name: SDTD Prerequisites | Accept Steam license agreement
+  ansible.builtin.debconf:
+    name: steam
+    question: steam/question
+    value: "I AGREE"
+    vtype: select
+  become: true
+
+- name: SDTD Prerequisites | Accept Steam license (purge)
+  ansible.builtin.debconf:
+    name: steam
+    question: steam/license
+    value: ""
+    vtype: note
+  become: true
+
+- name: SDTD Prerequisites | Display prerequisites completion
+  ansible.builtin.debug:
+    msg: "System prerequisites installed successfully"

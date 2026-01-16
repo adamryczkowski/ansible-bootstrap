@@ -1,0 +1,23 @@
+---
+# 7 Days to Die server role handlers
+
+- name: SDTD | Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+  become: true
+  listen: "SDTD | Reload systemd"
+
+- name: SDTD | Restart server
+  ansible.builtin.systemd:
+    name: "sdtdserver"
+    state: restarted
+  become: true
+  listen: "SDTD | Restart server"
+  when: sdtd_server_enable_service | bool
+
+- name: SDTD | Reload UFW
+  community.general.ufw:
+    state: reloaded
+  become: true
+  listen: "SDTD | Reload UFW"
+  when: sdtd_server_configure_firewall | bool

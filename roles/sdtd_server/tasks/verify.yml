@@ -1,0 +1,138 @@
+---
+# Verification tasks for 7 Days to Die server
+#
+# Purpose:
+#   Verifies the server installation and configuration.
+#   Provides a summary of the server setup and next steps.
+
+- name: SDTD Verify | Check server executable exists
+  ansible.builtin.stat:
+    path: "{{ sdtd_server_home }}/serverfiles/7DaysToDieServer.x86_64"
+  register: sdtd_server_verify_executable
+
+- name: SDTD Verify | Check serverconfig.xml exists
+  ansible.builtin.stat:
+    path: "{{ sdtd_server_home }}/serverfiles/serverconfig.xml"
+  register: sdtd_server_verify_config
+
+- name: SDTD Verify | Check LinuxGSM script exists
+  ansible.builtin.stat:
+    path: "{{ sdtd_server_home }}/sdtdserver"
+  register: sdtd_server_verify_linuxgsm
+
+- name: SDTD Verify | Get server details via LinuxGSM
+  ansible.builtin.command:
+    cmd: ./sdtdserver details
+    chdir: "{{ sdtd_server_home }}"
+  become: true
+  become_user: "{{ sdtd_server_username }}"
+  environment:
+    HOME: "{{ sdtd_server_home }}"
+  register: sdtd_server_verify_details
+  changed_when: false
+  failed_when: false
+
+- name: SDTD Verify | Check if server is running
+  ansible.builtin.command:
+    cmd: ./sdtdserver monitor
+    chdir: "{{ sdtd_server_home }}"
+  become: true
+  become_user: "{{ sdtd_server_username }}"
+  environment:
+    HOME: "{{ sdtd_server_home }}"
+  register: sdtd_server_verify_running
+  changed_when: false
+  failed_when: false
+
+- name: SDTD Verify | Check systemd service status
+  ansible.builtin.systemd:
+    name: sdtdserver
+  register: sdtd_server_verify_service
+  failed_when: false
+  when: sdtd_server_enable_service | bool
+
+- name: SDTD Verify | Get disk usage
+  ansible.builtin.command:
+    cmd: du -sh {{ sdtd_server_home }}/serverfiles
+  register: sdtd_server_verify_disk
+  changed_when: false
+  failed_when: false
+
+- name: SDTD Verify | Display verification summary
+  ansible.builtin.debug:
+    msg: |
+      ============================================================
+      7 Days to Die Server Installation Summary
+      ============================================================
+
+      Installation Status:
+      - Server executable: {{ 'OK' if sdtd_server_verify_executable.stat.exists else 'MISSING' }}
+      - Server config: {{ 'OK' if sdtd_server_verify_config.stat.exists else 'MISSING' }}
+      - LinuxGSM script: {{ 'OK' if sdtd_server_verify_linuxgsm.stat.exists else 'MISSING' }}
+      - Disk usage: {{ sdtd_server_verify_disk.stdout | default('Unknown') }}
+
+      Server Configuration:
+      - Server Name: {{ sdtd_server_name }}
+      - Max Players: {{ sdtd_server_max_players }}
+      - Game World: {{ sdtd_server_game_world }}
+      - Port: {{ sdtd_server_port }}
+      - EAC Enabled: {{ sdtd_server_eac_enabled }}
+
+      User: {{ sdtd_server_username }}
+      Home: {{ sdtd_server_home }}
+
+      {% if sdtd_server_enable_service %}
+      Systemd Service: {{ 'Enabled' if sdtd_server_verify_service.status.UnitFileState | default('') == 'enabled' else 'Disabled' }}
+      {% endif %}
+
+      Server Status: {{ 'Running' if sdtd_server_verify_running.rc == 0 else 'Stopped' }}
+
+      ============================================================
+      Management Commands
+      ============================================================
+
+      As {{ sdtd_server_username }} user:
+        cd {{ sdtd_server_home }}
+        ./sdtdserver start      # Start the server
+        ./sdtdserver stop       # Stop the server
+        ./sdtdserver restart    # Restart the server
+        ./sdtdserver console    # Access server console
+        ./sdtdserver update     # Update game files
+        ./sdtdserver backup     # Create backup
+        ./sdtdserver details    # Show server details
+        ./sdtdserver monitor    # Check if running
+
+      {% if sdtd_server_enable_service %}
+      Using systemd:
+        sudo systemctl start sdtdserver
+        sudo systemctl stop sdtdserver
+        sudo systemctl status sdtdserver
+      {% endif %}
+
+      ============================================================
+      Connection Information
+      ============================================================
+
+      Players can connect using:
+        Server IP: <your-server-ip>
+        Port: {{ sdtd_server_port }}
+        {% if sdtd_server_password %}
+        Password: (configured)
+        {% else %}
+        Password: (none)
+        {% endif %}
+
+      {% if sdtd_server_control_panel_enabled %}
+      Control Panel: http://<your-server-ip>:{{ sdtd_server_control_panel_port }}
+      {% endif %}
+
+      ============================================================
+
+- name: SDTD Verify | Assert installation is complete
+  ansible.builtin.assert:
+    that:
+      - sdtd_server_verify_executable.stat.exists
+      - sdtd_server_verify_config.stat.exists
+      - sdtd_server_verify_linuxgsm.stat.exists
+    fail_msg: "Server installation verification failed. Some components are missing."
+    success_msg: "Server installation verified successfully!"

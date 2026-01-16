@@ -1,0 +1,73 @@
+---
+# Game server installation tasks for 7 Days to Die
+#
+# Purpose:
+#   Uses LinuxGSM to install the 7 Days to Die dedicated server via SteamCMD.
+#   This downloads approximately 12-15GB of game files from Steam.
+
+- name: SDTD Install | Check if server is already installed
+  ansible.builtin.stat:
+    path: "{{ sdtd_server_home }}/serverfiles/7DaysToDieServer.x86_64"
+  register: sdtd_server_installed
+
+- name: SDTD Install | Display installation status
+  ansible.builtin.debug:
+    msg: >-
+      Server installation status:
+      {{ 'Already installed' if sdtd_server_installed.stat.exists else 'Not installed - will install now' }}
+
+- name: SDTD Install | Install game server via LinuxGSM
+  ansible.builtin.command:
+    cmd: ./sdtdserver auto-install
+    chdir: "{{ sdtd_server_home }}"
+  become: true
+  become_user: "{{ sdtd_server_username }}"
+  environment:
+    HOME: "{{ sdtd_server_home }}"
+  when: not sdtd_server_installed.stat.exists
+  register: sdtd_server_install_result
+  # Installation can take 10-30 minutes depending on network speed
+  async: 3600
+  poll: 60
+  changed_when: true
+
+- name: SDTD Install | Display installation result
+  ansible.builtin.debug:
+    msg: "{{ sdtd_server_install_result.stdout_lines | default(['Installation skipped - already installed']) }}"
+  when: sdtd_server_install_result is defined
+
+- name: SDTD Install | Verify server files exist
+  ansible.builtin.stat:
+    path: "{{ sdtd_server_home }}/serverfiles/7DaysToDieServer.x86_64"
+  register: sdtd_server_verify
+
+- name: SDTD Install | Fail if server files not found
+  ansible.builtin.fail:
+    msg: >-
+      Server installation failed. Server executable not found at
+      {{ sdtd_server_home }}/serverfiles/7DaysToDieServer.x86_64
+  when: not sdtd_server_verify.stat.exists
+
+- name: SDTD Install | Check for serverconfig.xml
+  ansible.builtin.stat:
+    path: "{{ sdtd_server_home }}/serverfiles/serverconfig.xml"
+  register: sdtd_server_serverconfig_check
+
+- name: SDTD Install | Copy default serverconfig.xml if not exists
+  ansible.builtin.copy:
+    src: "{{ sdtd_server_home }}/serverfiles/serverconfig.xml.example"
+    dest: "{{ sdtd_server_home }}/serverfiles/serverconfig.xml"
+    remote_src: true
+    owner: "{{ sdtd_server_username }}"
+    group: "{{ sdtd_server_username }}"
+    mode: "0644"
+  become: true
+  when:
+    - not sdtd_server_serverconfig_check.stat.exists
+  failed_when: false
+
+- name: SDTD Install | Display installation completion
+  ansible.builtin.debug:
+    msg: |
+      7 Days to Die server installation complete!
+      Server files location: {{ sdtd_server_home }}/serverfiles/

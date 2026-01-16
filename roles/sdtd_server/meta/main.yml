@@ -1,0 +1,29 @@
+---
+# 7 Days to Die dedicated server role metadata
+
+galaxy_info:
+  author: Adam
+  description: >-
+    Install and configure a 7 Days to Die dedicated game server using LinuxGSM.
+    Provides automated installation, configuration, and systemd service management.
+  company: ""
+  license: MIT
+  min_ansible_version: "2.14"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - noble   # 24.04 LTS
+        - jammy   # 22.04 LTS
+
+  galaxy_tags:
+    - game
+    - server
+    - 7daystodie
+    - 7dtd
+    - sdtd
+    - linuxgsm
+    - steamcmd
+    - ubuntu
+    - gaming
+
+dependencies: []

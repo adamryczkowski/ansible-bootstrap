@@ -97,7 +97,7 @@
     - "'already installed' not in rust_binstall_result.stderr"
   environment:
     HOME: "/home/{{ rust_username }}"
-    PATH: "/home/{{ rust_username }}/.cargo/bin:{{ ansible_env.PATH }}"
+    PATH: "/home/{{ rust_username }}/.cargo/bin:{{ ansible_facts['env']['PATH'] }}"
   when: rust_packages | length > 0 and rust_install_binstall | bool
 
 - name: Rust | Install Rust packages via cargo install (fallback)
@@ -111,5 +111,5 @@
   failed_when: false
   environment:
     HOME: "/home/{{ rust_username }}"
-    PATH: "/home/{{ rust_username }}/.cargo/bin:{{ ansible_env.PATH }}"
+    PATH: "/home/{{ rust_username }}/.cargo/bin:{{ ansible_facts['env']['PATH'] }}"
   when: rust_packages | length > 0 and not rust_install_binstall | bool

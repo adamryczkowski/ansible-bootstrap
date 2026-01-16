@@ -1,0 +1,134 @@
+---
+# 7 Days to Die Dedicated Server Playbook
+#
+# Purpose:
+#   Installs and configures a 7 Days to Die dedicated game server using LinuxGSM.
+#   Provides a complete, production-ready game server setup.
+#
+# Usage:
+#   ansible-playbook -i inventory/production/hosts.yml playbooks/sdtd_server.yml
+#   ansible-playbook -i inventory/production/hosts.yml playbooks/sdtd_server.yml --limit gameserver
+#
+# Requirements:
+#   - Ubuntu 24.04 LTS or 22.04 LTS
+#   - Minimum 8GB RAM (12GB+ recommended for larger servers)
+#   - At least 20GB free disk space
+#   - Internet access for downloading game files (~15GB)
+#   - Sudo access on target hosts
+#
+# What this playbook does:
+#   1. Installs system dependencies (32-bit libraries, SteamCMD requirements)
+#   2. Creates a dedicated game server user
+#   3. Downloads and configures LinuxGSM
+#   4. Installs the 7 Days to Die dedicated server via SteamCMD
+#   5. Configures server settings (serverconfig.xml)
+#   6. Sets up UFW firewall rules (optional)
+#   7. Creates a systemd service for server management
+#   8. Verifies the installation
+#
+# Default settings (can be overridden in inventory or command line):
+#   - Server name: "7 Days to Die Server"
+#   - Max players: 8
+#   - Game world: Navezgane
+#   - Port: 26900
+#   - EAC: Enabled
+#
+# Example with custom settings:
+#   ansible-playbook -i inventory/production/hosts.yml playbooks/sdtd_server.yml \
+#     -e sdtd_server_name="My Awesome Server" \
+#     -e sdtd_server_max_players=16 \
+#     -e sdtd_server_game_world=RWG
+#
+# Sources:
+#   - https://linuxgsm.com/servers/sdtdserver/
+#   - https://docs.linuxgsm.com/
+#   - https://7daystodie.fandom.com/wiki/Server
+#   - https://developer.valvesoftware.com/wiki/SteamCMD
+
+- name: Install and configure 7 Days to Die dedicated server
+  hosts: all
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Check if running Ubuntu
+      ansible.builtin.assert:
+        that:
+          - ansible_distribution == "Ubuntu"
+        fail_msg: "This playbook is designed for Ubuntu systems only"
+        success_msg: "Running on Ubuntu {{ ansible_distribution_version }}"
+
+    - name: Check Ubuntu version
+      ansible.builtin.assert:
+        that:
+          - ansible_distribution_version is version('22.04', '>=')
+        fail_msg: "Ubuntu 22.04 LTS or newer is required"
+        success_msg: "Ubuntu {{ ansible_distribution_version }} is supported"
+
+    - name: Check available memory
+      ansible.builtin.debug:
+        msg: >-
+          Available memory: {{ ansible_memtotal_mb }}MB.
+          {% if ansible_memtotal_mb < 8000 %}
+          WARNING: Less than 8GB RAM detected. The server may experience performance issues.
+          Recommended: 8GB minimum, 12GB+ for larger servers.
+          {% else %}
+          Memory is sufficient for running a game server.
+          {% endif %}
+
+    - name: Check available disk space
+      ansible.builtin.command:
+        cmd: df -BG --output=avail /home | tail -1
+      register: sdtd_disk_check
+      changed_when: false
+
+    - name: Display disk space warning if needed
+      ansible.builtin.debug:
+        msg: >-
+          Available disk space: {{ sdtd_disk_check.stdout | trim }}.
+          The game server requires approximately 15-20GB of disk space.
+      when: (sdtd_disk_check.stdout | trim | regex_replace('G', '') | int) < 25
+
+  roles:
+    - role: sdtd_server
+      tags: [sdtd, gameserver, 7dtd]
+
+  post_tasks:
+    - name: Display completion message
+      ansible.builtin.debug:
+        msg: |
+          ============================================================
+          7 Days to Die Server Installation Complete!
+          ============================================================
+
+          The server has been installed and configured.
+
+          Server Details:
+          - Name: {{ sdtd_server_name }}
+          - Port: {{ sdtd_server_port }}
+          - Max Players: {{ sdtd_server_max_players }}
+          - Game World: {{ sdtd_server_game_world }}
+          - User: {{ sdtd_server_username }}
+          - Home: {{ sdtd_server_home }}
+
+          {% if sdtd_server_enable_service %}
+          To start the server:
+            sudo systemctl start sdtdserver
+
+          To check server status:
+            sudo systemctl status sdtdserver
+          {% else %}
+          To start the server:
+            sudo -u {{ sdtd_server_username }} {{ sdtd_server_home }}/sdtdserver start
+          {% endif %}
+
+          To access the server console:
+            sudo -u {{ sdtd_server_username }} {{ sdtd_server_home }}/sdtdserver console
+
+          To update the server:
+            sudo -u {{ sdtd_server_username }} {{ sdtd_server_home }}/sdtdserver update
+
+          Players can connect to:
+            <server-ip>:{{ sdtd_server_port }}
+
+          ============================================================

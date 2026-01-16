@@ -1,0 +1,369 @@
+---
+# 7 Days to Die LXD Playbook - Create LXD container and install game server
+#
+# This playbook:
+# 1. Creates an LXD container on the specified host (192.168.42.5)
+# 2. Configures the container with cli-improved tools (full profile)
+# 3. Installs 7 Days to Die dedicated server
+# 4. Configures port forwarding via LXD proxy devices
+#
+# Usage:
+#   ansible-playbook playbooks/sdtd_server_lxd.yml -i inventory/sdtd_server
+#
+# Prerequisites:
+#   - LXD must be installed and configured on the target host (192.168.42.5)
+#   - SSH access to the LXD host
+#   - Sufficient disk space (~25GB) and memory (8GB+) on the host
+#
+# Note: This playbook uses `lxc exec` to configure the container since
+# SSH is not available in a fresh container. All container configuration
+# is delegated to the LXD host.
+
+# =============================================================================
+# Play 1: Create LXD Container on Host
+# =============================================================================
+
+- name: Create LXD container for 7 Days to Die server
+  hosts: lxd_hosts
+  become: false
+  gather_facts: true
+
+  pre_tasks:
+    - name: Verify LXD is available
+      ansible.builtin.command: lxc --version
+      register: sdtd_lxd_version_check
+      changed_when: false
+      failed_when: sdtd_lxd_version_check.rc != 0
+
+    - name: Display LXD version
+      ansible.builtin.debug:
+        msg: "LXD version: {{ sdtd_lxd_version_check.stdout }}"
+
+    - name: Check available disk space
+      ansible.builtin.shell: |
+        set -o pipefail
+        df -BG /var/lib/lxd 2>/dev/null || df -BG /var/snap/lxd/common/lxd | tail -1 | awk '{print $4}' | tr -d 'G'
+      args:
+        executable: /bin/bash
+      register: sdtd_disk_space
+      changed_when: false
+
+    - name: Verify sufficient disk space (25GB minimum)
+      ansible.builtin.assert:
+        that:
+          - sdtd_disk_space.stdout | int >= 25
+        fail_msg: "Insufficient disk space. Need at least 25GB, have {{ sdtd_disk_space.stdout }}GB"
+        success_msg: "Disk space check passed: {{ sdtd_disk_space.stdout }}GB available"
+
+  roles:
+    - role: lxd_container
+      tags: [lxd, container]
+
+  post_tasks:
+    - name: Get container IP address
+      ansible.builtin.command: "lxc list {{ sdtd_container_name }} --format json"
+      register: sdtd_lxd_container_info
+      changed_when: false
+
+    - name: Parse container IP
+      ansible.builtin.set_fact:
+        sdtd_lxd_container_ip: >-
+          {{
+            (sdtd_lxd_container_info.stdout | from_json)[0].state.network.eth0.addresses
+            | selectattr('family', 'equalto', 'inet')
+            | map(attribute='address')
+            | first
+          }}
+      when: (sdtd_lxd_container_info.stdout | from_json) | length > 0
+
+    - name: Configure port forwarding - Game ports TCP (26900-26905)
+      ansible.builtin.command: >
+        lxc config device add {{ sdtd_container_name }} gameport{{ item }} proxy
+        listen=tcp:0.0.0.0:{{ item }}
+        connect=tcp:127.0.0.1:{{ item }}
+      loop: "{{ range(sdtd_server_port | int, sdtd_server_port | int + 6) | list }}"
+      register: sdtd_tcp_proxy_result
+      failed_when: false
+      changed_when: "'already exists' not in sdtd_tcp_proxy_result.stderr"
+
+    - name: Configure port forwarding - Game ports UDP (26900-26905)
+      ansible.builtin.command: >
+        lxc config device add {{ sdtd_container_name }} gameportudp{{ item }} proxy
+        listen=udp:0.0.0.0:{{ item }}
+        connect=udp:127.0.0.1:{{ item }}
+      loop: "{{ range(sdtd_server_port | int, sdtd_server_port | int + 6) | list }}"
+      register: sdtd_udp_proxy_result
+      failed_when: false
+      changed_when: "'already exists' not in sdtd_udp_proxy_result.stderr"
+
+    - name: Configure port forwarding - Control panel (if enabled)
+      ansible.builtin.command: >
+        lxc config device add {{ sdtd_container_name }} controlpanel proxy
+        listen=tcp:0.0.0.0:{{ sdtd_server_control_panel_port }}
+        connect=tcp:127.0.0.1:{{ sdtd_server_control_panel_port }}
+      when: sdtd_server_control_panel_enabled | bool
+      register: sdtd_cp_proxy_result
+      failed_when: false
+      changed_when: "'already exists' not in sdtd_cp_proxy_result.stderr"
+
+    - name: Configure port forwarding - Telnet (if enabled)
+      ansible.builtin.command: >
+        lxc config device add {{ sdtd_container_name }} telnet proxy
+        listen=tcp:0.0.0.0:{{ sdtd_server_telnet_port }}
+        connect=tcp:127.0.0.1:{{ sdtd_server_telnet_port }}
+      when: sdtd_server_telnet_enabled | bool
+      register: sdtd_telnet_proxy_result
+      failed_when: false
+      changed_when: "'already exists' not in sdtd_telnet_proxy_result.stderr"
+
+    - name: Display container information
+      ansible.builtin.debug:
+        msg: |
+          ============================================================
+          LXD Container Created Successfully!
+          ============================================================
+          Container Name: {{ sdtd_container_name }}
+          Container IP: {{ sdtd_lxd_container_ip | default('Not available yet') }}
+
+          Port Forwarding Configured:
+          - Game ports: {{ sdtd_server_port }}-{{ sdtd_server_port | int + 5 }} (TCP/UDP)
+          {% if sdtd_server_control_panel_enabled %}
+          - Control panel: {{ sdtd_server_control_panel_port }} (TCP)
+          {% endif %}
+          {% if sdtd_server_telnet_enabled %}
+          - Telnet: {{ sdtd_server_telnet_port }} (TCP)
+          {% endif %}
+          ============================================================
+
+# =============================================================================
+# Play 2: Configure Container Base System via lxc exec
+# =============================================================================
+
+- name: Configure 7D2D container base system via lxc exec
+  hosts: lxd_hosts
+  become: false
+  gather_facts: false
+
+  tasks:
+    - name: Wait for container to be ready
+      ansible.builtin.command: lxc exec {{ sdtd_container_name }} -- cat /etc/os-release
+      register: sdtd_container_ready
+      until: sdtd_container_ready.rc == 0
+      retries: 30
+      delay: 2
+      changed_when: false
+
+    - name: Update apt cache in container
+      ansible.builtin.command: lxc exec {{ sdtd_container_name }} -- apt-get update
+      changed_when: true
+
+    - name: Install essential packages in container
+      ansible.builtin.command: >
+        lxc exec {{ sdtd_container_name }} -- apt-get install -y
+        python3 python3-apt sudo openssh-server curl wget git vim tmux
+        unzip htop iotop nethogs build-essential
+      changed_when: true
+
+    - name: Create target user in container
+      ansible.builtin.command: >
+        lxc exec {{ sdtd_container_name }} --
+        useradd -m -s /bin/bash -G sudo {{ target_user }}
+      register: sdtd_user_create
+      failed_when: false
+      changed_when: sdtd_user_create.rc == 0
+
+    - name: Configure passwordless sudo for user
+      ansible.builtin.command: >
+        lxc exec {{ sdtd_container_name }} -- bash -c
+        "echo '{{ target_user }} ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/{{ target_user }}"
+      changed_when: true
+
+    - name: Create .ssh directory for user
+      ansible.builtin.command: >
+        lxc exec {{ sdtd_container_name }} -- mkdir -p /home/{{ target_user }}/.ssh
+      changed_when: true
+
+    - name: Set .ssh directory permissions
+      ansible.builtin.command: >
+        lxc exec {{ sdtd_container_name }} -- chmod 700 /home/{{ target_user }}/.ssh
+      changed_when: true
+
+    - name: Copy SSH authorized_keys from host to container
+      ansible.builtin.shell: |
+        cat ~/.ssh/authorized_keys | lxc exec {{ sdtd_container_name }} -- tee /home/{{ target_user }}/.ssh/authorized_keys
+      changed_when: true
+
+    - name: Set authorized_keys permissions
+      ansible.builtin.command: >
+        lxc exec {{ sdtd_container_name }} -- chmod 600 /home/{{ target_user }}/.ssh/authorized_keys
+      changed_when: true
+
+    - name: Set ownership of .ssh directory
+      ansible.builtin.command: >
+        lxc exec {{ sdtd_container_name }} -- chown -R {{ target_user }}:{{ target_user }} /home/{{ target_user }}/.ssh
+      changed_when: true
+
+    - name: Enable and start SSH service
+      ansible.builtin.command: lxc exec {{ sdtd_container_name }} -- systemctl enable --now ssh
+      changed_when: true
+
+    - name: Display SSH setup complete
+      ansible.builtin.debug:
+        msg: |
+          SSH access configured for container.
+          User '{{ target_user }}' can now SSH into the container.
+
+    # Now add the container to inventory for SSH-based configuration
+    - name: Get updated container IP
+      ansible.builtin.command: "lxc list {{ sdtd_container_name }} --format json"
+      register: sdtd_lxd_container_info_updated
+      changed_when: false
+
+    - name: Parse updated container IP
+      ansible.builtin.set_fact:
+        sdtd_lxd_container_ip: >-
+          {{
+            (sdtd_lxd_container_info_updated.stdout | from_json)[0].state.network.eth0.addresses
+            | selectattr('family', 'equalto', 'inet')
+            | map(attribute='address')
+            | first
+          }}
+
+    - name: Add container to in-memory inventory
+      ansible.builtin.add_host:
+        name: "{{ sdtd_container_name }}"
+        groups: lxd_containers
+        ansible_host: "{{ sdtd_lxd_container_ip }}"
+        ansible_user: "{{ target_user }}"
+        ansible_ssh_common_args: "-o ProxyJump={{ ansible_user }}@{{ ansible_host }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+        ansible_python_interpreter: /usr/bin/python3
+
+# =============================================================================
+# Play 3: Install CLI Improved Tools via SSH
+# =============================================================================
+
+- name: Install CLI improved tools in container
+  hosts: "{{ sdtd_container_name | default('sdtd-server') }}"
+  become: true
+  gather_facts: true
+
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+    cli_tools_profile: full
+
+  pre_tasks:
+    - name: Wait for SSH to be available
+      ansible.builtin.wait_for_connection:
+        timeout: 120
+
+    - name: Gather facts
+      ansible.builtin.setup:
+
+    - name: Verify Ubuntu 24.04
+      ansible.builtin.assert:
+        that:
+          - ansible_distribution == "Ubuntu"
+          - ansible_distribution_version is version('24.04', '>=')
+        fail_msg: "This playbook requires Ubuntu 24.04 or later"
+        success_msg: "Running on {{ ansible_distribution }} {{ ansible_distribution_version }}"
+
+  roles:
+    # Base system configuration (locale, timezone, sysctl)
+    - role: common
+      tags: [common, base]
+
+    # Package management (APT packages)
+    - role: packages
+      tags: [packages, base]
+
+    # Rust toolchain (required for cli_tools full profile)
+    - role: rust
+      vars:
+        rust_username: "{{ target_user }}"
+      tags: [rust, cli]
+
+    # CLI tools with full profile (cli-improved equivalent)
+    - role: cli_tools
+      vars:
+        cli_tools_username: "{{ target_user }}"
+        cli_tools_profile: full
+      tags: [cli_tools, cli]
+
+    # Bashrc configuration
+    - role: bashrc
+      vars:
+        bashrc_username: "{{ target_user }}"
+      tags: [bashrc, cli]
+
+# =============================================================================
+# Play 4: Install 7 Days to Die Server
+# =============================================================================
+
+- name: Install 7 Days to Die server in container
+  hosts: "{{ sdtd_container_name | default('sdtd-server') }}"
+  become: true
+  gather_facts: true
+
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+
+  roles:
+    - role: sdtd_server
+      tags: [sdtd, gameserver]
+
+  post_tasks:
+    - name: Get container IP for final message
+      ansible.builtin.command: hostname -I
+      register: sdtd_lxd_container_hostname
+      changed_when: false
+
+    - name: Display final installation summary
+      ansible.builtin.debug:
+        msg: |
+          ============================================================
+          7 Days to Die Server Installation Complete!
+          ============================================================
+
+          Container Name: {{ sdtd_container_name | default('sdtd-server') }}
+          Container IP: {{ sdtd_lxd_container_hostname.stdout | trim }}
+          LXD Host IP: {{ hostvars[groups['lxd_hosts'][0]]['ansible_host'] | default('192.168.42.5') }}
+
+          Server Configuration:
+          - Server Name: {{ sdtd_server_name }}
+          - Max Players: {{ sdtd_server_max_players }}
+          - Game World: {{ sdtd_server_game_world }}
+          - Port: {{ sdtd_server_port }}
+
+          ============================================================
+          Connection Information
+          ============================================================
+
+          Players can connect using:
+            Server IP: {{ hostvars[groups['lxd_hosts'][0]]['ansible_host'] | default('192.168.42.5') }}
+            Port: {{ sdtd_server_port }}
+            {% if sdtd_server_password %}
+            Password: (configured)
+            {% else %}
+            Password: (none)
+            {% endif %}
+
+          Port Forwarding Active:
+          - {{ hostvars[groups['lxd_hosts'][0]]['ansible_host'] | default('192.168.42.5') }}:{{ sdtd_server_port }}-{{ sdtd_server_port | int + 5 }} → container
+          {% if sdtd_server_control_panel_enabled %}
+          - Control Panel: http://{{ hostvars[groups['lxd_hosts'][0]]['ansible_host'] | default('192.168.42.5') }}:{{ sdtd_server_control_panel_port }}
+          {% endif %}
+
+          ============================================================
+          Management Commands
+          ============================================================
+
+          Via LXD:
+            lxc exec {{ sdtd_container_name | default('sdtd-server') }} -- sudo -u {{ sdtd_server_username }} ./sdtdserver start
+            lxc exec {{ sdtd_container_name | default('sdtd-server') }} -- sudo -u {{ sdtd_server_username }} ./sdtdserver stop
+            lxc exec {{ sdtd_container_name | default('sdtd-server') }} -- sudo -u {{ sdtd_server_username }} ./sdtdserver console
+
+          Via systemd:
+            lxc exec {{ sdtd_container_name | default('sdtd-server') }} -- systemctl start sdtdserver
+            lxc exec {{ sdtd_container_name | default('sdtd-server') }} -- systemctl status sdtdserver
+
+          ============================================================

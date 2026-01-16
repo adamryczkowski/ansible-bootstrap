@@ -1,0 +1,66 @@
+---
+# Molecule converge playbook for 7 Days to Die server test
+#
+# This tests the role's prerequisites and LinuxGSM setup
+# without performing the full game installation.
+
+- name: Converge - 7 Days to Die server setup (prerequisites only)
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    # Test configuration
+    sdtd_server_username: sdtdserver
+    sdtd_server_name: "Molecule Test Server"
+    sdtd_server_max_players: 4
+    sdtd_server_enable_service: false  # Skip service for test
+    sdtd_server_configure_firewall: false  # Skip firewall for test
+    sdtd_server_start_after_install: false
+
+  pre_tasks:
+    - name: Display test configuration
+      ansible.builtin.debug:
+        msg: |
+          7 Days to Die Server Molecule Test
+          - Target user: {{ sdtd_server_username }}
+          - Server name: {{ sdtd_server_name }}
+          - OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+  tasks:
+    # Test prerequisites installation
+    - name: Include prerequisites tasks
+      ansible.builtin.include_role:
+        name: sdtd_server
+        tasks_from: prerequisites.yml
+
+    # Test user creation
+    - name: Include user setup tasks
+      ansible.builtin.include_role:
+        name: sdtd_server
+        tasks_from: user.yml
+
+    # Test LinuxGSM installation
+    - name: Include LinuxGSM installation tasks
+      ansible.builtin.include_role:
+        name: sdtd_server
+        tasks_from: linuxgsm.yml
+
+  post_tasks:
+    - name: Display converge completion
+      ansible.builtin.debug:
+        msg: |
+          Molecule Converge Complete!
+
+          Tested components:
+          - System prerequisites (32-bit libraries, dependencies)
+          - User creation ({{ sdtd_server_username }})
+          - LinuxGSM installation and initialization
+
+          Note: Full game installation was skipped for testing
+          (would require ~15GB download and 30+ minutes)

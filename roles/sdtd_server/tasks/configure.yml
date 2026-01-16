@@ -1,0 +1,279 @@
+---
+# Server configuration tasks for 7 Days to Die
+#
+# Purpose:
+#   Configures the serverconfig.xml file with the desired server settings.
+#   Uses xml module to modify specific settings while preserving the rest.
+
+- name: SDTD Configure | Check if serverconfig.xml exists
+  ansible.builtin.stat:
+    path: "{{ sdtd_server_home }}/serverfiles/serverconfig.xml"
+  register: sdtd_server_config_check
+
+- name: SDTD Configure | Fail if serverconfig.xml not found
+  ansible.builtin.fail:
+    msg: >-
+      serverconfig.xml not found at {{ sdtd_server_home }}/serverfiles/serverconfig.xml
+      Please ensure the server is installed first.
+  when: not sdtd_server_config_check.stat.exists
+
+- name: SDTD Configure | Backup original serverconfig.xml
+  ansible.builtin.copy:
+    src: "{{ sdtd_server_home }}/serverfiles/serverconfig.xml"
+    dest: "{{ sdtd_server_home }}/serverfiles/serverconfig.xml.backup"
+    remote_src: true
+    owner: "{{ sdtd_server_username }}"
+    group: "{{ sdtd_server_username }}"
+    mode: "0644"
+    force: false
+  become: true
+
+# Server representation settings
+- name: SDTD Configure | Set ServerName
+  community.general.xml:
+    path: "{{ sdtd_server_home }}/serverfiles/serverconfig.xml"
+    xpath: "//property[@name='ServerName']"
+    attribute: value
+    value: "{{ sdtd_server_name }}"
+  become: true
+  become_user: "{{ sdtd_server_username }}"
+
+- name: SDTD Configure | Set ServerDescription
+  community.general.xml:
+    path: "{{ sdtd_server_home }}/serverfiles/serverconfig.xml"
+    xpath: "//property[@name='ServerDescription']"
+    attribute: value
+    value: "{{ sdtd_server_description }}"
+  become: true
+  become_user: "{{ sdtd_server_username }}"
+
+- name: SDTD Configure | Set ServerPassword
+  community.general.xml:
+    path: "{{ sdtd_server_home }}/serverfiles/serverconfig.xml"
+    xpath: "//property[@name='ServerPassword']"
+    attribute: value
+    value: "{{ sdtd_server_password }}"
+  become: true
+  become_user: "{{ sdtd_server_username }}"
+
+- name: SDTD Configure | Set ServerVisibility
+  community.general.xml:
+    path: "{{ sdtd_server_home }}/serverfiles/serverconfig.xml"
+    xpath: "//property[@name='ServerVisibility']"
+    attribute: value
+    value: "{{ sdtd_server_visibility | string }}"
+  become: true
+  become_user: "{{ sdtd_server_username }}"
+
+- name: SDTD Configure | Set Region
+  community.general.xml:
+    path: "{{ sdtd_server_home }}/serverfiles/serverconfig.xml"
+    xpath: "//property[@name='Region']"
+    attribute: value
+    value: "{{ sdtd_server_region }}"
+  become: true
+  become_user: "{{ sdtd_server_username }}"
+
+- name: SDTD Configure | Set Language
+  community.general.xml:
+    path: "{{ sdtd_server_home }}/serverfiles/serverconfig.xml"
+    xpath: "//property[@name='Language']"
+    attribute: value
+    value: "{{ sdtd_server_language }}"
+  become: true
+  become_user: "{{ sdtd_server_username }}"
+
+# Network settings
+- name: SDTD Configure | Set ServerPort
+  community.general.xml:
+    path: "{{ sdtd_server_home }}/serverfiles/serverconfig.xml"
+    xpath: "//property[@name='ServerPort']"
+    attribute: value
+    value: "{{ sdtd_server_port | string }}"
+  become: true
+  become_user: "{{ sdtd_server_username }}"
+
+# Player slots settings
+- name: SDTD Configure | Set ServerMaxPlayerCount
+  community.general.xml:
+    path: "{{ sdtd_server_home }}/serverfiles/serverconfig.xml"
+    xpath: "//property[@name='ServerMaxPlayerCount']"
+    attribute: value
+    value: "{{ sdtd_server_max_players | string }}"
+  become: true
+  become_user: "{{ sdtd_server_username }}"
+
+- name: SDTD Configure | Set ServerReservedSlots
+  community.general.xml:
+    path: "{{ sdtd_server_home }}/serverfiles/serverconfig.xml"
+    xpath: "//property[@name='ServerReservedSlots']"
+    attribute: value
+    value: "{{ sdtd_server_reserved_slots | string }}"
+  become: true
+  become_user: "{{ sdtd_server_username }}"
+
+- name: SDTD Configure | Set ServerAdminSlots
+  community.general.xml:
+    path: "{{ sdtd_server_home }}/serverfiles/serverconfig.xml"
+    xpath: "//property[@name='ServerAdminSlots']"
+    attribute: value
+    value: "{{ sdtd_server_admin_slots | string }}"
+  become: true
+  become_user: "{{ sdtd_server_username }}"
+
+# Game settings
+- name: SDTD Configure | Set GameWorld
+  community.general.xml:
+    path: "{{ sdtd_server_home }}/serverfiles/serverconfig.xml"
+    xpath: "//property[@name='GameWorld']"
+    attribute: value
+    value: "{{ sdtd_server_game_world }}"
+  become: true
+  become_user: "{{ sdtd_server_username }}"
+
+- name: SDTD Configure | Set WorldGenSeed
+  community.general.xml:
+    path: "{{ sdtd_server_home }}/serverfiles/serverconfig.xml"
+    xpath: "//property[@name='WorldGenSeed']"
+    attribute: value
+    value: "{{ sdtd_server_world_gen_seed }}"
+  become: true
+  become_user: "{{ sdtd_server_username }}"
+  when: sdtd_server_game_world == "RWG"
+
+- name: SDTD Configure | Set WorldGenSize
+  community.general.xml:
+    path: "{{ sdtd_server_home }}/serverfiles/serverconfig.xml"
+    xpath: "//property[@name='WorldGenSize']"
+    attribute: value
+    value: "{{ sdtd_server_world_gen_size | string }}"
+  become: true
+  become_user: "{{ sdtd_server_username }}"
+  when: sdtd_server_game_world == "RWG"
+
+- name: SDTD Configure | Set GameName
+  community.general.xml:
+    path: "{{ sdtd_server_home }}/serverfiles/serverconfig.xml"
+    xpath: "//property[@name='GameName']"
+    attribute: value
+    value: "{{ sdtd_server_game_name }}"
+  become: true
+  become_user: "{{ sdtd_server_username }}"
+
+- name: SDTD Configure | Set GameDifficulty
+  community.general.xml:
+    path: "{{ sdtd_server_home }}/serverfiles/serverconfig.xml"
+    xpath: "//property[@name='GameDifficulty']"
+    attribute: value
+    value: "{{ sdtd_server_game_difficulty | string }}"
+  become: true
+  become_user: "{{ sdtd_server_username }}"
+
+# Anti-cheat settings
+- name: SDTD Configure | Set EACEnabled
+  community.general.xml:
+    path: "{{ sdtd_server_home }}/serverfiles/serverconfig.xml"
+    xpath: "//property[@name='EACEnabled']"
+    attribute: value
+    value: "{{ 'true' if sdtd_server_eac_enabled else 'false' }}"
+  become: true
+  become_user: "{{ sdtd_server_username }}"
+
+# Performance settings
+- name: SDTD Configure | Set MaxSpawnedZombies
+  community.general.xml:
+    path: "{{ sdtd_server_home }}/serverfiles/serverconfig.xml"
+    xpath: "//property[@name='MaxSpawnedZombies']"
+    attribute: value
+    value: "{{ sdtd_server_max_spawned_zombies | string }}"
+  become: true
+  become_user: "{{ sdtd_server_username }}"
+
+- name: SDTD Configure | Set MaxSpawnedAnimals
+  community.general.xml:
+    path: "{{ sdtd_server_home }}/serverfiles/serverconfig.xml"
+    xpath: "//property[@name='MaxSpawnedAnimals']"
+    attribute: value
+    value: "{{ sdtd_server_max_spawned_animals | string }}"
+  become: true
+  become_user: "{{ sdtd_server_username }}"
+
+- name: SDTD Configure | Set ServerMaxWorldTransferSpeedKiBs
+  community.general.xml:
+    path: "{{ sdtd_server_home }}/serverfiles/serverconfig.xml"
+    xpath: "//property[@name='ServerMaxWorldTransferSpeedKiBs']"
+    attribute: value
+    value: "{{ sdtd_server_max_world_transfer_speed | string }}"
+  become: true
+  become_user: "{{ sdtd_server_username }}"
+
+# Control panel settings
+- name: SDTD Configure | Set ControlPanelEnabled
+  community.general.xml:
+    path: "{{ sdtd_server_home }}/serverfiles/serverconfig.xml"
+    xpath: "//property[@name='ControlPanelEnabled']"
+    attribute: value
+    value: "{{ 'true' if sdtd_server_control_panel_enabled else 'false' }}"
+  become: true
+  become_user: "{{ sdtd_server_username }}"
+
+- name: SDTD Configure | Set ControlPanelPort
+  community.general.xml:
+    path: "{{ sdtd_server_home }}/serverfiles/serverconfig.xml"
+    xpath: "//property[@name='ControlPanelPort']"
+    attribute: value
+    value: "{{ sdtd_server_control_panel_port | string }}"
+  become: true
+  become_user: "{{ sdtd_server_username }}"
+  when: sdtd_server_control_panel_enabled | bool
+
+- name: SDTD Configure | Set ControlPanelPassword
+  community.general.xml:
+    path: "{{ sdtd_server_home }}/serverfiles/serverconfig.xml"
+    xpath: "//property[@name='ControlPanelPassword']"
+    attribute: value
+    value: "{{ sdtd_server_control_panel_password }}"
+  become: true
+  become_user: "{{ sdtd_server_username }}"
+  when: sdtd_server_control_panel_enabled | bool
+  no_log: true
+
+# Telnet settings
+- name: SDTD Configure | Set TelnetEnabled
+  community.general.xml:
+    path: "{{ sdtd_server_home }}/serverfiles/serverconfig.xml"
+    xpath: "//property[@name='TelnetEnabled']"
+    attribute: value
+    value: "{{ 'true' if sdtd_server_telnet_enabled else 'false' }}"
+  become: true
+  become_user: "{{ sdtd_server_username }}"
+
+- name: SDTD Configure | Set TelnetPort
+  community.general.xml:
+    path: "{{ sdtd_server_home }}/serverfiles/serverconfig.xml"
+    xpath: "//property[@name='TelnetPort']"
+    attribute: value
+    value: "{{ sdtd_server_telnet_port | string }}"
+  become: true
+  become_user: "{{ sdtd_server_username }}"
+  when: sdtd_server_telnet_enabled | bool
+
+- name: SDTD Configure | Set TelnetPassword
+  community.general.xml:
+    path: "{{ sdtd_server_home }}/serverfiles/serverconfig.xml"
+    xpath: "//property[@name='TelnetPassword']"
+    attribute: value
+    value: "{{ sdtd_server_telnet_password }}"
+  become: true
+  become_user: "{{ sdtd_server_username }}"
+  when: sdtd_server_telnet_enabled | bool
+  no_log: true
+
+- name: SDTD Configure | Display configuration completion
+  ansible.builtin.debug:
+    msg: |
+      Server configuration complete!
+      Server Name: {{ sdtd_server_name }}
+      Max Players: {{ sdtd_server_max_players }}
+      Game World: {{ sdtd_server_game_world }}
+      Port: {{ sdtd_server_port }}
