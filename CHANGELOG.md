@@ -76,6 +76,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - SDTD Server role: Fixed INJECT_FACTS_AS_VARS deprecation warnings (use `ansible_facts['fact_name']` syntax for Ansible 2.24+ compatibility)
 - SDTD Server role: Added `acl` package to prerequisites for `become_user` support (GitHub issue ansible/ansible#74830)
+- SDTD Server role: Added `python3-lxml` package for community.general.xml module (serverconfig.xml editing)
 - SDTD Server role: Fixed user creation logic (removed faulty getent check, user module is idempotent)
 - Rust role: Fixed INJECT_FACTS_AS_VARS deprecation warning (`ansible_env.PATH` → `ansible_facts['env']['PATH']`)
 - Sway role: Fixed brightness key bindings not working for non-adam users (hardcoded /home/adam/ paths in i3-config repository are now replaced with the actual user's home directory via `sway_fix_hardcoded_paths` variable)
