@@ -28,6 +28,8 @@
 - name: SDTD Prerequisites | Install required system packages (base)
   ansible.builtin.apt:
     name:
+      # ACL support for Ansible become_user (required for unprivileged user tasks)
+      - acl
       # Core utilities required by LinuxGSM (from ubuntu-24.04.csv line 1)
       - bc
       - binutils
