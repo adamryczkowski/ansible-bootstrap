@@ -121,8 +121,20 @@ sdtd_server_game_difficulty: 2
 # =============================================================================
 
 # Enable Easy Anti-Cheat (EAC)
-# Set to false if using mods
-sdtd_server_eac_enabled: true
+# Set to false if using mods or for private servers
+sdtd_server_eac_enabled: false
+
+# =============================================================================
+# Network Protocol Settings
+# =============================================================================
+
+# Disabled network protocols (comma-separated)
+# Options: LiteNetLib, SteamNetworking
+# - Empty string: Both protocols enabled (recommended for most setups)
+# - "SteamNetworking": Only LiteNetLib (for direct connections with proper port forwarding)
+# - "LiteNetLib": Only SteamNetworking (for NAT traversal via Steam relay)
+# Note: LiteNetLib requires IPv6 support at kernel level
+sdtd_server_disabled_network_protocols: ""
 
 # =============================================================================
 # Performance Settings

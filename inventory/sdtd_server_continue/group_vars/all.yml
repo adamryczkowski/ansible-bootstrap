@@ -1,0 +1,139 @@
+---
+# 7 Days to Die Server LXD Container Configuration
+#
+# This configuration defines the LXD container and game server settings.
+# Customize these values according to your needs.
+
+# =============================================================================
+# Target User Configuration
+# =============================================================================
+
+# Target user for configuration inside the container
+target_user: adam
+
+# =============================================================================
+# LXD Container Configuration
+# =============================================================================
+
+# Container name
+sdtd_container_name: sdtd-server
+
+# LXD container image settings
+# Using ubuntu: remote (cloud-images.ubuntu.com) for container images
+lxd_container_image_server: https://cloud-images.ubuntu.com/releases/
+lxd_container_image_protocol: simplestreams
+
+# Container definition for lxd_container role
+lxd_containers:
+  - name: "{{ sdtd_container_name }}"
+    image: "24.04"  # Ubuntu 24.04 LTS (Noble Numbat)
+    profiles:
+      - default
+    config:
+      # Resource limits for game server
+      # 7D2D requires significant resources:
+      # - CPU: 4+ cores recommended
+      # - RAM: 8GB minimum, 12GB+ recommended for larger worlds
+      limits.cpu: "4"
+      limits.memory: 12GB
+      # Security settings
+      security.nesting: "false"
+    devices: {}
+    # Network will use the default profile's bridge
+
+# =============================================================================
+# 7 Days to Die Server Configuration
+# =============================================================================
+
+# Server identity
+sdtd_server_name: "My 7D2D Server"
+sdtd_server_description: "A 7 Days to Die dedicated server"
+sdtd_server_password: ""  # Leave empty for no password
+
+# Network settings
+sdtd_server_port: 26900  # Main game port (uses 26900-26905)
+
+# Player settings
+sdtd_server_max_players: 8
+sdtd_server_reserved_slots: 0
+sdtd_server_admin_slots: 0
+
+# Game world settings
+sdtd_server_game_world: "Navezgane"  # Navezgane or RWG (Random World Gen)
+sdtd_server_world_gen_seed: "MyRandomSeed"  # Only used if game_world is RWG
+sdtd_server_world_gen_size: 6144  # Only used if game_world is RWG
+sdtd_server_game_name: "My Game"
+sdtd_server_game_difficulty: 2  # 0-5 (Scavenger to Insane)
+
+# Server visibility
+sdtd_server_visibility: 2  # 0=Not listed, 1=Friends only, 2=Public
+sdtd_server_region: "Europe"
+sdtd_server_language: "English"
+
+# Anti-cheat (EAC)
+# Note: EAC may not work in LXC containers - disable if issues occur
+sdtd_server_eac_enabled: false
+
+# Network protocols
+# Empty string allows both LiteNetLib and SteamNetworking
+# Note: LiteNetLib requires IPv6 at kernel level
+sdtd_server_disabled_network_protocols: ""
+
+# Performance settings
+sdtd_server_max_spawned_zombies: 64
+sdtd_server_max_spawned_animals: 50
+sdtd_server_max_world_transfer_speed: 512
+
+# Control panel (web-based admin)
+sdtd_server_control_panel_enabled: true
+sdtd_server_control_panel_port: 8080
+sdtd_server_control_panel_password: "CHANGE_ME"  # Change this!
+
+# Telnet console
+sdtd_server_telnet_enabled: true
+sdtd_server_telnet_port: 8081
+sdtd_server_telnet_password: "CHANGE_ME"  # Change this!
+
+# Service settings
+sdtd_server_enable_service: true
+sdtd_server_start_after_install: false  # Set to true to auto-start
+
+# =============================================================================
+# CLI Tools Configuration (cli-improved)
+# =============================================================================
+
+# Use full profile for enhanced CLI experience
+cli_tools_profile: full
+
+# =============================================================================
+# Common Packages
+# =============================================================================
+
+common_packages:
+  - curl
+  - wget
+  - git
+  - vim
+  - tmux
+  - unzip
+  - htop
+  - iotop
+  - nethogs
+
+# Package configuration
+packages_update_cache: true
+packages_upgrade: true
+
+# =============================================================================
+# User Setup Configuration
+# =============================================================================
+
+user_setup_create_user: true
+user_setup_username: "{{ target_user }}"
+user_setup_shell: /bin/bash
+user_setup_authorized_operators:
+  - adam@legion9
+  - adam@potwor
+
+# Bashrc configuration
+bashrc_enabled: true

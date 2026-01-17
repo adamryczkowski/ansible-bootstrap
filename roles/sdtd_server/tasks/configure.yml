@@ -93,6 +93,15 @@
   become: true
   become_user: "{{ sdtd_server_username }}"
 
+- name: SDTD Configure | Set ServerDisabledNetworkProtocols
+  community.general.xml:
+    path: "{{ sdtd_server_home }}/serverfiles/serverconfig.xml"
+    xpath: "//property[@name='ServerDisabledNetworkProtocols']"
+    attribute: value
+    value: "{{ sdtd_server_disabled_network_protocols }}"
+  become: true
+  become_user: "{{ sdtd_server_username }}"
+
 # Player slots settings
 - name: SDTD Configure | Set ServerMaxPlayerCount
   community.general.xml:
@@ -207,36 +216,29 @@
   become: true
   become_user: "{{ sdtd_server_username }}"
 
-# Control panel settings
-- name: SDTD Configure | Set ControlPanelEnabled
+# Web Dashboard settings (formerly Control Panel in older versions)
+# Note: In 7D2D V1.0+, ControlPanel was renamed to WebDashboard
+- name: SDTD Configure | Set WebDashboardEnabled
   community.general.xml:
     path: "{{ sdtd_server_home }}/serverfiles/serverconfig.xml"
-    xpath: "//property[@name='ControlPanelEnabled']"
+    xpath: "//property[@name='WebDashboardEnabled']"
     attribute: value
     value: "{{ 'true' if sdtd_server_control_panel_enabled else 'false' }}"
   become: true
   become_user: "{{ sdtd_server_username }}"
 
-- name: SDTD Configure | Set ControlPanelPort
+- name: SDTD Configure | Set WebDashboardPort
   community.general.xml:
     path: "{{ sdtd_server_home }}/serverfiles/serverconfig.xml"
-    xpath: "//property[@name='ControlPanelPort']"
+    xpath: "//property[@name='WebDashboardPort']"
     attribute: value
     value: "{{ sdtd_server_control_panel_port | string }}"
   become: true
   become_user: "{{ sdtd_server_username }}"
   when: sdtd_server_control_panel_enabled | bool
 
-- name: SDTD Configure | Set ControlPanelPassword
-  community.general.xml:
-    path: "{{ sdtd_server_home }}/serverfiles/serverconfig.xml"
-    xpath: "//property[@name='ControlPanelPassword']"
-    attribute: value
-    value: "{{ sdtd_server_control_panel_password }}"
-  become: true
-  become_user: "{{ sdtd_server_username }}"
-  when: sdtd_server_control_panel_enabled | bool
-  no_log: true
+# Note: WebDashboard in 7D2D V1.0+ uses token-based auth, not password
+# The password setting is no longer applicable
 
 # Telnet settings
 - name: SDTD Configure | Set TelnetEnabled

@@ -1,0 +1,63 @@
+---
+# 7 Days to Die Server - Continue Installation on Existing Container
+#
+# This playbook continues the sdtd_server role on an existing LXD container.
+# Use this when the container already exists and you need to re-run or continue
+# the server installation/configuration.
+#
+# Usage:
+#   ansible-playbook playbooks/sdtd_server_continue.yml -i inventory/sdtd_server_continue
+#
+# Prerequisites:
+#   - Container must already exist with SSH access configured
+#   - Container must be accessible via ProxyJump through LXD host
+
+- name: Continue 7 Days to Die server installation
+  hosts: sdtd_container
+  become: true
+  gather_facts: true
+
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+
+  pre_tasks:
+    - name: Wait for SSH to be available
+      ansible.builtin.wait_for_connection:
+        timeout: 60
+
+    - name: Gather facts
+      ansible.builtin.setup:
+
+    - name: Verify Ubuntu 24.04
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['distribution'] == "Ubuntu"
+          - ansible_facts['distribution_version'] is version('24.04', '>=')
+        fail_msg: "This playbook requires Ubuntu 24.04 or later"
+        success_msg: "Running on {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}"
+
+  roles:
+    - role: sdtd_server
+      tags: [sdtd, gameserver]
+
+  post_tasks:
+    - name: Display completion message
+      ansible.builtin.debug:
+        msg: |
+          ============================================================
+          7 Days to Die Server Configuration Complete!
+          ============================================================
+
+          Server Configuration:
+          - Server Name: {{ sdtd_server_name }}
+          - Max Players: {{ sdtd_server_max_players }}
+          - Game World: {{ sdtd_server_game_world }}
+          - Port: {{ sdtd_server_port }}
+
+          Management Commands:
+          - Start: sudo -u {{ sdtd_server_username }} ./sdtdserver start
+          - Stop: sudo -u {{ sdtd_server_username }} ./sdtdserver stop
+          - Console: sudo -u {{ sdtd_server_username }} ./sdtdserver console
+          - Status: systemctl status sdtdserver
+
+          ============================================================
