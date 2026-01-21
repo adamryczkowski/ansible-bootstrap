@@ -1,0 +1,9 @@
+#!/bin/bash
+# Reset the Synaptics fingerprint reader
+# This script resets the USB device to recover from stalled states
+# that can occur after suspend/resume cycles.
+#
+# USB ID: {{ sway_fingerprint_reader_usb_id }}
+# Managed by Ansible - do not edit manually
+
+exec /usr/bin/usbreset "{{ sway_fingerprint_reader_usb_id }}"

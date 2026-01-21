@@ -50,3 +50,11 @@
   listen: Restart greetd
   # Don't fail if greetd is not running (e.g., during initial setup)
   failed_when: false
+
+- name: Run pam-auth-update
+  ansible.builtin.command:
+    cmd: pam-auth-update --enable fprintd
+  become: true
+  listen: Run pam-auth-update
+  # Only runs on Debian/Ubuntu systems
+  when: ansible_os_family == "Debian"

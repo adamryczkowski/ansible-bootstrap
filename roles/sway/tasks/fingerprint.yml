@@ -1,0 +1,120 @@
+---
+# Sway role - Fingerprint authentication configuration
+#
+# This task file configures fingerprint authentication for:
+# 1. sudo - Command-line privilege escalation
+# 2. swaylock - Screen locker (using swaylock-fprintd fork)
+#
+# The configuration auto-detects supported Synaptics fingerprint readers
+# and only applies when compatible hardware is found.
+#
+# Supported devices (ThinkPad laptops):
+# - 06cb:00bd: Prometheus MIS Touch Fingerprint Reader
+# - 06cb:009a: Metallica MIS Touch
+# - 06cb:00c2: Synaptics Sensors
+#
+# Reference: docs/fingerprint-sudo-swaylock.md
+
+# === Phase 1: Detection ===
+
+- name: Fingerprint | Include hardware detection
+  ansible.builtin.include_tasks: fingerprint_detect.yml
+
+# === Phase 2: Package Installation (only if hardware detected) ===
+
+- name: Fingerprint | Install fingerprint packages (Debian/Ubuntu)
+  ansible.builtin.apt:
+    name: "{{ sway_fingerprint_packages_debian }}"
+    state: present
+    update_cache: true
+  become: true
+  when:
+    - sway_fingerprint_reader_detected | bool
+    - ansible_os_family == "Debian"
+
+- name: Fingerprint | Install fingerprint packages (Arch Linux)
+  community.general.pacman:
+    name: "{{ sway_fingerprint_packages_arch }}"
+    state: present
+  become: true
+  when:
+    - sway_fingerprint_reader_detected | bool
+    - ansible_os_family == "Archlinux"
+
+# === Phase 3: PAM Configuration ===
+
+# Debian/Ubuntu: Use debconf and pam-auth-update
+- name: Fingerprint | Enable fingerprint authentication in PAM (Debian/Ubuntu)
+  ansible.builtin.debconf:
+    name: libpam-fprintd
+    question: libpam-fprintd/enable-fingerprint
+    value: "true"
+    vtype: boolean
+  become: true
+  notify: Run pam-auth-update
+  when:
+    - sway_fingerprint_reader_detected | bool
+    - ansible_os_family == "Debian"
+
+# Arch Linux: Modify PAM files directly
+- name: Fingerprint | Check if pam_fprintd.so is already configured (Arch Linux)
+  ansible.builtin.command:
+    cmd: grep -q "pam_fprintd.so" /etc/pam.d/system-auth
+  register: sway_pam_fprintd_check
+  changed_when: false
+  failed_when: false
+  when:
+    - sway_fingerprint_reader_detected | bool
+    - ansible_os_family == "Archlinux"
+
+- name: Fingerprint | Add pam_fprintd.so to system-auth (Arch Linux)
+  ansible.builtin.lineinfile:
+    path: /etc/pam.d/system-auth
+    insertafter: "^#%PAM"
+    line: "auth      sufficient  pam_fprintd.so"
+    state: present
+  become: true
+  when:
+    - sway_fingerprint_reader_detected | bool
+    - ansible_os_family == "Archlinux"
+    - sway_pam_fprintd_check.rc != 0
+
+# === Phase 4: User Configuration ===
+
+- name: Fingerprint | Add user to input group for fingerprint access
+  ansible.builtin.user:
+    name: "{{ sway_username }}"
+    groups: input
+    append: true
+  become: true
+  when: sway_fingerprint_reader_detected | bool
+
+# === Phase 5: swaylock-fprintd Installation ===
+
+- name: Fingerprint | Include swaylock-fprintd installation
+  ansible.builtin.include_tasks: fingerprint_swaylock.yml
+  when: sway_fingerprint_reader_detected | bool
+
+# === Phase 6: Completion Message ===
+
+- name: Fingerprint | Display enrollment instructions
+  ansible.builtin.debug:
+    msg: |
+      ============================================================
+      Fingerprint authentication configured successfully!
+
+      Detected fingerprint reader: {{ sway_fingerprint_reader_usb_id }}
+
+      IMPORTANT: Fingerprint enrollment must be done manually.
+
+      To enroll your fingerprint, run:
+        sudo fprintd-enroll {{ sway_username }}
+
+      To verify enrollment:
+        fprintd-list {{ sway_username }}
+        fprintd-verify
+
+      Security note: Fingerprint is configured as an ALTERNATIVE
+      to password, not a replacement. See CVE-2024-37408.
+      ============================================================
+  when: sway_fingerprint_reader_detected | bool

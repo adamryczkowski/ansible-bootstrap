@@ -1,0 +1,6 @@
+# typos configuration
+# https://github.com/crate-ci/typos
+
+[default.extend-words]
+# MIS = Match-In-Sensor (fingerprint technology term)
+MIS = "MIS"

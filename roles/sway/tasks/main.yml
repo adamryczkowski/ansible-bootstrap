@@ -56,6 +56,10 @@
   ansible.builtin.include_tasks: fix_hardcoded_paths.yml
   when: sway_fix_hardcoded_paths | bool
 
+- name: Sway | Include swayidle monitor wake fix
+  ansible.builtin.include_tasks: fix_swayidle.yml
+  when: sway_fix_swayidle_monitor_wake | bool
+
 - name: Sway | Include GTK theme configuration for automatic dark/light mode
   ansible.builtin.include_tasks: gtk_theme.yml
   when: sway_configure_gtk_theme | bool
@@ -101,3 +105,7 @@
 - name: Sway | Include bright CLI tool installation
   ansible.builtin.include_tasks: bright.yml
   when: sway_install_bright | bool
+
+- name: Sway | Include fingerprint authentication configuration
+  ansible.builtin.include_tasks: fingerprint.yml
+  when: sway_enable_fingerprint_auth | bool

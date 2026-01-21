@@ -1,0 +1,16 @@
+#!/bin/bash
+# swaylock-wrapper - Wrapper script for swaylock-fprintd
+# Resets the Synaptics fingerprint reader before launching swaylock
+# to prevent "endpoint stalled" errors after suspend/resume.
+#
+# Managed by Ansible - do not edit manually
+# Reference: docs/fingerprint-sudo-swaylock.md
+
+# Reset the fingerprint reader (requires passwordless sudo configured)
+sudo /usr/local/bin/reset-fingerprint-reader >/dev/null 2>&1
+
+# Small delay to allow the device to reinitialize
+sleep 0.5
+
+# Execute the real swaylock binary with all passed arguments
+exec /usr/local/bin/swaylock-fprintd-bin "$@"

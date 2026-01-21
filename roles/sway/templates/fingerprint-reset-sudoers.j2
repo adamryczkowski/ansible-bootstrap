@@ -1,0 +1,8 @@
+# Allow {{ sway_username }} to reset the fingerprint reader without password
+# This is required for the swaylock-wrapper to reset the USB device
+# before launching swaylock-fprintd.
+#
+# Managed by Ansible - do not edit manually
+# Reference: docs/fingerprint-sudo-swaylock.md
+
+{{ sway_username }} ALL=(ALL) NOPASSWD: /usr/local/bin/reset-fingerprint-reader

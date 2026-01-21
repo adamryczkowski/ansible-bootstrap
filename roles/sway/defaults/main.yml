@@ -164,6 +164,15 @@ sway_deploy_custom_xkb_keymap: true
 # XKB keymap file location (relative to i3-config repository)
 sway_xkb_keymap_path: "xkb/keymap/custom"
 
+# Fix swayidle monitor wake issue
+# When multiple timeout statements are on the same swayidle command line,
+# the resume functionality can fail intermittently (known bug in swayidle).
+# This fix splits the swayidle configuration into separate processes.
+# References:
+# - https://github.com/swaywm/swayidle/issues/25
+# - https://github.com/swaywm/sway/issues/5903
+sway_fix_swayidle_monitor_wake: true
+
 # Lock before sleep configuration
 # This creates a systemd user service that locks the screen before system suspend
 # This is more reliable than swayidle's before-sleep event which depends on logind D-Bus
@@ -248,3 +257,69 @@ sway_greetd_user: "greeter"
 #   --asterisks: Show asterisks for password input
 #   --cmd: Default command to run (Sway)
 sway_greetd_command: "tuigreet --time --remember --remember-session --asterisks --cmd sway"
+
+# Fingerprint authentication configuration
+# When enabled, the role will auto-detect supported fingerprint readers
+# and configure fingerprint authentication for sudo and swaylock
+# Reference: docs/fingerprint-sudo-swaylock.md
+sway_enable_fingerprint_auth: true
+
+# Supported fingerprint reader USB IDs (Synaptics ThinkPad readers)
+# These are detected at runtime via lsusb
+sway_fingerprint_usb_ids:
+  - "06cb:00bd"  # Prometheus MIS Touch Fingerprint Reader
+  - "06cb:009a"  # Metallica MIS Touch
+  - "06cb:00c2"  # Synaptics Sensors
+
+# swaylock-fprintd repository (for building from source)
+# This fork of swaylock has native fingerprint support via D-Bus
+sway_swaylock_fprintd_repo: "https://github.com/SL-RU/swaylock-fprintd.git"
+sway_swaylock_fprintd_branch: "fprintd"
+sway_swaylock_fprintd_dest: "/opt/swaylock-fprintd"
+
+# Build dependencies for swaylock-fprintd (Debian/Ubuntu)
+sway_fingerprint_build_packages_debian:
+  - meson
+  - ninja-build
+  - libwayland-dev
+  - wayland-protocols
+  - libxkbcommon-dev
+  - libcairo2-dev
+  - libgdk-pixbuf-2.0-dev
+  - libpam0g-dev
+  - libdbus-1-dev
+  - libglib2.0-dev
+  - scdoc
+  - git
+
+# Build dependencies for swaylock-fprintd (Arch Linux - if AUR not available)
+sway_fingerprint_build_packages_arch:
+  - meson
+  - ninja
+  - wayland
+  - wayland-protocols
+  - libxkbcommon
+  - cairo
+  - gdk-pixbuf2
+  - pam
+  - dbus
+  - glib2
+  - scdoc
+  - git
+
+# Fingerprint packages (Debian/Ubuntu)
+sway_fingerprint_packages_debian:
+  - fprintd
+  - libfprint-2-2
+  - libfprint-2-tod1
+  - libpam-fprintd
+  - usbutils
+
+# Fingerprint packages (Arch Linux)
+sway_fingerprint_packages_arch:
+  - fprintd
+  - libfprint
+  - usbutils
+
+# AUR package for swaylock-fprintd (Arch Linux)
+sway_swaylock_fprintd_aur_package: "swaylock-fprintd-git"

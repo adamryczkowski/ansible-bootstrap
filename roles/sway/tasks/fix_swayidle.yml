@@ -1,0 +1,90 @@
+---
+# Sway role - Fix swayidle monitor wake issue
+#
+# Problem: When multiple timeout statements are on the same swayidle command line,
+# the resume functionality can fail intermittently. This is a known bug in swayidle.
+#
+# Root Cause: The monitor is turned off by swayidle after idle timeout, but the
+# 'resume' action fails to trigger when user activity is detected.
+#
+# Fix: Split the swayidle configuration into separate processes - one for display
+# power management and one for screen locking.
+#
+# References:
+# - https://github.com/swaywm/swayidle/issues/25
+# - https://github.com/swaywm/sway/issues/5903
+
+- name: Sway | Check if sway config exists
+  ansible.builtin.stat:
+    path: "{{ sway_config_dest }}/sway/config"
+  register: sway_config_file
+
+- name: Sway | Fix swayidle configuration - split into separate processes
+  when: sway_config_file.stat.exists
+  block:
+    - name: Sway | Read current sway config
+      ansible.builtin.slurp:
+        src: "{{ sway_config_dest }}/sway/config"
+      register: sway_config_content
+
+    - name: Sway | Decode sway config content
+      ansible.builtin.set_fact:
+        sway_config_decoded: "{{ sway_config_content.content | b64decode }}"
+
+    # Pattern to match combined swayidle command with both timeout and before-sleep
+    # This regex matches swayidle commands that have multiple timeout statements
+    - name: Sway | Replace combined swayidle command with split processes
+      ansible.builtin.replace:
+        path: "{{ sway_config_dest }}/sway/config"
+        # Match swayidle with multiple timeouts on one line (display power + lock)
+        regexp: >-
+          ^(\s*)exec\s+swayidle\s+-w\s+
+          timeout\s+(\d+)\s+'swaymsg\s+"output\s+\*\s+power\s+off"'\s+
+          resume\s+'swaymsg\s+"output\s+\*\s+power\s+on"'\s+\\?\s*
+          timeout\s+(\d+)\s+'([^']+)'\s+
+          before-sleep\s+'([^']+)'
+        replace: |
+          \1# swayidle split into separate processes to fix monitor wake bug
+          \1# See: https://github.com/swaywm/swayidle/issues/25
+          \1# Process 1: Handle display power
+          \1exec swayidle -w timeout \2 'swaymsg "output * power off"' \
+          \1         resume 'swaymsg "output * power on"' &
+          \1# Process 2: Handle screen lock
+          \1exec swayidle -w timeout \3 '\4' \
+          \1         before-sleep '\5' &
+      become: true
+      become_user: "{{ sway_username }}"
+      register: sway_swayidle_fix_combined
+
+    # Alternative pattern: swayidle with display power timeout and lock timeout (different order)
+    - name: Sway | Replace alternative swayidle pattern (lock first, then display)
+      ansible.builtin.replace:
+        path: "{{ sway_config_dest }}/sway/config"
+        # Match swayidle with lock timeout first, then display power
+        regexp: >-
+          ^(\s*)exec\s+swayidle\s+-w\s+
+          timeout\s+(\d+)\s+'([^']+conditional-lock[^']+)'\s+
+          before-sleep\s+'([^']+)'\s+\\?\s*
+          timeout\s+(\d+)\s+'swaymsg\s+"output\s+\*\s+power\s+off"'\s+
+          resume\s+'swaymsg\s+"output\s+\*\s+power\s+on"'
+        replace: |
+          \1# swayidle split into separate processes to fix monitor wake bug
+          \1# See: https://github.com/swaywm/swayidle/issues/25
+          \1# Process 1: Handle display power
+          \1exec swayidle -w timeout \5 'swaymsg "output * power off"' \
+          \1         resume 'swaymsg "output * power on"' &
+          \1# Process 2: Handle screen lock
+          \1exec swayidle -w timeout \2 '\3' \
+          \1         before-sleep '\4' &
+      become: true
+      become_user: "{{ sway_username }}"
+      register: sway_swayidle_fix_alt
+      when: not sway_swayidle_fix_combined.changed
+
+    - name: Sway | Report swayidle fix status
+      ansible.builtin.debug:
+        msg: >-
+          Swayidle configuration fix applied:
+          combined_pattern={{ sway_swayidle_fix_combined.changed | default(false) }},
+          alt_pattern={{ sway_swayidle_fix_alt.changed | default(false) }}
+      when: sway_swayidle_fix_combined.changed or (sway_swayidle_fix_alt.changed | default(false))

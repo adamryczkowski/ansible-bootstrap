@@ -1,0 +1,41 @@
+---
+# Sway role - Fingerprint reader detection
+#
+# This task file detects supported Synaptics fingerprint readers by checking
+# USB device IDs. It sets facts that are used by other fingerprint tasks.
+#
+# Supported devices (ThinkPad laptops):
+# - 06cb:00bd: Prometheus MIS Touch Fingerprint Reader
+# - 06cb:009a: Metallica MIS Touch
+# - 06cb:00c2: Synaptics Sensors
+#
+# Reference: docs/fingerprint-sudo-swaylock.md
+
+- name: Fingerprint | Check for supported fingerprint readers via lsusb
+  ansible.builtin.command:
+    cmd: lsusb
+  register: sway_lsusb_output
+  changed_when: false
+  failed_when: false
+
+- name: Fingerprint | Detect supported fingerprint reader USB IDs
+  ansible.builtin.set_fact:
+    sway_fingerprint_reader_detected: >-
+      {{ sway_fingerprint_usb_ids | select('search', sway_lsusb_output.stdout) | list | length > 0 }}
+    sway_fingerprint_reader_usb_id: >-
+      {{ sway_fingerprint_usb_ids | select('search', sway_lsusb_output.stdout) | list | first | default('') }}
+
+- name: Fingerprint | Display detection result
+  ansible.builtin.debug:
+    msg: >-
+      Fingerprint reader detection:
+      detected={{ sway_fingerprint_reader_detected }},
+      usb_id={{ sway_fingerprint_reader_usb_id | default('none') }}
+  when: sway_fingerprint_reader_detected | bool
+
+- name: Fingerprint | Skip message when no fingerprint reader found
+  ansible.builtin.debug:
+    msg: >-
+      No supported fingerprint reader detected. Skipping fingerprint authentication setup.
+      Supported USB IDs: {{ sway_fingerprint_usb_ids | join(', ') }}
+  when: not (sway_fingerprint_reader_detected | bool)

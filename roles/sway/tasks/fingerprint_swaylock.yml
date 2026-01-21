@@ -1,0 +1,220 @@
+---
+# Sway role - swaylock-fprintd installation
+#
+# This task file installs swaylock-fprintd, a fork of swaylock with native
+# fingerprint authentication support via D-Bus/fprintd.
+#
+# On Debian/Ubuntu: Build from source
+# On Arch Linux: Install from AUR (if helper available) or build from source
+#
+# Reference: docs/fingerprint-sudo-swaylock.md
+# Repository: https://github.com/SL-RU/swaylock-fprintd
+
+# === Debian/Ubuntu: Build from source ===
+
+- name: Fingerprint swaylock | Install build dependencies (Debian/Ubuntu)
+  ansible.builtin.apt:
+    name: "{{ sway_fingerprint_build_packages_debian }}"
+    state: present
+    update_cache: true
+  become: true
+  when: ansible_os_family == "Debian"
+
+- name: Fingerprint swaylock | Clone swaylock-fprintd repository
+  ansible.builtin.git:
+    repo: "{{ sway_swaylock_fprintd_repo }}"
+    dest: "{{ sway_swaylock_fprintd_dest }}"
+    version: "{{ sway_swaylock_fprintd_branch }}"
+    depth: 1
+    force: true
+  become: true
+  when: ansible_os_family == "Debian"
+
+- name: Fingerprint swaylock | Check if swaylock-fprintd is already built
+  ansible.builtin.stat:
+    path: "{{ sway_swaylock_fprintd_dest }}/build/swaylock"
+  register: sway_swaylock_fprintd_built
+  when: ansible_os_family == "Debian"
+
+- name: Fingerprint swaylock | Configure build with meson (Debian/Ubuntu)
+  ansible.builtin.command:
+    cmd: meson setup build --prefix=/usr/local
+    chdir: "{{ sway_swaylock_fprintd_dest }}"
+    creates: "{{ sway_swaylock_fprintd_dest }}/build/build.ninja"
+  become: true
+  when:
+    - ansible_os_family == "Debian"
+    - not (sway_swaylock_fprintd_built.stat.exists | default(false))
+
+- name: Fingerprint swaylock | Build with ninja (Debian/Ubuntu)
+  ansible.builtin.command:
+    cmd: ninja -C build
+    chdir: "{{ sway_swaylock_fprintd_dest }}"
+  become: true
+  register: sway_swaylock_ninja_build
+  changed_when: sway_swaylock_ninja_build.rc == 0
+  when:
+    - ansible_os_family == "Debian"
+    - not (sway_swaylock_fprintd_built.stat.exists | default(false))
+
+- name: Fingerprint swaylock | Install swaylock-fprintd binary (Debian/Ubuntu)
+  ansible.builtin.copy:
+    src: "{{ sway_swaylock_fprintd_dest }}/build/swaylock"
+    dest: /usr/local/bin/swaylock-fprintd-bin
+    mode: "0755"
+    owner: root
+    group: root
+    remote_src: true
+  become: true
+  when: ansible_os_family == "Debian"
+
+# === Arch Linux: Try AUR first, fall back to source ===
+
+- name: Fingerprint swaylock | Check for AUR helper (Arch Linux)
+  ansible.builtin.command:
+    cmd: which yay
+  register: sway_aur_helper_check
+  changed_when: false
+  failed_when: false
+  when: ansible_os_family == "Archlinux"
+
+- name: Fingerprint swaylock | Install from AUR using yay (Arch Linux)
+  ansible.builtin.command:
+    cmd: "yay -S --noconfirm {{ sway_swaylock_fprintd_aur_package }}"
+  become: true
+  become_user: "{{ sway_username }}"
+  register: sway_aur_install
+  changed_when: "'installing' in sway_aur_install.stdout or 'upgraded' in sway_aur_install.stdout"
+  when:
+    - ansible_os_family == "Archlinux"
+    - sway_aur_helper_check.rc == 0
+
+- name: Fingerprint swaylock | Check if AUR package installed swaylock
+  ansible.builtin.stat:
+    path: /usr/bin/swaylock
+  register: sway_aur_swaylock_installed
+  when:
+    - ansible_os_family == "Archlinux"
+    - sway_aur_helper_check.rc == 0
+
+- name: Fingerprint swaylock | Move AUR swaylock to swaylock-fprintd-bin (Arch Linux)
+  ansible.builtin.command:
+    cmd: mv /usr/bin/swaylock /usr/local/bin/swaylock-fprintd-bin
+    creates: /usr/local/bin/swaylock-fprintd-bin
+  become: true
+  when:
+    - ansible_os_family == "Archlinux"
+    - sway_aur_helper_check.rc == 0
+    - sway_aur_swaylock_installed.stat.exists | default(false)
+
+# Arch Linux fallback: Build from source if no AUR helper
+- name: Fingerprint swaylock | Install build dependencies (Arch Linux - no AUR)
+  community.general.pacman:
+    name: "{{ sway_fingerprint_build_packages_arch }}"
+    state: present
+  become: true
+  when:
+    - ansible_os_family == "Archlinux"
+    - sway_aur_helper_check.rc != 0
+
+- name: Fingerprint swaylock | Clone swaylock-fprintd repository (Arch Linux - no AUR)
+  ansible.builtin.git:
+    repo: "{{ sway_swaylock_fprintd_repo }}"
+    dest: "{{ sway_swaylock_fprintd_dest }}"
+    version: "{{ sway_swaylock_fprintd_branch }}"
+    depth: 1
+    force: true
+  become: true
+  when:
+    - ansible_os_family == "Archlinux"
+    - sway_aur_helper_check.rc != 0
+
+- name: Fingerprint swaylock | Configure build with meson (Arch Linux - no AUR)
+  ansible.builtin.command:
+    cmd: meson setup build --prefix=/usr/local
+    chdir: "{{ sway_swaylock_fprintd_dest }}"
+    creates: "{{ sway_swaylock_fprintd_dest }}/build/build.ninja"
+  become: true
+  when:
+    - ansible_os_family == "Archlinux"
+    - sway_aur_helper_check.rc != 0
+
+- name: Fingerprint swaylock | Build with ninja (Arch Linux - no AUR)
+  ansible.builtin.command:
+    cmd: ninja -C build
+    chdir: "{{ sway_swaylock_fprintd_dest }}"
+  become: true
+  register: sway_swaylock_ninja_build_arch
+  changed_when: sway_swaylock_ninja_build_arch.rc == 0
+  when:
+    - ansible_os_family == "Archlinux"
+    - sway_aur_helper_check.rc != 0
+
+- name: Fingerprint swaylock | Install swaylock-fprintd binary (Arch Linux - no AUR)
+  ansible.builtin.copy:
+    src: "{{ sway_swaylock_fprintd_dest }}/build/swaylock"
+    dest: /usr/local/bin/swaylock-fprintd-bin
+    mode: "0755"
+    owner: root
+    group: root
+    remote_src: true
+  become: true
+  when:
+    - ansible_os_family == "Archlinux"
+    - sway_aur_helper_check.rc != 0
+
+# === Common: Deploy wrapper and config ===
+
+- name: Fingerprint swaylock | Deploy USB reset script
+  ansible.builtin.template:
+    src: reset-fingerprint-reader.sh.j2
+    dest: /usr/local/bin/reset-fingerprint-reader
+    mode: "0755"
+    owner: root
+    group: root
+  become: true
+
+- name: Fingerprint swaylock | Configure passwordless sudo for fingerprint reset
+  ansible.builtin.template:
+    src: fingerprint-reset-sudoers.j2
+    dest: "/etc/sudoers.d/fingerprint-reset-{{ sway_username }}"
+    mode: "0440"
+    owner: root
+    group: root
+    validate: /usr/sbin/visudo -cf %s
+  become: true
+
+- name: Fingerprint swaylock | Deploy swaylock wrapper script
+  ansible.builtin.template:
+    src: swaylock-wrapper.sh.j2
+    dest: /usr/local/bin/swaylock-wrapper
+    mode: "0755"
+    owner: root
+    group: root
+  become: true
+
+- name: Fingerprint swaylock | Create swaylock symlink to wrapper
+  ansible.builtin.file:
+    src: /usr/local/bin/swaylock-wrapper
+    dest: /usr/local/bin/swaylock
+    state: link
+    force: true
+  become: true
+
+- name: Fingerprint swaylock | Ensure swaylock config directory exists
+  ansible.builtin.file:
+    path: "/home/{{ sway_username }}/.config/swaylock"
+    state: directory
+    mode: "0755"
+    owner: "{{ sway_username }}"
+    group: "{{ sway_username }}"
+  become: true
+
+- name: Fingerprint swaylock | Deploy swaylock config with fingerprint enabled
+  ansible.builtin.template:
+    src: swaylock-config.j2
+    dest: "/home/{{ sway_username }}/.config/swaylock/config"
+    mode: "0644"
+    owner: "{{ sway_username }}"
+    group: "{{ sway_username }}"
+  become: true
