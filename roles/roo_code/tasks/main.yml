@@ -1,0 +1,37 @@
+---
+# Roo-Code role - Install Roo-Code VS Code extension and configure MCP servers
+#
+# This role:
+# 1. Ensures VS Code is installed (via vscode role dependency)
+# 2. Installs the Roo-Code extension
+# 3. Sets up MCP servers in ~/.local/share/my-mcp
+# 4. Configures MCP settings for Roo-Code
+
+- name: Roo-Code | Set user home directory
+  ansible.builtin.set_fact:
+    roo_code_user_home: "{{ ansible_env.HOME if ansible_user == roo_code_username else '/home/' + roo_code_username }}"
+
+- name: Roo-Code | Expand MCP base directory
+  ansible.builtin.set_fact:
+    roo_code_mcp_dir: "{{ roo_code_mcp_base_dir | replace('~', roo_code_user_home) }}"
+
+- name: Roo-Code | Install system dependencies
+  ansible.builtin.include_tasks: dependencies.yml
+
+- name: Roo-Code | Install Roo-Code VS Code extension
+  ansible.builtin.include_tasks: extension.yml
+
+- name: Roo-Code | Create MCP base directory
+  ansible.builtin.file:
+    path: "{{ roo_code_mcp_dir }}"
+    state: directory
+    owner: "{{ roo_code_username }}"
+    mode: '0755'
+  become: true
+  become_user: "{{ roo_code_username }}"
+
+- name: Roo-Code | Setup MCP servers
+  ansible.builtin.include_tasks: mcp_servers.yml
+
+- name: Roo-Code | Configure MCP settings
+  ansible.builtin.include_tasks: mcp_settings.yml

@@ -12,6 +12,14 @@
 #    (gsettings takes precedence when xdg-desktop-portal-gtk is running)
 # 4. PCManFM and other GTK3 apps will automatically follow gsettings
 
+- name: Sway GTK | Install dconf dependencies (psutil for Ansible dconf module)
+  ansible.builtin.apt:
+    name:
+      - python3-psutil
+      - dconf-cli
+    state: present
+  become: true
+
 - name: Sway GTK | Ensure gtk-3.0 config directory exists
   ansible.builtin.file:
     path: "/home/{{ sway_username }}/.config/gtk-3.0"

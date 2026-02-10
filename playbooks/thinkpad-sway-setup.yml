@@ -1,0 +1,89 @@
+---
+# Playbook: Set up Sway window manager, fingerprint authentication, and VS Code
+#
+# Target: New ThinkPad laptop (TSK-PF615QJE / 192.168.11.117)
+# Reference: Old ThinkPad (TSK-PF3D0A9T / 192.168.42.205)
+#
+# This playbook installs and configures:
+# 1. Sway window manager with all supporting tools
+# 2. Fingerprint authentication for sudo and screen unlock
+# 3. Visual Studio Code from Microsoft's official repository
+#
+# Usage:
+#   ansible-playbook -i inventory/thinkpad-new/hosts.yml playbooks/thinkpad-sway-setup.yml --ask-become-pass
+#
+# After running this playbook, you need to manually:
+# 1. Enroll fingerprints: sudo fprintd-enroll adamryczkowski
+# 2. Log out and log back in to start using Sway
+
+- name: Set up Sway, fingerprint auth, and VS Code on new ThinkPad
+  hosts: thinkpad-new
+  become: false
+
+  vars:
+    # Sway configuration - matches reference machine setup
+    sway_username: "{{ target_user }}"
+    sway_install_method: nix  # Use Nix for latest Sway on Ubuntu
+    sway_enable_fingerprint_auth: true
+    sway_install_fusuma: true
+    sway_configure_gtk_theme: true
+    sway_install_bright: true
+    sway_fix_hardcoded_paths: true
+    sway_configure_lock_before_sleep: true
+    sway_configure_nethogs_sudoers: true
+    sway_configure_iotop: true
+    sway_configure_usbmon: true
+    sway_create_desktop_entry: true
+    sway_enable_wayland_in_gdm: true
+    sway_deploy_custom_xkb_keymap: true
+    sway_fix_swayidle_monitor_wake: true
+    sway_configure_slack_wayland: true
+
+  pre_tasks:
+    - name: Gather facts
+      ansible.builtin.setup:
+
+    - name: Display target system info
+      ansible.builtin.debug:
+        msg: |
+          Target system: {{ ansible_hostname }}
+          OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          User: {{ target_user }}
+
+  roles:
+    - role: sway
+      tags:
+        - sway
+        - desktop
+
+    - role: vscode
+      tags:
+        - vscode
+        - development
+
+  post_tasks:
+    - name: Display post-installation instructions
+      ansible.builtin.debug:
+        msg: |
+          ============================================================
+          Installation complete!
+
+          NEXT STEPS:
+
+          1. Enroll your fingerprints:
+            sudo fprintd-enroll {{ target_user }}
+
+          2. Verify fingerprint enrollment:
+            fprintd-list {{ target_user }}
+            fprintd-verify
+
+          3. Log out and select "Sway" from the session menu to start
+
+          4. VS Code is installed and ready to use:
+            code
+
+          NOTES:
+          - Fingerprint works for sudo and swaylock
+          - Configuration is in ~/.config/i3-config/
+          - Sway config: ~/.config/sway/config
+          ============================================================

@@ -270,6 +270,7 @@ sway_fingerprint_usb_ids:
   - "06cb:00bd"  # Prometheus MIS Touch Fingerprint Reader
   - "06cb:009a"  # Metallica MIS Touch
   - "06cb:00c2"  # Synaptics Sensors
+  - "06cb:00f9"  # Synaptics Fingerprint Reader (ThinkPad T14s Gen 5)
 
 # swaylock-fprintd repository (for building from source)
 # This fork of swaylock has native fingerprint support via D-Bus

@@ -1,0 +1,75 @@
+---
+# VS Code role - Install Visual Studio Code from Microsoft's official repository
+#
+# This role installs VS Code on Debian/Ubuntu systems using Microsoft's
+# official APT repository with DEB822 format (Ubuntu 24.04+).
+#
+# Reference: https://code.visualstudio.com/docs/setup/linux
+
+- name: VS Code | Install prerequisites
+  ansible.builtin.apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+    state: present
+    update_cache: true
+  become: true
+
+- name: VS Code | Download Microsoft GPG key
+  ansible.builtin.get_url:
+    url: "{{ vscode_gpg_key_url }}"
+    dest: /tmp/microsoft.asc
+    mode: '0644'
+  become: true
+
+- name: VS Code | Convert GPG key to binary format
+  ansible.builtin.command:
+    cmd: gpg --dearmor -o {{ vscode_gpg_keyring_path }} /tmp/microsoft.asc
+    creates: "{{ vscode_gpg_keyring_path }}"
+  become: true
+
+- name: VS Code | Set GPG keyring permissions
+  ansible.builtin.file:
+    path: "{{ vscode_gpg_keyring_path }}"
+    mode: '0644'
+    owner: root
+    group: root
+  become: true
+
+- name: VS Code | Add Microsoft APT repository (DEB822 format)
+  ansible.builtin.copy:
+    dest: "{{ vscode_sources_file }}"
+    content: |
+      ### THIS FILE IS AUTOMATICALLY CONFIGURED ###
+      # You may comment out this entry, but any other modifications may be lost.
+      Types: deb
+      URIs: {{ vscode_repo_url }}
+      Suites: stable
+      Components: main
+      Architectures: {{ vscode_architecture }}
+      Signed-By: {{ vscode_gpg_keyring_path }}
+    mode: '0644'
+    owner: root
+    group: root
+  become: true
+  register: vscode_repo_added
+
+- name: VS Code | Update APT cache after adding repository
+  ansible.builtin.apt:
+    update_cache: true
+  become: true
+  when: vscode_repo_added.changed
+
+- name: VS Code | Install VS Code
+  ansible.builtin.apt:
+    name: "{{ vscode_package_name }}"
+    state: present
+  become: true
+
+- name: VS Code | Clean up temporary GPG key
+  ansible.builtin.file:
+    path: /tmp/microsoft.asc
+    state: absent
+  become: true

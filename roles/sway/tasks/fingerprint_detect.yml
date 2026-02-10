@@ -21,9 +21,9 @@
 - name: Fingerprint | Detect supported fingerprint reader USB IDs
   ansible.builtin.set_fact:
     sway_fingerprint_reader_detected: >-
-      {{ sway_fingerprint_usb_ids | select('search', sway_lsusb_output.stdout) | list | length > 0 }}
+      {{ sway_fingerprint_usb_ids | select('in', sway_lsusb_output.stdout) | list | length > 0 }}
     sway_fingerprint_reader_usb_id: >-
-      {{ sway_fingerprint_usb_ids | select('search', sway_lsusb_output.stdout) | list | first | default('') }}
+      {{ sway_fingerprint_usb_ids | select('in', sway_lsusb_output.stdout) | list | first | default('') }}
 
 - name: Fingerprint | Display detection result
   ansible.builtin.debug:

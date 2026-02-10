@@ -1,0 +1,93 @@
+---
+# Roo-Code role defaults
+
+# Target user for Roo-Code configuration
+roo_code_username: "{{ ansible_user | default('adam') }}"
+
+# Base directory for MCP server installations
+roo_code_mcp_base_dir: "~/.local/share/my-mcp"
+
+# VS Code extension ID for Roo-Code
+roo_code_extension_id: "rooveterinaryinc.roo-cline"
+
+# Node.js version to use (installed via mise)
+roo_code_node_version: "22"
+
+# Python version to use (installed via mise)
+roo_code_python_version: "3.12"
+
+# MCP Servers configuration
+# Each server has: enabled, type (stdio/http), and source-specific settings
+
+roo_code_mcp_servers:
+  telegram:
+    enabled: true
+    type: stdio
+    git_repo: "https://github.com/chigwell/telegram-mcp.git"
+    install_method: poetry
+    # Requires .env file with Telegram API credentials
+
+  mcp_pdb:
+    enabled: true
+    type: stdio
+    install_method: uv
+    package_name: mcp-pdb
+
+  remove_background:
+    enabled: true
+    type: http
+    port: 8083
+    git_repo: "https://github.com/adamryczkowski/MCP-remove-background.git"
+    install_method: poetry
+    systemd_service: true
+
+  svg_mcp:
+    enabled: true
+    type: http
+    port: 8081
+    git_repo: "https://github.com/adamryczkowski/SVG-MCP.git"
+    install_method: poetry
+    systemd_service: true
+
+  imagen:
+    enabled: true
+    type: http
+    port: 8082
+    git_repo: "https://github.com/adamryczkowski/Imagen-MCP.git"
+    install_method: poetry
+    systemd_service: true
+
+  ssh_server:
+    enabled: true
+    type: stdio
+    git_repo: "https://github.com/mahathirmuh/mcp-ssh-server.git"
+    install_method: npm
+
+  chrome_devtools_mcp:
+    enabled: true
+    type: stdio
+    install_method: npm_global
+    package_name: chrome-devtools-mcp
+
+  browser_mcp:
+    enabled: true
+    type: stdio
+    install_method: npx
+    package_name: "@browsermcp/mcp@latest"
+
+  pdf_reader_mcp:
+    enabled: true
+    type: stdio
+    install_method: npm_global
+    package_name: "@sylphx/pdf-reader-mcp"
+
+# HTTP server ports mapping
+roo_code_http_ports:
+  svg_mcp: 8081
+  imagen: 8082
+  remove_background: 8083
+
+# Whether to deploy custom Roo-Code settings (cline_custom_settings.json)
+# This file contains provider profiles, global settings, and custom prompts
+# Note: This file may contain API keys - ensure proper security measures
+roo_code_deploy_custom_settings: true

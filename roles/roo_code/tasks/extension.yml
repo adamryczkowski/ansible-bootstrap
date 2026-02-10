@@ -1,0 +1,62 @@
+---
+# Install Roo-Code VS Code extension
+
+- name: Roo-Code | Check if Roo-Code extension is installed
+  ansible.builtin.command:
+    cmd: code --list-extensions
+  become: true
+  become_user: "{{ roo_code_username }}"
+  register: roo_code_vscode_extensions
+  changed_when: false
+
+- name: Roo-Code | Install Roo-Code extension
+  ansible.builtin.command:
+    cmd: code --install-extension {{ roo_code_extension_id }}
+  become: true
+  become_user: "{{ roo_code_username }}"
+  when: roo_code_extension_id not in roo_code_vscode_extensions.stdout
+  register: roo_code_extension_install
+  changed_when: "'successfully installed' in roo_code_extension_install.stdout | default('')"
+
+- name: Roo-Code | Create Roo-Code settings directory
+  ansible.builtin.file:
+    path: "{{ roo_code_user_home }}/.config/Code/User/globalStorage/rooveterinaryinc.roo-cline/settings"
+    state: directory
+    owner: "{{ roo_code_username }}"
+    mode: '0755'
+  become: true
+  become_user: "{{ roo_code_username }}"
+
+- name: Roo-Code | Deploy Roo-Code custom settings for import
+  ansible.builtin.copy:
+    src: cline_custom_settings.json
+    dest: "{{ roo_code_user_home }}/.config/Code/User/globalStorage/rooveterinaryinc.roo-cline/roo-code-settings-import.json"
+    owner: "{{ roo_code_username }}"
+    mode: '0600'
+  become: true
+  become_user: "{{ roo_code_username }}"
+  when: roo_code_deploy_custom_settings | default(true)
+  register: roo_code_settings_deployed
+
+- name: Roo-Code | Display settings import instructions
+  ansible.builtin.debug:
+    msg: |
+      ============================================================
+      MANUAL STEP REQUIRED: Import Roo-Code Settings
+
+      A settings file has been deployed to:
+        {{ roo_code_user_home }}/.config/Code/User/globalStorage/rooveterinaryinc.roo-cline/roo-code-settings-import.json
+
+      To import these settings:
+      1. Open VS Code
+      2. Open the Roo-Code panel (click the Roo icon in the sidebar)
+      3. Click the gear icon (⚙️) to open Settings
+      4. Click "Import Settings"
+      5. Select the file above
+
+      This will configure:
+      - API provider settings
+      - Global settings (auto-approval, allowed commands, etc.)
+      - Custom prompts
+      ============================================================
+  when: roo_code_settings_deployed.changed | default(false)

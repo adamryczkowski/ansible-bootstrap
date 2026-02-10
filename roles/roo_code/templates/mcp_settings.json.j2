@@ -1,0 +1,185 @@
+{
+  "mcpServers": {
+{% if roo_code_mcp_servers.telegram.enabled %}
+    "telegram": {
+      "command": "{{ roo_code_mcp_dir }}/telegram-mcp/.venv/bin/python",
+      "args": [
+        "{{ roo_code_mcp_dir }}/telegram-mcp/main.py"
+      ],
+      "cwd": "{{ roo_code_mcp_dir }}/telegram-mcp",
+      "env": {},
+      "disabled": false,
+      "alwaysAllow": [
+        "get_me",
+        "list_chats",
+        "search_public_chats",
+        "get_chat",
+        "list_messages",
+        "search_messages",
+        "get_pinned_messages",
+        "get_message_context",
+        "get_media_info",
+        "download_media",
+        "get_messages",
+        "get_chats"
+      ]
+    },
+{% endif %}
+{% if roo_code_mcp_servers.mcp_pdb.enabled %}
+    "mcp-pdb": {
+      "command": "{{ roo_code_user_home }}/.local/bin/uv",
+      "args": [
+        "run",
+        "--python",
+        "3.13",
+        "--with",
+        "mcp-pdb",
+        "mcp-pdb"
+      ],
+      "alwaysAllow": [
+        "start_debug",
+        "send_pdb_command",
+        "set_breakpoint",
+        "clear_breakpoint",
+        "list_breakpoints",
+        "restart_debug",
+        "examine_variable",
+        "get_debug_status",
+        "end_debug"
+      ],
+      "disabled": false
+    },
+{% endif %}
+{% if roo_code_mcp_servers.remove_background.enabled %}
+    "remove-background": {
+      "type": "streamable-http",
+      "url": "http://127.0.0.1:{{ roo_code_mcp_servers.remove_background.port }}/mcp",
+      "alwaysAllow": [
+        "remove_background",
+        "list_background_models"
+      ],
+      "timeout": 900,
+      "disabled": false
+    },
+{% endif %}
+{% if roo_code_mcp_servers.svg_mcp.enabled %}
+    "svg-mcp": {
+      "type": "streamable-http",
+      "url": "http://127.0.0.1:{{ roo_code_mcp_servers.svg_mcp.port }}/mcp",
+      "alwaysAllow": [
+        "svg_validate",
+        "svg_render",
+        "svg_diff",
+        "svg_edit",
+        "svg_optimize",
+        "svg_lint"
+      ],
+      "timeout": 60,
+      "disabled": false
+    },
+{% endif %}
+{% if roo_code_mcp_servers.imagen.enabled %}
+    "imagen": {
+      "type": "streamable-http",
+      "url": "http://127.0.0.1:{{ roo_code_mcp_servers.imagen.port }}/mcp",
+      "disabled": false,
+      "alwaysAllow": [
+        "generate_image",
+        "start_image_batch",
+        "get_next_image",
+        "get_batch_status",
+        "list_models",
+        "get_model_details"
+      ],
+      "timeout": 600
+    },
+{% endif %}
+{% if roo_code_mcp_servers.ssh_server.enabled %}
+    "ssh-server": {
+      "command": "node",
+      "args": [
+        "{{ roo_code_mcp_dir }}/mcp-ssh-server/dist/index.js"
+      ],
+      "env": {},
+      "alwaysAllow": [
+        "ssh_start_interactive_shell",
+        "ssh_connect_with_credential",
+        "ssh_read_output",
+        "ssh_save_credential",
+        "ssh_list_credentials",
+        "ssh_connect",
+        "ssh_send_input",
+        "ssh_close_interactive_shell",
+        "ssh_disconnect",
+        "ssh_execute",
+        "ssh_copy_file"
+      ],
+      "disabled": false
+    },
+{% endif %}
+{% if roo_code_mcp_servers.chrome_devtools_mcp.enabled %}
+    "chrome-devtools-mcp": {
+      "command": "{{ roo_code_node_bin }}/chrome-devtools-mcp",
+      "args": [],
+      "alwaysAllow": [
+        "click",
+        "drag",
+        "hover",
+        "press_key",
+        "upload_file",
+        "close_page",
+        "navigate_page",
+        "new_page",
+        "select_page",
+        "wait_for",
+        "emulate",
+        "resize_page",
+        "performance_analyze_insight",
+        "performance_start_trace",
+        "performance_stop_trace",
+        "evaluate_script",
+        "get_console_message",
+        "list_console_messages",
+        "take_screenshot",
+        "take_snapshot",
+        "list_network_requests",
+        "list_pages"
+      ],
+      "disabled": false
+    },
+{% endif %}
+{% if roo_code_mcp_servers.browser_mcp.enabled %}
+    "browsermcp": {
+      "command": "{{ roo_code_node_bin }}/npx",
+      "args": [
+        "{{ roo_code_mcp_servers.browser_mcp.package_name }}"
+      ],
+      "alwaysAllow": [
+        "browser_screenshot",
+        "browser_go_back",
+        "browser_type",
+        "browser_wait",
+        "browser_get_console_logs",
+        "browser_go_forward",
+        "browser_hover",
+        "browser_select_option",
+        "browser_press_key",
+        "browser_snapshot",
+        "browser_click",
+        "browser_navigate"
+      ],
+      "disabled": false
+    },
+{% endif %}
+{% if roo_code_mcp_servers.pdf_reader_mcp.enabled %}
+    "pdf-reader-mcp": {
+      "command": "{{ roo_code_node_bin }}/pdf-reader-mcp",
+      "args": [],
+      "alwaysAllow": [
+        "read_pdf"
+      ],
+      "disabled": false
+    }
+{% endif %}
+  }
+}

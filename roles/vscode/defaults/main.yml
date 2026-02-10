@@ -1,0 +1,20 @@
+---
+# VS Code role defaults
+
+# Package name (code for VS Code, code-insiders for Insiders build)
+vscode_package_name: code
+
+# Microsoft GPG key URL
+vscode_gpg_key_url: "https://packages.microsoft.com/keys/microsoft.asc"
+
+# GPG keyring path
+vscode_gpg_keyring_path: "/usr/share/keyrings/microsoft.gpg"
+
+# APT repository URL
+vscode_repo_url: "https://packages.microsoft.com/repos/code"
+
+# APT source file path (DEB822 format for Ubuntu 24.04+)
+vscode_sources_file: "/etc/apt/sources.list.d/vscode.sources"
+
+# Architecture (amd64 for x86_64)
+vscode_architecture: "amd64"

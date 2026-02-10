@@ -24,12 +24,14 @@
     owner: root
     group: root
     mode: "0644"
+  become: true
   register: sway_lock_service_deployed
   notify: Reload systemd daemon
 
 - name: Sway | Reload systemd daemon immediately if service changed
   ansible.builtin.systemd:
     daemon_reload: true
+  become: true
   when: sway_lock_service_deployed.changed
 
 - name: Sway | Enable lock-before-sleep system service
@@ -37,6 +39,7 @@
     name: "lock-before-sleep-{{ sway_username }}.service"
     enabled: true
     state: stopped
+  become: true
   # Service is triggered by sleep.target, not started directly
 
 - name: Sway | Remove old user service if it exists

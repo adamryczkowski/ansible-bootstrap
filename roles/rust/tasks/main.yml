@@ -43,6 +43,16 @@
     HOME: "/home/{{ rust_username }}"
   changed_when: true
 
+- name: Rust | Ensure stable toolchain is set as default
+  ansible.builtin.command: /home/{{ rust_username }}/.cargo/bin/rustup default stable
+  become: true
+  become_user: "{{ rust_username }}"
+  environment:
+    HOME: "/home/{{ rust_username }}"
+  register: rust_default_result
+  changed_when: "'installed' in rust_default_result.stderr or 'downloading' in rust_default_result.stderr"
+  failed_when: false
+
 - name: Rust | Clean up rustup installer
   ansible.builtin.file:
     path: /tmp/rustup-init.sh

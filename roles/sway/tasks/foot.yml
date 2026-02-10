@@ -27,6 +27,7 @@
       - libtllist-dev
       - check
       - libsystemd-dev
+      - git  # Required for meson to download fcft subproject if system version is too old
     state: present
     update_cache: true
   become: true

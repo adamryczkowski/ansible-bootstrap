@@ -1,0 +1,24 @@
+---
+# Configure MCP settings for Roo-Code
+
+- name: Roo-Code | Get mise node path
+  ansible.builtin.shell: |
+    export PATH="{{ roo_code_user_home }}/.local/share/mise/shims:$PATH"
+    dirname $(which node)
+  become: true
+  become_user: "{{ roo_code_username }}"
+  register: roo_code_mise_node_bin
+  changed_when: false
+
+- name: Roo-Code | Set node bin path
+  ansible.builtin.set_fact:
+    roo_code_node_bin: "{{ roo_code_mise_node_bin.stdout | trim }}"
+
+- name: Roo-Code | Deploy MCP settings
+  ansible.builtin.template:
+    src: mcp_settings.json.j2
+    dest: "{{ roo_code_user_home }}/.config/Code/User/globalStorage/rooveterinaryinc.roo-cline/settings/mcp_settings.json"
+    owner: "{{ roo_code_username }}"
+    mode: '0644'
+  become: true
+  become_user: "{{ roo_code_username }}"

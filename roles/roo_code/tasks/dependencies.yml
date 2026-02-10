@@ -1,0 +1,81 @@
+---
+# Install system dependencies for MCP servers
+# Note: mise is installed by the cli_tools role (dependency)
+
+- name: Roo-Code | Install apt dependencies
+  ansible.builtin.apt:
+    name:
+      - git
+      - curl
+      - build-essential
+      - python3-pip
+      - python3-venv
+      - pipx
+    state: present
+    update_cache: true
+  become: true
+
+- name: Roo-Code | Ensure pipx path is configured
+  ansible.builtin.command:
+    cmd: pipx ensurepath
+  become: true
+  become_user: "{{ roo_code_username }}"
+  changed_when: false
+  failed_when: false
+
+# mise is installed by cli_tools role, we just need to install Node.js and Python
+- name: Roo-Code | Install Node.js via mise
+  ansible.builtin.shell: |
+    export PATH="{{ roo_code_user_home }}/.local/bin:$PATH"
+    mise install node@{{ roo_code_node_version }}
+    mise use -g node@{{ roo_code_node_version }}
+  become: true
+  become_user: "{{ roo_code_username }}"
+  args:
+    creates: "{{ roo_code_user_home }}/.local/share/mise/installs/node"
+
+- name: Roo-Code | Install Python via mise
+  ansible.builtin.shell: |
+    export PATH="{{ roo_code_user_home }}/.local/bin:$PATH"
+    mise install python@{{ roo_code_python_version }}
+    mise use -g python@{{ roo_code_python_version }}
+  become: true
+  become_user: "{{ roo_code_username }}"
+  args:
+    creates: "{{ roo_code_user_home }}/.local/share/mise/installs/python"
+
+- name: Roo-Code | Install uv via pipx
+  ansible.builtin.command:
+    cmd: pipx install uv
+  become: true
+  become_user: "{{ roo_code_username }}"
+  register: roo_code_uv_install
+  changed_when: "'installed package' in roo_code_uv_install.stdout"
+  failed_when: false
+
+- name: Roo-Code | Install poetry via pipx
+  ansible.builtin.command:
+    cmd: pipx install poetry
+  become: true
+  become_user: "{{ roo_code_username }}"
+  register: roo_code_poetry_install
+  changed_when: "'installed package' in roo_code_poetry_install.stdout"
+  failed_when: false
+
+- name: Roo-Code | Install just via pipx
+  ansible.builtin.command:
+    cmd: pipx install rust-just
+  become: true
+  become_user: "{{ roo_code_username }}"
+  register: roo_code_just_install
+  changed_when: "'installed package' in roo_code_just_install.stdout"
+  failed_when: false
+
+- name: Roo-Code | Disable Poetry keyring to prevent GUI popups
+  ansible.builtin.command:
+    cmd: poetry config keyring.enabled false
+  become: true
+  become_user: "{{ roo_code_username }}"
+  environment:
+    PATH: "{{ roo_code_user_home }}/.local/bin:{{ ansible_env.PATH }}"
+  changed_when: false

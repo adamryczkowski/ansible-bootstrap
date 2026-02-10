@@ -1,0 +1,226 @@
+---
+# Install and configure MCP servers
+
+# ============================================================================
+# Telegram MCP (Python/Poetry)
+# ============================================================================
+- name: Roo-Code | Clone telegram-mcp
+  ansible.builtin.git:
+    repo: "{{ roo_code_mcp_servers.telegram.git_repo }}"
+    dest: "{{ roo_code_mcp_dir }}/telegram-mcp"
+    version: main
+    depth: 1
+  become: true
+  become_user: "{{ roo_code_username }}"
+  when: roo_code_mcp_servers.telegram.enabled
+
+- name: Roo-Code | Setup telegram-mcp with poetry
+  ansible.builtin.shell: |
+    export PATH="{{ roo_code_user_home }}/.local/bin:$PATH"
+    cd {{ roo_code_mcp_dir }}/telegram-mcp
+    poetry lock
+    poetry install --no-root
+  become: true
+  become_user: "{{ roo_code_username }}"
+  args:
+    creates: "{{ roo_code_mcp_dir }}/telegram-mcp/.venv"
+  when: roo_code_mcp_servers.telegram.enabled
+
+- name: Roo-Code | Create telegram-mcp .env template
+  ansible.builtin.copy:
+    dest: "{{ roo_code_mcp_dir }}/telegram-mcp/.env.example"
+    content: |
+      # Telegram API credentials
+      # Get these from https://my.telegram.org/apps
+      TELEGRAM_API_ID=your_api_id
+      TELEGRAM_API_HASH=your_api_hash
+      TELEGRAM_SESSION_STRING=your_session_string
+    owner: "{{ roo_code_username }}"
+    mode: '0600'
+  become: true
+  become_user: "{{ roo_code_username }}"
+  when: roo_code_mcp_servers.telegram.enabled
+
+# ============================================================================
+# SSH Server MCP (Node.js)
+# ============================================================================
+- name: Roo-Code | Clone mcp-ssh-server
+  ansible.builtin.git:
+    repo: "{{ roo_code_mcp_servers.ssh_server.git_repo }}"
+    dest: "{{ roo_code_mcp_dir }}/mcp-ssh-server"
+    version: main
+    depth: 1
+  become: true
+  become_user: "{{ roo_code_username }}"
+  when: roo_code_mcp_servers.ssh_server.enabled
+
+- name: Roo-Code | Install mcp-ssh-server dependencies
+  ansible.builtin.shell: |
+    export PATH="{{ roo_code_user_home }}/.local/bin:{{ roo_code_user_home }}/.local/share/mise/shims:$PATH"
+    cd {{ roo_code_mcp_dir }}/mcp-ssh-server
+    npm install
+    npm run build
+  become: true
+  become_user: "{{ roo_code_username }}"
+  args:
+    creates: "{{ roo_code_mcp_dir }}/mcp-ssh-server/node_modules"
+  when: roo_code_mcp_servers.ssh_server.enabled
+
+# ============================================================================
+# Chrome DevTools MCP (npm global)
+# ============================================================================
+- name: Roo-Code | Install chrome-devtools-mcp globally
+  ansible.builtin.shell: |
+    export PATH="{{ roo_code_user_home }}/.local/bin:{{ roo_code_user_home }}/.local/share/mise/shims:$PATH"
+    npm install -g {{ roo_code_mcp_servers.chrome_devtools_mcp.package_name }}
+  become: true
+  become_user: "{{ roo_code_username }}"
+  when: roo_code_mcp_servers.chrome_devtools_mcp.enabled
+  register: roo_code_chrome_devtools_install
+  changed_when: "'added' in roo_code_chrome_devtools_install.stdout | default('')"
+
+# ============================================================================
+# PDF Reader MCP (npm global)
+# ============================================================================
+- name: Roo-Code | Install pdf-reader-mcp globally
+  ansible.builtin.shell: |
+    export PATH="{{ roo_code_user_home }}/.local/bin:{{ roo_code_user_home }}/.local/share/mise/shims:$PATH"
+    npm install -g {{ roo_code_mcp_servers.pdf_reader_mcp.package_name }}
+  become: true
+  become_user: "{{ roo_code_username }}"
+  when: roo_code_mcp_servers.pdf_reader_mcp.enabled
+  register: roo_code_pdf_reader_install
+  changed_when: "'added' in roo_code_pdf_reader_install.stdout | default('')"
+
+# ============================================================================
+# SVG MCP (Python/Poetry with systemd)
+# ============================================================================
+- name: Roo-Code | Clone SVG-MCP
+  ansible.builtin.git:
+    repo: "{{ roo_code_mcp_servers.svg_mcp.git_repo }}"
+    dest: "{{ roo_code_mcp_dir }}/SVG-MCP"
+    version: main
+    depth: 1
+  become: true
+  become_user: "{{ roo_code_username }}"
+  when: roo_code_mcp_servers.svg_mcp.enabled
+
+- name: Roo-Code | Setup SVG-MCP
+  ansible.builtin.shell: |
+    export PATH="{{ roo_code_user_home }}/.local/bin:$PATH"
+    cd {{ roo_code_mcp_dir }}/SVG-MCP
+    just setup
+  become: true
+  become_user: "{{ roo_code_username }}"
+  args:
+    creates: "{{ roo_code_mcp_dir }}/SVG-MCP/.venv"
+  when: roo_code_mcp_servers.svg_mcp.enabled
+
+- name: Roo-Code | Install SVG-MCP systemd service
+  ansible.builtin.shell: |
+    export PATH="{{ roo_code_user_home }}/.local/bin:$PATH"
+    cd {{ roo_code_mcp_dir }}/SVG-MCP
+    just install-systemd-service
+  become: true
+  become_user: "{{ roo_code_username }}"
+  args:
+    creates: "{{ roo_code_user_home }}/.config/systemd/user/svg-mcp.service"
+  when: roo_code_mcp_servers.svg_mcp.enabled and roo_code_mcp_servers.svg_mcp.systemd_service
+
+# ============================================================================
+# Imagen MCP (Python/Poetry with systemd)
+# ============================================================================
+- name: Roo-Code | Clone Imagen-MCP
+  ansible.builtin.git:
+    repo: "{{ roo_code_mcp_servers.imagen.git_repo }}"
+    dest: "{{ roo_code_mcp_dir }}/Imagen-MCP"
+    version: main
+    depth: 1
+  become: true
+  become_user: "{{ roo_code_username }}"
+  when: roo_code_mcp_servers.imagen.enabled
+
+- name: Roo-Code | Setup Imagen-MCP
+  ansible.builtin.shell: |
+    export PATH="{{ roo_code_user_home }}/.local/bin:$PATH"
+    cd {{ roo_code_mcp_dir }}/Imagen-MCP
+    just setup
+  become: true
+  become_user: "{{ roo_code_username }}"
+  args:
+    creates: "{{ roo_code_mcp_dir }}/Imagen-MCP/.venv"
+  when: roo_code_mcp_servers.imagen.enabled
+
+- name: Roo-Code | Install Imagen-MCP systemd service
+  ansible.builtin.shell: |
+    export PATH="{{ roo_code_user_home }}/.local/bin:$PATH"
+    cd {{ roo_code_mcp_dir }}/Imagen-MCP
+    just install-systemd-service
+  become: true
+  become_user: "{{ roo_code_username }}"
+  args:
+    creates: "{{ roo_code_user_home }}/.config/systemd/user/imagen-mcp.service"
+  when: roo_code_mcp_servers.imagen.enabled and roo_code_mcp_servers.imagen.systemd_service
+
+# ============================================================================
+# Remove Background MCP (Python/Poetry with systemd)
+# ============================================================================
+- name: Roo-Code | Clone MCP-remove-background
+  ansible.builtin.git:
+    repo: "{{ roo_code_mcp_servers.remove_background.git_repo }}"
+    dest: "{{ roo_code_mcp_dir }}/MCP-remove-background"
+    version: main
+    depth: 1
+  become: true
+  become_user: "{{ roo_code_username }}"
+  when: roo_code_mcp_servers.remove_background.enabled
+
+- name: Roo-Code | Setup MCP-remove-background
+  ansible.builtin.shell: |
+    export PATH="{{ roo_code_user_home }}/.local/bin:$PATH"
+    cd {{ roo_code_mcp_dir }}/MCP-remove-background
+    just setup
+  become: true
+  become_user: "{{ roo_code_username }}"
+  args:
+    creates: "{{ roo_code_mcp_dir }}/MCP-remove-background/.venv"
+  when: roo_code_mcp_servers.remove_background.enabled
+
+- name: Roo-Code | Install MCP-remove-background systemd service
+  ansible.builtin.shell: |
+    export PATH="{{ roo_code_user_home }}/.local/bin:$PATH"
+    cd {{ roo_code_mcp_dir }}/MCP-remove-background
+    just install-systemd-service
+  become: true
+  become_user: "{{ roo_code_username }}"
+  args:
+    creates: "{{ roo_code_user_home }}/.config/systemd/user/mcp-remove-background.service"
+  when: roo_code_mcp_servers.remove_background.enabled and roo_code_mcp_servers.remove_background.systemd_service
+
+# ============================================================================
+# mcp-pdb (via uv - no installation needed, runs on demand)
+# ============================================================================
+- name: Roo-Code | Verify mcp-pdb can be run via uv
+  ansible.builtin.shell: |
+    export PATH="{{ roo_code_user_home }}/.local/bin:$PATH"
+    uv run --python 3.13 --with mcp-pdb mcp-pdb --help
+  become: true
+  become_user: "{{ roo_code_username }}"
+  when: roo_code_mcp_servers.mcp_pdb.enabled
+  register: roo_code_mcp_pdb_check
+  changed_when: false
+  failed_when: false
+
+# ============================================================================
+# Browser MCP (npx - no installation needed, runs on demand)
+# ============================================================================
+- name: Roo-Code | Verify browser-mcp can be run via npx
+  ansible.builtin.shell: |
+    export PATH="{{ roo_code_user_home }}/.local/bin:{{ roo_code_user_home }}/.local/share/mise/shims:$PATH"
+    npx {{ roo_code_mcp_servers.browser_mcp.package_name }} --help || true
+  become: true
+  become_user: "{{ roo_code_username }}"
+  when: roo_code_mcp_servers.browser_mcp.enabled
+  register: roo_code_browser_mcp_check
+  changed_when: false
+  failed_when: false

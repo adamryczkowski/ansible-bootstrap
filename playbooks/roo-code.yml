@@ -1,0 +1,170 @@
+---
+# Playbook: Set up Roo-Code with MCP servers
+#
+# This playbook installs and configures:
+# 1. Visual Studio Code from Microsoft's official APT repository (not snap)
+# 2. Roo-Code VS Code extension
+# 3. MCP servers for AI-assisted development:
+#    - telegram: Telegram messaging integration
+#    - mcp-pdb: Python debugger integration
+#    - remove-background: Image background removal
+#    - svg-mcp: SVG manipulation and validation
+#    - imagen: Image generation
+#    - ssh-server: SSH operations
+#    - chrome-devtools-mcp: Chrome DevTools integration
+#    - browser-mcp: Browser automation
+#    - pdf-reader-mcp: PDF reading
+#
+# Usage:
+#   ansible-playbook -i inventory/<your-inventory>/hosts.yml playbooks/roo-code.yml --ask-become-pass
+#
+# Prerequisites:
+#   - Target system should be Ubuntu 22.04+ or Debian 11+
+#   - User should have sudo access
+#
+# After running this playbook:
+# 1. For telegram MCP: Configure ~/.local/share/my-mcp/telegram-mcp/.env with your Telegram API credentials
+# 2. Start VS Code and the Roo-Code extension should be ready
+# 3. HTTP-based MCP servers (svg-mcp, imagen, remove-background) run as systemd user services
+
+- name: Set up Roo-Code with MCP servers
+  hosts: all
+  become: false
+
+  vars:
+    # Target user for Roo-Code configuration
+    target_user: "{{ ansible_user | default('adam') }}"
+
+    # Override default settings if needed
+    roo_code_username: "{{ target_user }}"
+
+    # MCP base directory (all MCP servers will be installed here)
+    roo_code_mcp_base_dir: "~/.local/share/my-mcp"
+
+    # Node.js and Python versions
+    roo_code_node_version: "22"
+    roo_code_python_version: "3.12"
+
+    # Enable/disable specific MCP servers
+    # Set to false to skip installation of specific servers
+    roo_code_mcp_servers:
+      telegram:
+        enabled: false  # Disabled - upstream repo has broken poetry.lock
+        type: stdio
+        git_repo: "https://github.com/chigwell/telegram-mcp.git"
+        install_method: poetry
+
+      mcp_pdb:
+        enabled: true
+        type: stdio
+        install_method: uv
+        package_name: mcp-pdb
+
+      remove_background:
+        enabled: true
+        type: http
+        port: 8083
+        git_repo: "https://github.com/adamryczkowski/MCP-remove-background.git"
+        install_method: poetry
+        systemd_service: true
+
+      svg_mcp:
+        enabled: true
+        type: http
+        port: 8081
+        git_repo: "https://github.com/adamryczkowski/SVG-MCP.git"
+        install_method: poetry
+        systemd_service: true
+
+      imagen:
+        enabled: true
+        type: http
+        port: 8082
+        git_repo: "https://github.com/adamryczkowski/Imagen-MCP.git"
+        install_method: poetry
+        systemd_service: true
+
+      ssh_server:
+        enabled: true
+        type: stdio
+        git_repo: "https://github.com/mahathirmuh/mcp-ssh-server.git"
+        install_method: npm
+
+      chrome_devtools_mcp:
+        enabled: true
+        type: stdio
+        install_method: npm_global
+        package_name: chrome-devtools-mcp
+
+      browser_mcp:
+        enabled: true
+        type: stdio
+        install_method: npx
+        package_name: "@browsermcp/mcp@latest"
+
+      pdf_reader_mcp:
+        enabled: true
+        type: stdio
+        install_method: npm_global
+        package_name: "@sylphx/pdf-reader-mcp"
+
+  pre_tasks:
+    - name: Gather facts
+      ansible.builtin.setup:
+
+    - name: Display target system info
+      ansible.builtin.debug:
+        msg: |
+          Target system: {{ ansible_hostname }}
+          OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          User: {{ target_user }}
+          MCP directory: {{ roo_code_mcp_base_dir }}
+
+  roles:
+    - role: roo_code
+      tags:
+        - roo-code
+        - vscode
+        - mcp
+
+  post_tasks:
+    - name: Display post-installation instructions
+      ansible.builtin.debug:
+        msg: |
+          ============================================================
+          Roo-Code Installation Complete!
+
+          INSTALLED COMPONENTS:
+          - VS Code (from Microsoft APT repository)
+          - Roo-Code extension
+          - MCP servers in {{ roo_code_mcp_base_dir }}
+
+          NEXT STEPS:
+
+          1. For Telegram MCP (if enabled):
+            - Get API credentials from https://my.telegram.org/apps
+            - Copy and edit the .env file:
+              cp {{ roo_code_mcp_base_dir }}/telegram-mcp/.env.example {{ roo_code_mcp_base_dir }}/telegram-mcp/.env
+            - Generate session string using the provided script
+
+          2. HTTP-based MCP servers are running as systemd user services:
+            - svg-mcp:           http://127.0.0.1:8081/mcp
+            - imagen:            http://127.0.0.1:8082/mcp
+            - remove-background: http://127.0.0.1:8083/mcp
+
+            Check status with:
+              systemctl --user status svg-mcp
+              systemctl --user status imagen-mcp
+              systemctl --user status mcp-remove-background
+
+          3. Start VS Code:
+            code
+
+          4. The MCP settings are configured in:
+            ~/.config/Code/User/globalStorage/rooveterinaryinc.roo-cline/settings/mcp_settings.json
+
+          NOTES:
+          - All MCP servers are installed in {{ roo_code_mcp_base_dir }}
+          - Node.js and Python are managed via mise
+          - HTTP services start automatically on user login
+          ============================================================
