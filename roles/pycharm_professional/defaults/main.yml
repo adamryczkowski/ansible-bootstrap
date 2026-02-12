@@ -1,0 +1,39 @@
+---
+# PyCharm Professional role defaults
+
+# Username for PyCharm configuration
+pycharm_username: "{{ target_user | default(ansible_user) | default('adam') }}"
+
+# User home directory
+pycharm_user_home: "/home/{{ pycharm_username }}"
+
+# Installation method: snap (recommended) or toolbox
+pycharm_install_method: snap
+
+# PyCharm Professional plugins to install
+# Plugin IDs from JetBrains Marketplace
+pycharm_plugins:
+  - name: AsciiDoc
+    id: org.asciidoctor.intellij.asciidoc
+    marketplace_id: "7391"
+  - name: Auto Dark Mode
+    id: com.github.weisj.darkmode
+    marketplace_id: "14076"
+  - name: BashSupport Pro
+    id: pro.bashsupport
+    marketplace_id: "13841"
+  - name: GitHub Copilot
+    id: com.github.copilot
+    marketplace_id: "17718"
+  - name: Just
+    id: linux_china.just
+    marketplace_id: "18658"
+  - name: Pydantic
+    id: com.koxudaxi.pydantic
+    marketplace_id: "12861"
+  - name: Pyright
+    id: com.insync.pyright
+    marketplace_id: "24145"
+
+# Whether to install plugins (requires PyCharm to be installed first)
+pycharm_install_plugins: true

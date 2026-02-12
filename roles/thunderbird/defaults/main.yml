@@ -4,6 +4,9 @@
 # Username for Thunderbird configuration
 thunderbird_username: "{{ target_user | default(ansible_user) | default('adam') }}"
 
+# User home directory
+thunderbird_user_home: "/home/{{ thunderbird_username }}"
+
 # Installation method: apt or snap
 thunderbird_install_method: apt
 
@@ -22,3 +25,17 @@ thunderbird_preferences:
     value: 1
   - name: mail.ui.show.migration.on.upgrade
     value: false
+
+# Profile copying configuration
+# Set to true to copy profile from role's files directory
+thunderbird_copy_profile: false
+
+# Profile name on the target system
+# This should match the profile directory name in roles/thunderbird/files/thunderbird-profile/
+thunderbird_profile_name: "f9wn398m.default-release"
+
+# Source for profile files
+# Options:
+#   - local: Use files from role's files directory (default)
+#   - remote: Copy from a remote host (legacy, not recommended)
+thunderbird_profile_source: local

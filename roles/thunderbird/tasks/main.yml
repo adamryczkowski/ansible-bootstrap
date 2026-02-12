@@ -17,16 +17,21 @@
 
 - name: Thunderbird | Create Thunderbird profile directory
   ansible.builtin.file:
-    path: "/home/{{ thunderbird_username }}/.thunderbird"
+    path: "{{ thunderbird_user_home }}/.thunderbird"
     state: directory
     mode: "0755"
     owner: "{{ thunderbird_username }}"
     group: "{{ thunderbird_username }}"
   become: true
 
+# Profile copying from remote host
+- name: Thunderbird | Copy profile from remote host
+  ansible.builtin.include_tasks: copy_profile.yml
+  when: thunderbird_copy_profile | bool
+
 - name: Thunderbird | Check if default profile exists
   ansible.builtin.find:
-    paths: "/home/{{ thunderbird_username }}/.thunderbird"
+    paths: "{{ thunderbird_user_home }}/.thunderbird"
     patterns: "*.default*"
     file_type: directory
   register: thunderbird_profiles
@@ -39,7 +44,7 @@
       {% for pref in thunderbird_preferences %}
       user_pref("{{ pref.name }}", {{ pref.value | to_json }});
       {% endfor %}
-    dest: "/home/{{ thunderbird_username }}/.thunderbird/{{ item.path | basename }}/user.js"
+    dest: "{{ thunderbird_user_home }}/.thunderbird/{{ item.path | basename }}/user.js"
     mode: "0644"
     owner: "{{ thunderbird_username }}"
     group: "{{ thunderbird_username }}"
@@ -47,9 +52,9 @@
   loop: "{{ thunderbird_profiles.files }}"
   when: thunderbird_profiles.files | length > 0 and thunderbird_preferences | length > 0
 
-- name: Thunderbird | Install Lightning calendar extension
-  ansible.builtin.apt:
-    name: xul-ext-lightning
-    state: present
-  become: true
-  when: thunderbird_install_lightning | bool and thunderbird_install_method == "apt"
+# Note: Lightning calendar is now built into Thunderbird 102+
+# The xul-ext-lightning package is no longer needed or available
+- name: Thunderbird | Lightning calendar note
+  ansible.builtin.debug:
+    msg: "Lightning calendar is built into Thunderbird 102+. No separate extension needed."
+  when: thunderbird_install_lightning | bool

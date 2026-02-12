@@ -1,0 +1,51 @@
+---
+# Slack role - Install Slack messaging application
+
+- name: Slack | Install Slack via Snap
+  community.general.snap:
+    name: slack
+    classic: true
+    state: present
+  become: true
+  when: slack_install_method == "snap"
+
+- name: Slack | Create desktop applications directory
+  ansible.builtin.file:
+    path: "/home/{{ slack_username }}/.local/share/applications"
+    state: directory
+    mode: "0755"
+    owner: "{{ slack_username }}"
+    group: "{{ slack_username }}"
+  become: true
+  when: slack_use_wayland | bool
+
+- name: Slack | Create Wayland-enabled desktop entry
+  ansible.builtin.copy:
+    content: |
+      [Desktop Entry]
+      Name=Slack (Wayland)
+      Comment=Slack Desktop (Wayland native)
+      GenericName=Slack Client for Linux
+      Exec=env ELECTRON_OZONE_PLATFORM_HINT=auto /snap/bin/slack --enable-features=UseOzonePlatform,WaylandWindowDecorations %U
+      Icon=/snap/slack/current/usr/share/pixmaps/slack.png
+      Type=Application
+      StartupNotify=true
+      Categories=Network;InstantMessaging;
+      MimeType=x-scheme-handler/slack;
+    dest: "/home/{{ slack_username }}/.local/share/applications/slack-wayland.desktop"
+    mode: "0644"
+    owner: "{{ slack_username }}"
+    group: "{{ slack_username }}"
+  become: true
+  when: slack_use_wayland | bool
+
+- name: Slack | Verify Slack installation
+  ansible.builtin.command:
+    cmd: /snap/bin/slack --version
+  register: slack_version
+  changed_when: false
+  failed_when: false
+
+- name: Slack | Display Slack version
+  ansible.builtin.debug:
+    msg: "Slack version: {{ slack_version.stdout | default('Not installed') }}"

@@ -1,0 +1,20 @@
+---
+# Slack role metadata
+
+galaxy_info:
+  author: Adam Ryczkowski
+  description: Install Slack messaging application
+  license: MIT
+  min_ansible_version: "2.10"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - focal
+        - jammy
+        - noble
+    - name: Debian
+      versions:
+        - bullseye
+        - bookworm
+
+dependencies: []

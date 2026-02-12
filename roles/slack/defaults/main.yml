@@ -1,0 +1,11 @@
+---
+# Slack role defaults
+
+# Username for Slack configuration
+slack_username: "{{ target_user | default(ansible_user) | default('adam') }}"
+
+# Installation method: snap (recommended) or deb
+slack_install_method: snap
+
+# Configure Slack to use Wayland (for Sway/Wayland environments)
+slack_use_wayland: true

@@ -1,0 +1,34 @@
+---
+# GlobalProtect VPN role defaults
+
+# Username for GlobalProtect configuration
+globalprotect_username: "{{ target_user | default(ansible_user) | default('adam') }}"
+
+# User home directory
+globalprotect_user_home: "/home/{{ globalprotect_username }}"
+
+# GlobalProtect version
+globalprotect_version: "6.2.6-c35"
+
+# Package type: cli or gui
+# cli - Command-line only (GlobalProtect_deb-*.deb)
+# gui - GUI version with Qt dependencies (GlobalProtect_UI_deb-*.deb)
+globalprotect_package_type: cli
+
+# Source for the GlobalProtect package
+# Options:
+#   - local: Use file from role's files directory (default)
+#   - remote: Copy from a remote host (requires globalprotect_remote_host and globalprotect_remote_path)
+globalprotect_source: local
+
+# Remote host to copy GlobalProtect package from (only used if source is "remote")
+globalprotect_remote_host: ""
+globalprotect_remote_user: "adam"
+globalprotect_remote_path: ""
+
+# Local path for GlobalProtect package (relative to role's files directory)
+# The package file should be placed in roles/globalprotect/files/
+globalprotect_local_path: "PanGPLinux-{{ globalprotect_version }}.tgz"
+
+# Temporary directory for extraction
+globalprotect_temp_dir: "/tmp/globalprotect-install"

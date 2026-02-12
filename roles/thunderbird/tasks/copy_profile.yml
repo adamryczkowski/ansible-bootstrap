@@ -1,0 +1,71 @@
+---
+# Thunderbird profile copying from role's files directory
+# This task file handles copying Thunderbird account settings (email and calendar)
+# Files are stored in roles/thunderbird/files/ and copied to target
+
+- name: Thunderbird | Check if profile already exists on target
+  ansible.builtin.stat:
+    path: "{{ thunderbird_user_home }}/.thunderbird/{{ thunderbird_profile_name }}"
+  register: thunderbird_target_profile_stat
+  become: true
+
+- name: Thunderbird | Create profile directory
+  ansible.builtin.file:
+    path: "{{ thunderbird_user_home }}/.thunderbird/{{ thunderbird_profile_name }}"
+    state: directory
+    owner: "{{ thunderbird_username }}"
+    group: "{{ thunderbird_username }}"
+    mode: "0700"
+  become: true
+
+- name: Thunderbird | Create calendar-data directory
+  ansible.builtin.file:
+    path: "{{ thunderbird_user_home }}/.thunderbird/{{ thunderbird_profile_name }}/calendar-data"
+    state: directory
+    owner: "{{ thunderbird_username }}"
+    group: "{{ thunderbird_username }}"
+    mode: "0700"
+  become: true
+
+- name: Thunderbird | Copy profile settings files
+  ansible.builtin.copy:
+    src: "thunderbird-profile/{{ item.src }}"
+    dest: "{{ thunderbird_user_home }}/.thunderbird/{{ thunderbird_profile_name }}/{{ item.dest }}"
+    owner: "{{ thunderbird_username }}"
+    group: "{{ thunderbird_username }}"
+    mode: "{{ item.mode }}"
+  become: true
+  loop:
+    - { src: "prefs.js", dest: "prefs.js", mode: "0600" }
+    - { src: "logins.json", dest: "logins.json", mode: "0600" }
+    - { src: "key4.db", dest: "key4.db", mode: "0600" }
+    - { src: "cert9.db", dest: "cert9.db", mode: "0600" }
+    - { src: "calendar-data/local.sqlite", dest: "calendar-data/local.sqlite", mode: "0700" }
+
+- name: Thunderbird | Copy profiles.ini
+  ansible.builtin.copy:
+    src: "profiles.ini"
+    dest: "{{ thunderbird_user_home }}/.thunderbird/profiles.ini"
+    owner: "{{ thunderbird_username }}"
+    group: "{{ thunderbird_username }}"
+    mode: "0644"
+  become: true
+
+- name: Thunderbird | Copy installs.ini
+  ansible.builtin.copy:
+    src: "installs.ini"
+    dest: "{{ thunderbird_user_home }}/.thunderbird/installs.ini"
+    owner: "{{ thunderbird_username }}"
+    group: "{{ thunderbird_username }}"
+    mode: "0644"
+  become: true
+
+- name: Thunderbird | Profile copy complete
+  ansible.builtin.debug:
+    msg: |
+      Thunderbird profile settings copied successfully
+      Profile: {{ thunderbird_profile_name }}
+      Location: {{ thunderbird_user_home }}/.thunderbird/{{ thunderbird_profile_name }}
+
+      Account settings, logins, and calendar data have been deployed.
+      IMAP email data will synchronize automatically on first launch.

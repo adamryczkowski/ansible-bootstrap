@@ -1,0 +1,90 @@
+---
+# GlobalProtect VPN role - Install Palo Alto GlobalProtect VPN client
+
+- name: GlobalProtect | Create temporary directory
+  ansible.builtin.file:
+    path: "{{ globalprotect_temp_dir }}"
+    state: directory
+    mode: "0755"
+  become: true
+
+- name: GlobalProtect | Copy package from remote host
+  ansible.builtin.shell: |
+    scp -o StrictHostKeyChecking=no \
+        {{ globalprotect_remote_user }}@{{ globalprotect_remote_host }}:{{ globalprotect_remote_path }} \
+        {{ globalprotect_temp_dir }}/PanGPLinux-{{ globalprotect_version }}.tgz
+  args:
+    creates: "{{ globalprotect_temp_dir }}/PanGPLinux-{{ globalprotect_version }}.tgz"
+  become: true
+  become_user: "{{ globalprotect_username }}"
+  when: globalprotect_source == "remote"
+
+- name: GlobalProtect | Copy package from local path
+  ansible.builtin.copy:
+    src: "{{ globalprotect_local_path }}"
+    dest: "{{ globalprotect_temp_dir }}/PanGPLinux-{{ globalprotect_version }}.tgz"
+    mode: "0644"
+  become: true
+  when: globalprotect_source == "local" and globalprotect_local_path | length > 0
+
+- name: GlobalProtect | Extract package
+  ansible.builtin.unarchive:
+    src: "{{ globalprotect_temp_dir }}/PanGPLinux-{{ globalprotect_version }}.tgz"
+    dest: "{{ globalprotect_temp_dir }}"
+    remote_src: true
+  become: true
+
+# CLI package: GlobalProtect_deb-*.deb (no UI_ prefix)
+# GUI package: GlobalProtect_UI_deb-*.deb
+- name: GlobalProtect | Set deb package pattern
+  ansible.builtin.set_fact:
+    globalprotect_deb_pattern: "{{ 'GlobalProtect_UI_deb-*.deb' if globalprotect_package_type == 'gui' else 'GlobalProtect_deb-*.deb' }}"
+
+- name: GlobalProtect | Find the deb package
+  ansible.builtin.find:
+    paths: "{{ globalprotect_temp_dir }}"
+    patterns: "{{ globalprotect_deb_pattern }}"
+    recurse: true
+    # Exclude UI package when looking for CLI
+    excludes: "{{ ['GlobalProtect_UI_deb-*.deb'] if globalprotect_package_type == 'cli' else [] }}"
+  register: globalprotect_deb_files
+
+- name: GlobalProtect | Display found package
+  ansible.builtin.debug:
+    msg: "Installing GlobalProtect {{ globalprotect_package_type | upper }} package: {{ globalprotect_deb_files.files[0].path | basename }}"
+  when: globalprotect_deb_files.files | length > 0
+
+- name: GlobalProtect | Install GlobalProtect deb package
+  ansible.builtin.apt:
+    deb: "{{ globalprotect_deb_files.files[0].path }}"
+    state: present
+  become: true
+  when: globalprotect_deb_files.files | length > 0
+
+# Qt dependencies only needed for GUI version
+- name: GlobalProtect | Install GUI dependencies
+  ansible.builtin.apt:
+    name:
+      - libqt5webkit5
+      - libqt5webenginewidgets5
+    state: present
+  become: true
+  failed_when: false
+  when: globalprotect_package_type == "gui"
+
+- name: GlobalProtect | Clean up temporary directory
+  ansible.builtin.file:
+    path: "{{ globalprotect_temp_dir }}"
+    state: absent
+  become: true
+
+- name: GlobalProtect | Verify installation
+  ansible.builtin.command:
+    cmd: which globalprotect
+  register: globalprotect_installed
+  changed_when: false
+  failed_when: false
+
+- name: GlobalProtect | Display installation status
+  ansible.builtin.debug:
+    msg: "GlobalProtect {{ globalprotect_package_type | upper }} {{ 'installed successfully' if globalprotect_installed.rc == 0 else 'installation may require manual verification' }}"

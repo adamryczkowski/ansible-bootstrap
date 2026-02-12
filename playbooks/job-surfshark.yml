@@ -1,0 +1,202 @@
+---
+# Playbook: Set up workstation for Surfshark job
+#
+# This playbook installs and configures:
+# 1. Roo-Code (VS Code with MCP servers)
+# 2. PyCharm Professional with plugins:
+#    - AsciiDoc
+#    - Auto Dark Mode
+#    - BashSupport Pro
+#    - GitHub Copilot
+#    - Just
+#    - Pydantic
+#    - Pyright
+# 3. Slack messaging application
+# 4. Thunderbird with profile copied from reference machine
+# 5. GlobalProtect VPN client
+#
+# Usage:
+#   ansible-playbook -i inventory/<your-inventory>/hosts.yml playbooks/job-surfshark.yml --ask-become-pass
+#
+# Prerequisites:
+#   - Target system should be Ubuntu 22.04+ or Debian 11+
+#   - User should have sudo access
+#   - SSH key access to the reference machine (192.168.42.205) for profile copying
+
+- name: Set up workstation for Surfshark job
+  hosts: all
+  become: false
+
+  vars:
+    # Target user for configuration
+    target_user: "{{ ansible_user | default('adam') }}"
+
+    # Roo-Code configuration
+    roo_code_username: "{{ target_user }}"
+    roo_code_mcp_base_dir: "~/.local/share/my-mcp"
+    roo_code_node_version: "22"
+    roo_code_python_version: "3.12"
+    roo_code_mcp_servers:
+      telegram:
+        enabled: false
+        type: stdio
+        git_repo: "https://github.com/chigwell/telegram-mcp.git"
+        install_method: poetry
+      mcp_pdb:
+        enabled: true
+        type: stdio
+        install_method: uv
+        package_name: mcp-pdb
+      remove_background:
+        enabled: true
+        type: http
+        port: 8083
+        git_repo: "https://github.com/adamryczkowski/MCP-remove-background.git"
+        install_method: poetry
+        systemd_service: true
+      svg_mcp:
+        enabled: true
+        type: http
+        port: 8081
+        git_repo: "https://github.com/adamryczkowski/SVG-MCP.git"
+        install_method: poetry
+        systemd_service: true
+      imagen:
+        enabled: true
+        type: http
+        port: 8082
+        git_repo: "https://github.com/adamryczkowski/Imagen-MCP.git"
+        install_method: poetry
+        systemd_service: true
+      ssh_server:
+        enabled: true
+        type: stdio
+        git_repo: "https://github.com/mahathirmuh/mcp-ssh-server.git"
+        install_method: npm
+      chrome_devtools_mcp:
+        enabled: true
+        type: stdio
+        install_method: npm_global
+        package_name: chrome-devtools-mcp
+      browser_mcp:
+        enabled: true
+        type: stdio
+        install_method: npx
+        package_name: "@browsermcp/mcp@latest"
+      pdf_reader_mcp:
+        enabled: true
+        type: stdio
+        install_method: npm_global
+        package_name: "@sylphx/pdf-reader-mcp"
+
+    # PyCharm Professional configuration
+    pycharm_username: "{{ target_user }}"
+    pycharm_install_method: snap
+    pycharm_install_plugins: true
+    # Plugins are defined in role defaults
+
+    # Slack configuration
+    slack_username: "{{ target_user }}"
+    slack_install_method: snap
+    slack_use_wayland: true
+
+    # Thunderbird configuration - copy profile from role files
+    thunderbird_username: "{{ target_user }}"
+    thunderbird_install_method: apt
+    thunderbird_copy_profile: true
+    thunderbird_profile_name: "f9wn398m.default-release"
+    thunderbird_profile_source: local
+
+    # GlobalProtect configuration - use package from role files
+    globalprotect_username: "{{ target_user }}"
+    globalprotect_version: "6.2.6-c35"
+    globalprotect_source: local
+    globalprotect_local_path: "PanGPLinux-6.2.6-c35.tgz"
+    globalprotect_package_type: cli  # Use CLI version (no GUI)
+
+  pre_tasks:
+    - name: Gather facts
+      ansible.builtin.setup:
+
+    - name: Display target system info
+      ansible.builtin.debug:
+        msg: |
+          Target system: {{ ansible_hostname }}
+          OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          User: {{ target_user }}
+
+  roles:
+    - role: roo_code
+      tags:
+        - roo-code
+        - vscode
+        - mcp
+
+    - role: pycharm_professional
+      tags:
+        - pycharm
+        - development
+
+    - role: slack
+      tags:
+        - slack
+        - communication
+
+    - role: thunderbird
+      tags:
+        - thunderbird
+        - email
+
+    - role: globalprotect
+      tags:
+        - globalprotect
+        - vpn
+
+  post_tasks:
+    - name: Display post-installation instructions
+      ansible.builtin.debug:
+        msg: |
+          ============================================================
+          Surfshark Workstation Setup Complete!
+
+          INSTALLED COMPONENTS:
+
+          1. Roo-Code (VS Code with MCP servers)
+              - MCP servers in ~/.local/share/my-mcp
+              - HTTP services: svg-mcp:8081, imagen:8082, remove-background:8083
+
+          2. PyCharm Professional
+              - Installed via Snap
+              - Plugins: AsciiDoc, Auto Dark Mode, BashSupport Pro,
+              GitHub Copilot, Just, Pydantic, Pyright
+              - Note: You may need to restart PyCharm for plugins to activate
+
+          3. Slack
+              - Installed via Snap
+              - Wayland-enabled desktop entry created
+
+          4. Thunderbird
+              - Profile: {{ thunderbird_profile_name }}
+              - IMAP email data will synchronize automatically on first launch
+
+          5. GlobalProtect VPN
+              - Version: {{ globalprotect_version }}
+              - Installed from role files
+
+          NEXT STEPS:
+
+          1. Log out and log back in to ensure all environment changes take effect
+
+          2. Start PyCharm and verify plugins are installed:
+              pycharm-professional
+
+          3. Start Thunderbird and verify your accounts are configured:
+              thunderbird
+
+          4. Connect to VPN using GlobalProtect:
+              globalprotect connect
+
+          5. Start VS Code with Roo-Code:
+              code
+
+          ============================================================

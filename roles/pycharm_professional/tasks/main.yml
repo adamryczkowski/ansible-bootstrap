@@ -1,0 +1,58 @@
+---
+# PyCharm Professional role - Install and configure PyCharm Professional with plugins
+
+- name: PyCharm | Install PyCharm Professional via Snap
+  community.general.snap:
+    name: pycharm-professional
+    classic: true
+    state: present
+  become: true
+  when: pycharm_install_method == "snap"
+
+- name: PyCharm | Wait for PyCharm to be available
+  ansible.builtin.wait_for:
+    path: /snap/bin/pycharm-professional
+    state: present
+    timeout: 30
+  when: pycharm_install_method == "snap"
+
+- name: PyCharm | Create PyCharm config directory
+  ansible.builtin.file:
+    path: "{{ pycharm_user_home }}/.config/JetBrains"
+    state: directory
+    mode: "0755"
+    owner: "{{ pycharm_username }}"
+    group: "{{ pycharm_username }}"
+  become: true
+
+- name: PyCharm | Find PyCharm config directory
+  ansible.builtin.find:
+    paths: "{{ pycharm_user_home }}/.config/JetBrains"
+    patterns: "PyCharm*"
+    file_type: directory
+  register: pycharm_professional_config_dirs
+  become: true
+  become_user: "{{ pycharm_username }}"
+
+- name: PyCharm | Install plugins using PyCharm CLI
+  ansible.builtin.command:
+    cmd: "/snap/bin/pycharm-professional installPlugins {{ item.id }}"
+  loop: "{{ pycharm_plugins }}"
+  loop_control:
+    label: "{{ item.name }}"
+  become: true
+  become_user: "{{ pycharm_username }}"
+  environment:
+    HOME: "{{ pycharm_user_home }}"
+  when: pycharm_install_plugins | bool
+  register: pycharm_professional_plugin_result
+  failed_when: false
+  changed_when: "'already installed' not in pycharm_professional_plugin_result.stdout | default('')"
+
+- name: PyCharm | Display plugin installation results
+  ansible.builtin.debug:
+    msg: "Plugin {{ item.item.name }}: {{ 'installed' if item.rc == 0 else 'failed or already installed' }}"
+  loop: "{{ pycharm_professional_plugin_result.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when: pycharm_install_plugins | bool
