@@ -48,6 +48,7 @@ desktop_applications:
   - vlc
   - gimp
   - inkscape
+  - keepassxc
 
 # Flatpak
 desktop_install_flatpak: true
