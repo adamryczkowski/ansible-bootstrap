@@ -21,6 +21,7 @@
       value: "false"
     - key: "/org/gnome/desktop/screensaver/ubuntu-lock-on-suspend"
       value: "false"
+  failed_when: false  # Some keys may be locked by system policy
 
 - name: Desktop GNOME | Configure touchpad settings
   community.general.dconf:

@@ -51,6 +51,11 @@
           User: {{ target_user }}
 
   roles:
+    - role: desktop
+      tags:
+        - desktop
+        - applications
+
     - role: sway
       tags:
         - sway
