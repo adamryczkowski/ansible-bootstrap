@@ -19,3 +19,8 @@ common_sysctl_settings:
   fs.inotify.max_user_watches: 524288
   # Increase file descriptors
   fs.file-max: 2097152
+
+# Install reconnect_vpn.sh script (for SoftEther VPN reconnection)
+# When enabled, installs the script to /usr/local/bin/reconnect_vpn.sh
+# and configures sudoers to allow passwordless execution
+common_install_reconnect_vpn: false

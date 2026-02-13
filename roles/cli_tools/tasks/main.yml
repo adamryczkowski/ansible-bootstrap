@@ -242,6 +242,24 @@
 - name: CLI Tools | Configure atuin
   when: cli_tools_install_atuin | bool
   block:
+    - name: CLI Tools | Create atuin config directory
+      ansible.builtin.file:
+        path: "/home/{{ cli_tools_username }}/.config/atuin"
+        state: directory
+        mode: "0755"
+        owner: "{{ cli_tools_username }}"
+        group: "{{ cli_tools_username }}"
+      become: true
+
+    - name: CLI Tools | Deploy atuin config
+      ansible.builtin.copy:
+        src: atuin_config.toml
+        dest: "/home/{{ cli_tools_username }}/.config/atuin/config.toml"
+        mode: "0644"
+        owner: "{{ cli_tools_username }}"
+        group: "{{ cli_tools_username }}"
+      become: true
+
     - name: CLI Tools | Add atuin to bashrc.d
       ansible.builtin.copy:
         content: |

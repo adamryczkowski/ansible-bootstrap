@@ -29,6 +29,7 @@ packages_base:
   - unzip
   - jq
   - build-essential
+  - sshfs
 
 # Additional packages to install
 packages_additional: []

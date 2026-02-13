@@ -58,3 +58,27 @@
   loop: "{{ common_sysctl_settings | dict2items }}"
   become: true
   when: common_sysctl_settings | length > 0
+
+# VPN Reconnect Script
+- name: Common | Install reconnect_vpn.sh script
+  ansible.builtin.copy:
+    src: reconnect_vpn.sh
+    dest: /usr/local/bin/reconnect_vpn.sh
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+  when: common_install_reconnect_vpn | default(false)
+
+- name: Common | Configure sudoers for reconnect_vpn.sh (passwordless)
+  ansible.builtin.copy:
+    content: |
+      # Allow all users to run reconnect_vpn.sh without password
+      ALL ALL=(ALL) NOPASSWD: /usr/local/bin/reconnect_vpn.sh
+    dest: /etc/sudoers.d/reconnect_vpn
+    owner: root
+    group: root
+    mode: "0440"
+    validate: "visudo -cf %s"
+  become: true
+  when: common_install_reconnect_vpn | default(false)

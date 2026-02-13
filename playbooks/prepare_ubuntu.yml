@@ -45,8 +45,10 @@
         cache_valid_time: 3600
 
   roles:
-    # Base system configuration (locale, timezone, sysctl)
+    # Base system configuration (locale, timezone, sysctl, VPN reconnect script)
     - role: common
+      vars:
+        common_install_reconnect_vpn: true
       tags: [common, base]
 
     # Package management (APT packages)
