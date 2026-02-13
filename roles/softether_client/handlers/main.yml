@@ -1,0 +1,21 @@
+---
+# Handlers for softether_client role
+
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+  become: true
+
+- name: Restart softether client
+  ansible.builtin.systemd:
+    name: softether_client
+    state: restarted
+    enabled: true
+  become: true
+
+- name: Restart softether connection
+  ansible.builtin.systemd:
+    name: "softether_{{ softether_connection_name }}_client"
+    state: restarted
+    enabled: true
+  become: true

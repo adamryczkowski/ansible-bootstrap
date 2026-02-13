@@ -1,0 +1,213 @@
+---
+# SoftEther VPN Client Role - Main Tasks
+#
+# Purpose:
+#   Installs SoftEther VPN client from source and configures a VPN connection
+#   to a SoftEther VPN server. Replaces the legacy softether-client.sh script.
+#
+# Key Variables:
+#   - softether_server_address: VPN server IP or hostname (required)
+#   - softether_vpn_username: VPN username (required)
+#   - softether_password: VPN password (required)
+#   - softether_port: Server port (default: 992)
+#   - softether_vpn_hub: Virtual hub name (default: VPN)
+#   - softether_connection_name: Connection name (default: username)
+#   - softether_nicname: Virtual NIC name (default: vpn)
+#   - softether_ip: Static IP or 'dhcp' (default: dhcp)
+#
+# Example Usage:
+#   - role: softether_client
+#     vars:
+#       softether_server_address: "192.168.1.1"
+#       softether_vpn_username: "myuser"
+#       softether_password: "{{ vault_softether_password }}"
+
+- name: SoftEther | Validate required variables
+  ansible.builtin.assert:
+    that:
+      - softether_server_address | length > 0
+      - softether_vpn_username | length > 0
+      - softether_password | length > 0
+    fail_msg: "Required variables softether_server_address, softether_vpn_username, and softether_password must be set"
+
+- name: SoftEther | Validate IP format if static IP is specified
+  ansible.builtin.assert:
+    that:
+      - softether_ip == 'dhcp' or softether_ip is regex('^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$')
+    fail_msg: "softether_ip must be 'dhcp' or a valid IPv4 address"
+
+- name: SoftEther | Install build dependencies
+  ansible.builtin.apt:
+    name:
+      - cmake
+      - gcc
+      - g++
+      - make
+      - pkgconf
+      - libncurses5-dev
+      - libssl-dev
+      - libsodium-dev
+      - libreadline-dev
+      - zlib1g-dev
+      - isc-dhcp-client
+      - git
+      - net-tools
+    state: present
+    update_cache: true
+  become: true
+
+- name: SoftEther | Check if vpnclient is already installed
+  ansible.builtin.stat:
+    path: /usr/local/bin/vpnclient
+  register: softether_client_vpnclient_installed
+
+- name: SoftEther | Clone SoftEther VPN repository
+  ansible.builtin.git:
+    repo: "{{ softether_git_repo }}"
+    dest: "{{ softether_install_dir }}"
+    depth: 1
+    force: true
+  become: true
+  when: not softether_client_vpnclient_installed.stat.exists
+
+- name: SoftEther | Run configure
+  ansible.builtin.command:
+    cmd: ./configure
+    chdir: "{{ softether_install_dir }}"
+  become: true
+  when: not softether_client_vpnclient_installed.stat.exists
+  changed_when: true
+
+- name: SoftEther | Build SoftEther
+  ansible.builtin.command:
+    cmd: "make -C build -j {{ softether_build_jobs }}"
+    chdir: "{{ softether_install_dir }}"
+  become: true
+  when: not softether_client_vpnclient_installed.stat.exists
+  changed_when: true
+
+- name: SoftEther | Install SoftEther
+  ansible.builtin.command:
+    cmd: make -C build install
+    chdir: "{{ softether_install_dir }}"
+  become: true
+  when: not softether_client_vpnclient_installed.stat.exists
+  changed_when: true
+
+- name: SoftEther | Create softether scripts directory
+  ansible.builtin.file:
+    path: /usr/local/lib/softether
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+
+- name: SoftEther | Deploy softether_client systemd service
+  ansible.builtin.template:
+    src: softether_client.service.j2
+    dest: /etc/systemd/system/softether_client.service
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  notify:
+    - Reload systemd
+    - Restart softether client
+
+- name: SoftEther | Enable and start softether_client service
+  ansible.builtin.systemd:
+    name: softether_client
+    enabled: true
+    state: started
+    daemon_reload: true
+  become: true
+
+- name: SoftEther | Wait for vpnclient to be ready
+  ansible.builtin.pause:
+    seconds: 3
+
+- name: SoftEther | Check if VPN NIC exists
+  ansible.builtin.command:
+    cmd: vpncmd localhost /CLIENT /CMD NicList
+  register: softether_client_nic_list
+  become: true
+  changed_when: false
+  failed_when: false
+
+- name: SoftEther | Create VPN NIC
+  ansible.builtin.command:
+    cmd: "vpncmd localhost /CLIENT /CMD NicCreate {{ softether_nicname }}"
+  become: true
+  when: softether_nicname not in softether_client_nic_list.stdout
+  changed_when: true
+
+- name: SoftEther | Check if VPN account exists
+  ansible.builtin.command:
+    cmd: vpncmd localhost /CLIENT /CMD AccountList
+  register: softether_client_account_list
+  become: true
+  changed_when: false
+  failed_when: false
+
+- name: SoftEther | Create VPN account
+  ansible.builtin.command:
+    cmd: >
+      vpncmd localhost /CLIENT /CMD AccountCreate {{ softether_connection_name }}
+      /SERVER:{{ softether_server_address }}:{{ softether_port }}
+      /HUB:{{ softether_vpn_hub }}
+      /USERNAME:{{ softether_vpn_username }}
+      /NICNAME:{{ softether_nicname }}
+  become: true
+  when: softether_connection_name not in softether_client_account_list.stdout
+  changed_when: true
+
+- name: SoftEther | Set VPN account password
+  ansible.builtin.command:
+    cmd: >
+      vpncmd localhost /CLIENT /CMD AccountPasswordSet {{ softether_connection_name }}
+      /PASSWORD:{{ softether_password }}
+      /TYPE:standard
+  become: true
+  changed_when: true
+  no_log: true
+
+- name: SoftEther | Deploy start VPN script (DHCP mode)
+  ansible.builtin.template:
+    src: start_vpn_dhcp.sh.j2
+    dest: "/usr/local/lib/softether/start_{{ softether_connection_name }}_vpn.sh"
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+  when: softether_ip == 'dhcp'
+
+- name: SoftEther | Deploy start VPN script (static IP mode)
+  ansible.builtin.template:
+    src: start_vpn_static.sh.j2
+    dest: "/usr/local/lib/softether/start_{{ softether_connection_name }}_vpn.sh"
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+  when: softether_ip != 'dhcp'
+
+- name: SoftEther | Deploy connection-specific systemd service
+  ansible.builtin.template:
+    src: softether_connection.service.j2
+    dest: "/etc/systemd/system/softether_{{ softether_connection_name }}_client.service"
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  notify:
+    - Reload systemd
+    - Restart softether connection
+
+- name: SoftEther | Enable and start connection service
+  ansible.builtin.systemd:
+    name: "softether_{{ softether_connection_name }}_client"
+    enabled: true
+    state: started
+    daemon_reload: true
+  become: true

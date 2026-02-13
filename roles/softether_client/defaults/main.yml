@@ -1,0 +1,41 @@
+---
+# Default variables for softether_client role
+#
+# This role installs SoftEther VPN client from source and configures
+# a VPN connection to a SoftEther VPN server.
+#
+# Required variables:
+#   - softether_server_address: VPN server IP or hostname
+#   - softether_username: VPN username
+#   - softether_password: VPN password (should be stored in vault)
+#
+# Optional variables with defaults:
+#   - softether_port: Server port (default: 992)
+#   - softether_vpn_hub: Virtual hub name (default: VPN)
+#   - softether_connection_name: Connection name (default: username)
+#   - softether_nicname: Virtual NIC name (default: vpn)
+#   - softether_ip: Static IP or 'dhcp' (default: dhcp)
+
+# Username to run the VPN client as (for file ownership)
+softether_username: "{{ target_user | default(ansible_user) | default('adam') }}"
+
+# VPN Server configuration
+softether_server_address: ""
+softether_port: 992
+softether_vpn_hub: "VPN"
+
+# VPN Account configuration
+softether_vpn_username: ""
+softether_password: ""
+softether_connection_name: "{{ softether_vpn_username }}"
+softether_nicname: "vpn"
+
+# Network configuration: 'dhcp' or a static IP address
+softether_ip: "dhcp"
+
+# SoftEther source repository
+softether_git_repo: "https://github.com/SoftEtherVPN/SoftEtherVPN"
+softether_install_dir: "/usr/local/lib/SoftEtherVPN"
+
+# Build configuration
+softether_build_jobs: 4

@@ -1,0 +1,15 @@
+[Unit]
+Description=SoftEther {{ softether_connection_name }} Client
+After=softether_client.service
+Requires=softether_client.service
+
+[Service]
+Type=oneshot
+ExecStartPre=/bin/sh -c 'until ping -c1 {{ softether_server_address }}; do sleep 1; done;'
+ExecStart=/bin/bash /usr/local/lib/softether/start_{{ softether_connection_name }}_vpn.sh
+ExecStop=/usr/local/bin/vpncmd localhost /CLIENT /CMD accountdisconnect {{ softether_connection_name }}
+ExecStop=/bin/bash -c "ifconfig vpn_{{ softether_nicname }} down"
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

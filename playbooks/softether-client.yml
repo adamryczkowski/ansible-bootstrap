@@ -1,0 +1,40 @@
+---
+# SoftEther VPN Client Playbook
+#
+# This playbook installs and configures SoftEther VPN client on target hosts.
+#
+# Usage:
+#   ansible-playbook playbooks/softether-client.yml -i inventory/hosts.yml \
+#     -e softether_server_address=192.168.1.1 \
+#     -e softether_vpn_username=myuser \
+#     -e softether_password=mypassword \
+#     -e softether_vpn_hub=VPN
+#
+# Or with an ad-hoc inventory:
+#   ansible-playbook playbooks/softether-client.yml \
+#     -i "192.168.11.117," \
+#     -u adam \
+#     -e softether_server_address=vpn.example.com \
+#     -e softether_vpn_username=myuser \
+#     -e softether_password=mypassword
+#
+# Variables:
+#   Required:
+#     - softether_server_address: VPN server IP or hostname
+#     - softether_vpn_username: VPN username
+#     - softether_password: VPN password
+#
+#   Optional:
+#     - softether_port: Server port (default: 992)
+#     - softether_vpn_hub: Virtual hub name (default: VPN)
+#     - softether_connection_name: Connection name (default: username)
+#     - softether_nicname: Virtual NIC name (default: vpn)
+#     - softether_ip: Static IP or 'dhcp' (default: dhcp)
+
+- name: Install and configure SoftEther VPN Client
+  hosts: all
+  gather_facts: true
+  become: true
+
+  roles:
+    - role: softether_client

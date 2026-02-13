@@ -1,0 +1,16 @@
+---
+# SoftEther VPN Client role metadata
+
+galaxy_info:
+  author: Adam
+  description: Install SoftEther VPN client from source and configure VPN connection
+  company: ""
+  license: MIT
+  min_ansible_version: "2.14"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+        - noble
+
+dependencies: []

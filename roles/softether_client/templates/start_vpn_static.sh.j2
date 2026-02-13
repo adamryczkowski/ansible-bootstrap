@@ -1,0 +1,7 @@
+#!/bin/sh
+# SoftEther VPN start script for {{ softether_connection_name }} (static IP mode)
+sudo /usr/local/bin/vpncmd localhost /CLIENT /CMD accountconnect {{ softether_connection_name }}
+sudo ifconfig vpn_{{ softether_nicname }} {{ softether_ip }}
+if service --status-all | grep -Fq 'isc-dhcp-server'; then
+  sudo systemctl restart isc-dhcp-server.service
+fi

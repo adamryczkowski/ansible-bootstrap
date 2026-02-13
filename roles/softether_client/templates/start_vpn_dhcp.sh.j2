@@ -1,0 +1,4 @@
+#!/bin/sh
+# SoftEther VPN start script for {{ softether_connection_name }} (DHCP mode)
+sudo /usr/local/bin/vpncmd localhost /CLIENT /CMD accountconnect {{ softether_connection_name }}
+sudo dhclient vpn_{{ softether_nicname }}
