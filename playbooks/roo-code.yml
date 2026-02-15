@@ -114,7 +114,8 @@
       source_remote: "adam@192.168.42.207:/home/adam/tmp/AI"
       dest_dir: "~/.local/share/AI_prompts"
       register_for_sync: true
-      run_sync: true
+      run_sync: true  # Only runs on initial clone to avoid conflicts
+      deploy_global: true  # Create symlinks in ~/.roo/ for immediate visibility
 
   pre_tasks:
     - name: Gather facts

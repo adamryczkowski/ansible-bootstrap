@@ -102,5 +102,8 @@ roo_code_ai_prompts:
   dest_dir: "~/.local/share/AI_prompts"
   # Whether to add the target host to git-sync-hosts.txt
   register_for_sync: true
-  # Whether to run synchronization after cloning
+  # Whether to run synchronization after cloning (only runs on initial clone)
   run_sync: true
+  # Whether to deploy global prompts via symlinks to ~/.roo/
+  # This creates symlinks so changes are immediately visible after git-sync
+  deploy_global: true

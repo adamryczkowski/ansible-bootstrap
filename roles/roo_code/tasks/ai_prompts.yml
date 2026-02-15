@@ -4,11 +4,21 @@
 # This task file:
 # 1. Clones the AI prompts repository to the target host
 # 2. Registers the target host in git-sync-hosts.txt
-# 3. Runs synchronization to ensure all hosts are in sync
+# 3. Runs synchronization ONLY on initial clone (to avoid conflicts)
+# 4. Creates symlinks from ~/.roo/ to the repository files
+#
+# The symlink approach ensures:
+# - Changes to prompt files are immediately visible
+# - Running git-sync2.sh propagates changes to all hosts
+# - No need to re-run Ansible after syncing
 
 - name: AI Prompts | Expand destination directory
   ansible.builtin.set_fact:
     roo_code_ai_prompts_dest: "{{ roo_code_ai_prompts.dest_dir | replace('~', roo_code_user_home) }}"
+
+- name: AI Prompts | Set roo home directory
+  ansible.builtin.set_fact:
+    roo_code_roo_home: "{{ roo_code_user_home }}/.roo"
 
 - name: AI Prompts | Check if repository already exists
   ansible.builtin.stat:
@@ -23,6 +33,11 @@
   become: true
   become_user: "{{ roo_code_username }}"
   when: not roo_code_ai_prompts_git_dir.stat.exists
+  register: roo_code_ai_prompts_clone_result
+
+- name: AI Prompts | Track if repository was just cloned
+  ansible.builtin.set_fact:
+    roo_code_ai_prompts_just_cloned: "{{ roo_code_ai_prompts_clone_result.changed | default(false) }}"
 
 - name: AI Prompts | Get target hostname
   ansible.builtin.command: hostname
@@ -65,6 +80,8 @@
     cd "{{ roo_code_ai_prompts_dest }}"
     git add git-sync-hosts.txt
     git commit -m "Add {{ roo_code_target_hostname.stdout }} to sync hosts"
+  args:
+    executable: /bin/bash
   become: true
   become_user: "{{ roo_code_username }}"
   when: roo_code_host_registered.changed | default(false)
@@ -72,19 +89,24 @@
   changed_when: roo_code_commit_result.rc == 0
   failed_when: false
 
-- name: AI Prompts | Run git-sync2.sh synchronization
+# Only run sync on initial clone to avoid conflicts during non-interactive Ansible runs
+- name: AI Prompts | Run git-sync2.sh synchronization (initial clone only)
   ansible.builtin.shell: |
     cd "{{ roo_code_ai_prompts_dest }}"
     ./deploy/git-sync2.sh 2>&1
+  args:
+    executable: /bin/bash
   become: true
   become_user: "{{ roo_code_username }}"
-  when: roo_code_ai_prompts.run_sync | default(true)
+  when:
+    - roo_code_ai_prompts.run_sync | default(true)
+    - roo_code_ai_prompts_just_cloned
   register: roo_code_sync_result
-  changed_when: "'Sync complete' in roo_code_sync_result.stdout"
+  changed_when: "'Sync complete' in roo_code_sync_result.stdout or 'All hosts synchronized' in roo_code_sync_result.stdout"
 
 - name: AI Prompts | Display sync result
   ansible.builtin.debug:
-    msg: "{{ roo_code_sync_result.stdout_lines | default(['Sync not run']) }}"
+    msg: "{{ roo_code_sync_result.stdout_lines | default(['Sync skipped - repository already existed']) }}"
   when: roo_code_ai_prompts.run_sync | default(true)
 
 - name: AI Prompts | Verify synchronization completed
@@ -94,4 +116,100 @@
       - roo_code_sync_result.stdout is search('Synchronization Complete') or roo_code_sync_result.stdout is search('All hosts synchronized')
     fail_msg: "Synchronization did not complete successfully"
     success_msg: "Synchronization completed successfully"
-  when: roo_code_ai_prompts.run_sync | default(true)
+  when:
+    - roo_code_ai_prompts.run_sync | default(true)
+    - roo_code_ai_prompts_just_cloned
+
+# Deploy global prompts using symlinks
+- name: AI Prompts | Deploy global prompts
+  when: roo_code_ai_prompts.deploy_global | default(true)
+  block:
+    - name: AI Prompts | Ensure ~/.roo directory exists
+      ansible.builtin.file:
+        path: "{{ roo_code_roo_home }}"
+        state: directory
+        owner: "{{ roo_code_username }}"
+        mode: '0755'
+      become: true
+      become_user: "{{ roo_code_username }}"
+
+    - name: AI Prompts | Create symlink for custom_modes.yaml
+      ansible.builtin.file:
+        src: "{{ roo_code_ai_prompts_dest }}/custom_modes.yaml"
+        dest: "{{ roo_code_roo_home }}/custom_modes.yaml"
+        state: link
+        force: true
+      become: true
+      become_user: "{{ roo_code_username }}"
+
+    - name: AI Prompts | Find all rules directories in repository
+      ansible.builtin.find:
+        paths: "{{ roo_code_ai_prompts_dest }}/.roo"
+        file_type: directory
+        patterns: "rules*"
+      register: roo_code_rules_dirs
+
+    - name: AI Prompts | Create symlinks for rules directories
+      ansible.builtin.file:
+        src: "{{ item.path }}"
+        dest: "{{ roo_code_roo_home }}/{{ item.path | basename }}"
+        state: link
+        force: true
+      loop: "{{ roo_code_rules_dirs.files }}"
+      loop_control:
+        label: "{{ item.path | basename }}"
+      become: true
+      become_user: "{{ roo_code_username }}"
+
+    - name: AI Prompts | Check if skills directory exists
+      ansible.builtin.stat:
+        path: "{{ roo_code_ai_prompts_dest }}/.roo/skills"
+      register: roo_code_skills_dir
+
+    - name: AI Prompts | Create symlink for skills directory
+      ansible.builtin.file:
+        src: "{{ roo_code_ai_prompts_dest }}/.roo/skills"
+        dest: "{{ roo_code_roo_home }}/skills"
+        state: link
+        force: true
+      become: true
+      become_user: "{{ roo_code_username }}"
+      when: roo_code_skills_dir.stat.exists
+
+    - name: AI Prompts | Check if commands directory exists
+      ansible.builtin.stat:
+        path: "{{ roo_code_ai_prompts_dest }}/.roo/commands"
+      register: roo_code_commands_dir
+
+    - name: AI Prompts | Create symlink for commands directory
+      ansible.builtin.file:
+        src: "{{ roo_code_ai_prompts_dest }}/.roo/commands"
+        dest: "{{ roo_code_roo_home }}/commands"
+        state: link
+        force: true
+      become: true
+      become_user: "{{ roo_code_username }}"
+      when: roo_code_commands_dir.stat.exists
+
+- name: AI Prompts | Display deployment instructions
+  ansible.builtin.debug:
+    msg: |
+      ============================================================
+      AI Prompts Repository Setup Complete!
+
+      Repository: {{ roo_code_ai_prompts_dest }}
+      Global prompts: {{ roo_code_roo_home }}
+
+      SYMLINKS CREATED:
+      - {{ roo_code_roo_home }}/custom_modes.yaml -> repository
+      - {{ roo_code_roo_home }}/rules* -> repository
+      - {{ roo_code_roo_home }}/skills -> repository (if exists)
+      - {{ roo_code_roo_home }}/commands -> repository (if exists)
+
+      TO SYNC CHANGES BETWEEN HOSTS:
+        cd {{ roo_code_ai_prompts_dest }}
+        ./deploy/git-sync2.sh
+
+      Changes will be immediately visible after sync (no Ansible re-run needed).
+      ============================================================
+  when: roo_code_ai_prompts.deploy_global | default(true)
