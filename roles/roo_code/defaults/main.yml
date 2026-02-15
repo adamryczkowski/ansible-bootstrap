@@ -98,6 +98,8 @@ roo_code_ai_prompts:
   enabled: true
   # Remote source to clone from (SSH format: user@host:path)
   source_remote: "adam@192.168.42.207:/home/adam/tmp/AI"
+  # GitHub remote to set as 'origin' for pushing changes
+  github_remote: "git@github.com:adamryczkowski/AI-prompts.git"
   # Local destination directory on the target host
   dest_dir: "~/.local/share/AI_prompts"
   # Whether to add the target host to git-sync-hosts.txt

@@ -112,6 +112,7 @@
     roo_code_ai_prompts:
       enabled: true
       source_remote: "adam@192.168.42.207:/home/adam/tmp/AI"
+      github_remote: "git@github.com:adamryczkowski/AI-prompts.git"
       dest_dir: "~/.local/share/AI_prompts"
       register_for_sync: true
       run_sync: true  # Only runs on initial clone to avoid conflicts

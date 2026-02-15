@@ -39,6 +39,23 @@
   ansible.builtin.set_fact:
     roo_code_ai_prompts_just_cloned: "{{ roo_code_ai_prompts_clone_result.changed | default(false) }}"
 
+- name: AI Prompts | Set git remote origin to GitHub
+  ansible.builtin.shell: |
+    cd "{{ roo_code_ai_prompts_dest }}"
+    # Check if origin exists and update or add it
+    if git remote | grep -q '^origin$'; then
+      git remote set-url origin "{{ roo_code_ai_prompts.github_remote }}"
+    else
+      git remote add origin "{{ roo_code_ai_prompts.github_remote }}"
+    fi
+  args:
+    executable: /bin/bash
+  become: true
+  become_user: "{{ roo_code_username }}"
+  when: roo_code_ai_prompts.github_remote is defined
+  register: roo_code_set_remote_result
+  changed_when: roo_code_set_remote_result.rc == 0
+
 - name: AI Prompts | Get target hostname
   ansible.builtin.command: hostname
   register: roo_code_target_hostname
@@ -142,12 +159,49 @@
       become: true
       become_user: "{{ roo_code_username }}"
 
+    - name: AI Prompts | Check if .roomodes exists in repository
+      ansible.builtin.stat:
+        path: "{{ roo_code_ai_prompts_dest }}/.roomodes"
+      register: roo_code_roomodes_file
+
+    - name: AI Prompts | Create symlink for .roomodes (user-wide modes)
+      ansible.builtin.file:
+        src: "{{ roo_code_ai_prompts_dest }}/.roomodes"
+        dest: "{{ roo_code_user_home }}/.roomodes"
+        state: link
+        force: true
+      become: true
+      become_user: "{{ roo_code_username }}"
+      when: roo_code_roomodes_file.stat.exists
+
     - name: AI Prompts | Find all rules directories in repository
       ansible.builtin.find:
         paths: "{{ roo_code_ai_prompts_dest }}/.roo"
         file_type: directory
         patterns: "rules*"
       register: roo_code_rules_dirs
+
+    - name: AI Prompts | Check existing rules directories (to convert copies to symlinks)
+      ansible.builtin.stat:
+        path: "{{ roo_code_roo_home }}/{{ item.path | basename }}"
+      loop: "{{ roo_code_rules_dirs.files }}"
+      loop_control:
+        label: "{{ item.path | basename }}"
+      register: roo_code_existing_rules_dirs
+
+    - name: AI Prompts | Remove existing rules directories that are not symlinks
+      ansible.builtin.file:
+        path: "{{ item.stat.path }}"
+        state: absent
+      loop: "{{ roo_code_existing_rules_dirs.results }}"
+      loop_control:
+        label: "{{ item.stat.path | default('N/A') }}"
+      when:
+        - item.stat.exists | default(false)
+        - item.stat.isdir | default(false)
+        - not (item.stat.islnk | default(false))
+      become: true
+      become_user: "{{ roo_code_username }}"
 
     - name: AI Prompts | Create symlinks for rules directories
       ansible.builtin.file:
@@ -161,10 +215,28 @@
       become: true
       become_user: "{{ roo_code_username }}"
 
-    - name: AI Prompts | Check if skills directory exists
+    - name: AI Prompts | Check if skills directory exists in repository
       ansible.builtin.stat:
         path: "{{ roo_code_ai_prompts_dest }}/.roo/skills"
       register: roo_code_skills_dir
+
+    - name: AI Prompts | Check existing skills directory
+      ansible.builtin.stat:
+        path: "{{ roo_code_roo_home }}/skills"
+      register: roo_code_existing_skills_dir
+      when: roo_code_skills_dir.stat.exists
+
+    - name: AI Prompts | Remove existing skills directory if not a symlink
+      ansible.builtin.file:
+        path: "{{ roo_code_roo_home }}/skills"
+        state: absent
+      become: true
+      become_user: "{{ roo_code_username }}"
+      when:
+        - roo_code_skills_dir.stat.exists
+        - roo_code_existing_skills_dir.stat.exists | default(false)
+        - roo_code_existing_skills_dir.stat.isdir | default(false)
+        - not (roo_code_existing_skills_dir.stat.islnk | default(false))
 
     - name: AI Prompts | Create symlink for skills directory
       ansible.builtin.file:
@@ -176,10 +248,28 @@
       become_user: "{{ roo_code_username }}"
       when: roo_code_skills_dir.stat.exists
 
-    - name: AI Prompts | Check if commands directory exists
+    - name: AI Prompts | Check if commands directory exists in repository
       ansible.builtin.stat:
         path: "{{ roo_code_ai_prompts_dest }}/.roo/commands"
       register: roo_code_commands_dir
+
+    - name: AI Prompts | Check existing commands directory
+      ansible.builtin.stat:
+        path: "{{ roo_code_roo_home }}/commands"
+      register: roo_code_existing_commands_dir
+      when: roo_code_commands_dir.stat.exists
+
+    - name: AI Prompts | Remove existing commands directory if not a symlink
+      ansible.builtin.file:
+        path: "{{ roo_code_roo_home }}/commands"
+        state: absent
+      become: true
+      become_user: "{{ roo_code_username }}"
+      when:
+        - roo_code_commands_dir.stat.exists
+        - roo_code_existing_commands_dir.stat.exists | default(false)
+        - roo_code_existing_commands_dir.stat.isdir | default(false)
+        - not (roo_code_existing_commands_dir.stat.islnk | default(false))
 
     - name: AI Prompts | Create symlink for commands directory
       ansible.builtin.file:
@@ -198,10 +288,12 @@
       AI Prompts Repository Setup Complete!
 
       Repository: {{ roo_code_ai_prompts_dest }}
+      Git remote origin: {{ roo_code_ai_prompts.github_remote | default('not set') }}
       Global prompts: {{ roo_code_roo_home }}
 
       SYMLINKS CREATED:
       - {{ roo_code_roo_home }}/custom_modes.yaml -> repository
+      - {{ roo_code_user_home }}/.roomodes -> repository (user-wide modes)
       - {{ roo_code_roo_home }}/rules* -> repository
       - {{ roo_code_roo_home }}/skills -> repository (if exists)
       - {{ roo_code_roo_home }}/commands -> repository (if exists)
@@ -209,6 +301,10 @@
       TO SYNC CHANGES BETWEEN HOSTS:
         cd {{ roo_code_ai_prompts_dest }}
         ./deploy/git-sync2.sh
+
+      TO PUSH CHANGES TO GITHUB:
+        cd {{ roo_code_ai_prompts_dest }}
+        git push origin main
 
       Changes will be immediately visible after sync (no Ansible re-run needed).
       ============================================================
