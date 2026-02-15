@@ -35,3 +35,7 @@
 
 - name: Roo-Code | Configure MCP settings
   ansible.builtin.include_tasks: mcp_settings.yml
+
+- name: Roo-Code | Setup AI Prompts repository
+  ansible.builtin.include_tasks: ai_prompts.yml
+  when: roo_code_ai_prompts.enabled | default(false)

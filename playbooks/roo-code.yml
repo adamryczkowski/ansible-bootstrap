@@ -108,6 +108,14 @@
         install_method: npm_global
         package_name: "@sylphx/pdf-reader-mcp"
 
+    # AI Prompts repository configuration
+    roo_code_ai_prompts:
+      enabled: true
+      source_remote: "adam@192.168.42.207:/home/adam/tmp/AI"
+      dest_dir: "~/.local/share/AI_prompts"
+      register_for_sync: true
+      run_sync: true
+
   pre_tasks:
     - name: Gather facts
       ansible.builtin.setup:
@@ -163,8 +171,13 @@
           4. The MCP settings are configured in:
             ~/.config/Code/User/globalStorage/rooveterinaryinc.roo-cline/settings/mcp_settings.json
 
+          5. AI Prompts repository (if enabled):
+            - Location: {{ roo_code_ai_prompts.dest_dir | default('~/.local/share/AI_prompts') }}
+            - Sync with other hosts: ./deploy/git-sync2.sh
+
           NOTES:
           - All MCP servers are installed in {{ roo_code_mcp_base_dir }}
           - Node.js and Python are managed via mise
           - HTTP services start automatically on user login
+          - AI prompts are synchronized across registered hosts
           ============================================================

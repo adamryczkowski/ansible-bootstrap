@@ -1,0 +1,97 @@
+---
+# AI Prompts Repository Setup
+#
+# This task file:
+# 1. Clones the AI prompts repository to the target host
+# 2. Registers the target host in git-sync-hosts.txt
+# 3. Runs synchronization to ensure all hosts are in sync
+
+- name: AI Prompts | Expand destination directory
+  ansible.builtin.set_fact:
+    roo_code_ai_prompts_dest: "{{ roo_code_ai_prompts.dest_dir | replace('~', roo_code_user_home) }}"
+
+- name: AI Prompts | Check if repository already exists
+  ansible.builtin.stat:
+    path: "{{ roo_code_ai_prompts_dest }}/.git"
+  register: roo_code_ai_prompts_git_dir
+
+- name: AI Prompts | Clone repository from remote
+  ansible.builtin.git:
+    repo: "{{ roo_code_ai_prompts.source_remote }}"
+    dest: "{{ roo_code_ai_prompts_dest }}"
+    accept_hostkey: true
+  become: true
+  become_user: "{{ roo_code_username }}"
+  when: not roo_code_ai_prompts_git_dir.stat.exists
+
+- name: AI Prompts | Get target hostname
+  ansible.builtin.command: hostname
+  register: roo_code_target_hostname
+  changed_when: false
+
+- name: AI Prompts | Get target IP address
+  ansible.builtin.set_fact:
+    roo_code_target_ip: "{{ ansible_default_ipv4.address | default(ansible_host) }}"
+
+- name: AI Prompts | Build sync entry for this host
+  ansible.builtin.set_fact:
+    roo_code_sync_entry: "{{ roo_code_username }}@{{ roo_code_target_ip }}:{{ roo_code_ai_prompts_dest }}"
+
+- name: AI Prompts | Read current git-sync-hosts.txt
+  ansible.builtin.slurp:
+    src: "{{ roo_code_ai_prompts_dest }}/git-sync-hosts.txt"
+  register: roo_code_sync_hosts_content
+  become: true
+  become_user: "{{ roo_code_username }}"
+
+- name: AI Prompts | Check if host is already registered
+  ansible.builtin.set_fact:
+    roo_code_host_already_registered: "{{ roo_code_sync_entry in (roo_code_sync_hosts_content.content | b64decode) }}"
+
+- name: AI Prompts | Add host to git-sync-hosts.txt
+  ansible.builtin.lineinfile:
+    path: "{{ roo_code_ai_prompts_dest }}/git-sync-hosts.txt"
+    line: "\n# {{ roo_code_target_hostname.stdout }} (added by ansible)\n{{ roo_code_sync_entry }}"
+    insertafter: EOF
+  become: true
+  become_user: "{{ roo_code_username }}"
+  when:
+    - roo_code_ai_prompts.register_for_sync | default(true)
+    - not roo_code_host_already_registered
+  register: roo_code_host_registered
+
+- name: AI Prompts | Commit the host registration
+  ansible.builtin.shell: |
+    cd "{{ roo_code_ai_prompts_dest }}"
+    git add git-sync-hosts.txt
+    git commit -m "Add {{ roo_code_target_hostname.stdout }} to sync hosts"
+  become: true
+  become_user: "{{ roo_code_username }}"
+  when: roo_code_host_registered.changed | default(false)
+  register: roo_code_commit_result
+  changed_when: roo_code_commit_result.rc == 0
+  failed_when: false
+
+- name: AI Prompts | Run git-sync2.sh synchronization
+  ansible.builtin.shell: |
+    cd "{{ roo_code_ai_prompts_dest }}"
+    ./deploy/git-sync2.sh 2>&1
+  become: true
+  become_user: "{{ roo_code_username }}"
+  when: roo_code_ai_prompts.run_sync | default(true)
+  register: roo_code_sync_result
+  changed_when: "'Sync complete' in roo_code_sync_result.stdout"
+
+- name: AI Prompts | Display sync result
+  ansible.builtin.debug:
+    msg: "{{ roo_code_sync_result.stdout_lines | default(['Sync not run']) }}"
+  when: roo_code_ai_prompts.run_sync | default(true)
+
+- name: AI Prompts | Verify synchronization completed
+  ansible.builtin.assert:
+    that:
+      - roo_code_sync_result.stdout is search('Phase 5')
+      - roo_code_sync_result.stdout is search('Synchronization Complete') or roo_code_sync_result.stdout is search('All hosts synchronized')
+    fail_msg: "Synchronization did not complete successfully"
+    success_msg: "Synchronization completed successfully"
+  when: roo_code_ai_prompts.run_sync | default(true)
