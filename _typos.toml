@@ -1,0 +1,4 @@
+[default.extend-words]
+# Polish words that are valid
+ono = "ono"
+nam = "nam"
