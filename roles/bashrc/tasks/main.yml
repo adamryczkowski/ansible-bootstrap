@@ -16,12 +16,20 @@
     path: "/home/{{ bashrc_username }}/.bashrc"
     marker: "# {mark} ANSIBLE MANAGED - bashrc.d sourcing"
     block: |
-      # Source all files in .bashrc.d
-      if [ -d ~/.bashrc.d ]; then
-          for file in ~/.bashrc.d/*.sh; do
-              [ -r "$file" ] && source "$file"
-          done
-          unset file
+      export BASHCONFD="$HOME/.bashrc.d"
+
+      # Source the configurations in .bashrc.d directory
+      if [ -d "${BASHCONFD}" ]; then
+          CONFS=()
+          CONFS=$(ls "${BASHCONFD}"/*.sh 2> /dev/null)
+          if [ $? -eq 0 ]; then
+              for CONF in ${CONFS[@]}
+              do
+                  source $CONF
+              done
+          fi
+          unset CONFS
+          unset CONF
       fi
     create: true
     mode: "0644"

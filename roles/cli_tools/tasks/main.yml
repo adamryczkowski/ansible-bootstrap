@@ -173,15 +173,41 @@
       when: not cli_tools_fzf_installed.stat.exists
       changed_when: true
 
+    - name: CLI Tools | Ensure fzf config directory exists
+      ansible.builtin.file:
+        path: "/home/{{ cli_tools_username }}/.config/fzf"
+        state: directory
+        mode: "0755"
+        owner: "{{ cli_tools_username }}"
+        group: "{{ cli_tools_username }}"
+      become: true
+
+    - name: CLI Tools | Copy fzf.bash to config directory
+      ansible.builtin.copy:
+        src: "/home/{{ cli_tools_username }}/.fzf.bash"
+        dest: "/home/{{ cli_tools_username }}/.config/fzf/fzf.bash"
+        remote_src: true
+        mode: "0644"
+        owner: "{{ cli_tools_username }}"
+        group: "{{ cli_tools_username }}"
+      become: true
+      when: not cli_tools_fzf_installed.stat.exists
+
     - name: CLI Tools | Add fzf to bashrc.d
       ansible.builtin.copy:
         content: |
           # fzf configuration
-          [ -f ~/.fzf.bash ] && source ~/.fzf.bash
-        dest: "/home/{{ cli_tools_username }}/.bashrc.d/85_fzf.sh"
+          [ -f "$HOME/.config/fzf/fzf.bash" ] && source "$HOME/.config/fzf/fzf.bash"
+        dest: "/home/{{ cli_tools_username }}/.bashrc.d/31_fzf_bash_completion.sh"
         mode: "0644"
         owner: "{{ cli_tools_username }}"
         group: "{{ cli_tools_username }}"
+      become: true
+
+    - name: CLI Tools | Remove old fzf.sh if exists
+      ansible.builtin.file:
+        path: "/home/{{ cli_tools_username }}/.bashrc.d/85_fzf.sh"
+        state: absent
       become: true
 
 # =============================================================================
