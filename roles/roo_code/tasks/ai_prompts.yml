@@ -164,15 +164,59 @@
         path: "{{ roo_code_ai_prompts_dest }}/.roomodes"
       register: roo_code_roomodes_file
 
-    - name: AI Prompts | Create symlink for .roomodes (user-wide modes)
+    - name: AI Prompts | Set Roo-Code settings directory
+      ansible.builtin.set_fact:
+        roo_code_settings_dir: "{{ roo_code_user_home }}/.config/Code/User/globalStorage/rooveterinaryinc.roo-cline/settings"
+
+    - name: AI Prompts | Debug .roomodes check
+      ansible.builtin.debug:
+        msg: |
+          Checking .roomodes:
+          - Source path: {{ roo_code_ai_prompts_dest }}/.roomodes
+          - Exists: {{ roo_code_roomodes_file.stat.exists | default(false) }}
+          - Destination: {{ roo_code_settings_dir }}/custom_modes.yaml
+
+    - name: AI Prompts | Ensure Roo-Code settings directory exists
+      ansible.builtin.file:
+        path: "{{ roo_code_settings_dir }}"
+        state: directory
+        owner: "{{ roo_code_username }}"
+        mode: '0755'
+      become: true
+      become_user: "{{ roo_code_username }}"
+      when: roo_code_roomodes_file.stat.exists
+
+    - name: AI Prompts | Check existing custom_modes.yaml at destination
+      ansible.builtin.stat:
+        path: "{{ roo_code_settings_dir }}/custom_modes.yaml"
+      register: roo_code_existing_roomodes
+      when: roo_code_roomodes_file.stat.exists
+
+    - name: AI Prompts | Remove existing custom_modes.yaml if it's a regular file (not symlink)
+      ansible.builtin.file:
+        path: "{{ roo_code_settings_dir }}/custom_modes.yaml"
+        state: absent
+      become: true
+      become_user: "{{ roo_code_username }}"
+      when:
+        - roo_code_roomodes_file.stat.exists
+        - roo_code_existing_roomodes.stat.exists | default(false)
+        - not (roo_code_existing_roomodes.stat.islnk | default(false))
+
+    - name: AI Prompts | Create symlink for .roomodes (Roo-Code custom modes)
       ansible.builtin.file:
         src: "{{ roo_code_ai_prompts_dest }}/.roomodes"
-        dest: "{{ roo_code_user_home }}/.roomodes"
+        dest: "{{ roo_code_settings_dir }}/custom_modes.yaml"
         state: link
         force: true
       become: true
       become_user: "{{ roo_code_username }}"
       when: roo_code_roomodes_file.stat.exists
+
+    - name: AI Prompts | Warn if .roomodes not found in repository
+      ansible.builtin.debug:
+        msg: "WARNING: .roomodes file not found in repository at {{ roo_code_ai_prompts_dest }}/.roomodes - symlink not created"
+      when: not (roo_code_roomodes_file.stat.exists | default(false))
 
     - name: AI Prompts | Find all rules directories in repository
       ansible.builtin.find:
@@ -293,7 +337,7 @@
 
       SYMLINKS CREATED:
       - {{ roo_code_roo_home }}/custom_modes.yaml -> repository
-      - {{ roo_code_user_home }}/.roomodes -> repository (user-wide modes)
+      - {{ roo_code_settings_dir | default(roo_code_user_home + '/.config/Code/User/globalStorage/rooveterinaryinc.roo-cline/settings') }}/custom_modes.yaml -> repository (.roomodes)
       - {{ roo_code_roo_home }}/rules* -> repository
       - {{ roo_code_roo_home }}/skills -> repository (if exists)
       - {{ roo_code_roo_home }}/commands -> repository (if exists)
