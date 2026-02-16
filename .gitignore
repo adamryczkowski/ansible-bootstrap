@@ -40,11 +40,16 @@ vault.yml
 tmp/
 temp/
 
+# Backups
+backups/
+
+# Binary documents
+*.pdf
+
 # Work logs with sensitive info
 remote-work-log.md
 
 # Reference source code clones (for research)
 ref/
-ref/
-ref/
+
 roles/globalprotect/files/*.tgz

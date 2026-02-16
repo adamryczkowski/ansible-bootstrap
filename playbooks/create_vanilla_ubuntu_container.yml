@@ -1,0 +1,358 @@
+---
+# Create and configure vanilla-ubuntu LXC container
+#
+# This playbook:
+# 1. Creates an unprivileged LXC container on the LXD host
+# 2. Configures the container with prepare_ubuntu roles
+#
+# Usage:
+#   ansible-playbook playbooks/create_vanilla_ubuntu_container.yml \
+#     -i inventory/vanilla-ubuntu/hosts.yml
+#
+# Prerequisites:
+#   - LXD installed and initialized on the target host
+#   - SSH access to the LXD host as user 'adam'
+#   - community.general collection installed
+
+# =============================================================================
+# Play 1: Create LXC container on LXD host
+# =============================================================================
+- name: Create vanilla-ubuntu LXC container
+  hosts: lxd_hosts
+  become: true
+  gather_facts: true
+
+  vars:
+    container_name: vanilla-ubuntu
+    container_image: "24.04"
+
+  tasks:
+    - name: Display container creation info
+      ansible.builtin.debug:
+        msg: |
+          Creating LXC container:
+          - Name: {{ container_name }}
+          - Image: Ubuntu {{ container_image }}
+          - Host: {{ inventory_hostname }} ({{ ansible_host }})
+
+    - name: Check if container already exists
+      ansible.builtin.command: "lxc info {{ container_name }}"
+      register: container_check
+      failed_when: false
+      changed_when: false
+
+    - name: Create LXC container
+      community.general.lxd_container:
+        name: "{{ container_name }}"
+        state: started
+        source:
+          type: image
+          mode: pull
+          server: https://cloud-images.ubuntu.com/releases/
+          protocol: simplestreams
+          alias: "{{ container_image }}"
+        profiles:
+          - default
+        config:
+          # Enable nesting for potential nested containers
+          security.nesting: "true"
+        wait_for_ipv4_addresses: true
+        timeout: 600
+      register: lxd_container_result
+      when: container_check.rc != 0
+
+    - name: Wait for container to be fully ready
+      ansible.builtin.pause:
+        seconds: 10
+      when: container_check.rc != 0
+
+    - name: Install Python3 in container (required for Ansible)
+      ansible.builtin.command: "lxc exec {{ container_name }} -- apt-get update"
+      changed_when: true
+      when: container_check.rc != 0
+
+    - name: Install Python3 package
+      ansible.builtin.command: "lxc exec {{ container_name }} -- apt-get install -y python3"
+      changed_when: true
+      when: container_check.rc != 0
+
+    - name: Get container IP address
+      ansible.builtin.command: "lxc list {{ container_name }} --format json"
+      register: container_info
+      changed_when: false
+
+    - name: Display container status
+      ansible.builtin.debug:
+        msg: |
+          Container {{ container_name }} is ready!
+          Status: {{ (container_info.stdout | from_json)[0].status }}
+          IPv4: {{ (container_info.stdout | from_json)[0].state.network.eth0.addresses | selectattr('family', 'equalto', 'inet') | map(attribute='address') | first | default('No IP yet') }}
+
+    - name: Set container IP fact for later use
+      ansible.builtin.set_fact:
+        container_ip: "{{ (container_info.stdout | from_json)[0].state.network.eth0.addresses | selectattr('family', 'equalto', 'inet') | map(attribute='address') | first }}"
+
+    - name: Add container to in-memory inventory
+      ansible.builtin.add_host:
+        name: "{{ container_name }}"
+        groups: lxd_containers_dynamic
+        ansible_host: "{{ container_name }}"
+        ansible_connection: community.general.lxd
+        ansible_lxd_remote: local
+        ansible_python_interpreter: /usr/bin/python3
+        ansible_user: root
+        target_user: adam
+        cli_tools_profile: minimal
+        # Delegate through the LXD host
+        ansible_lxd_host: "{{ inventory_hostname }}"
+
+# =============================================================================
+# Play 2: Configure container with prepare_ubuntu roles
+# Runs on LXD host, delegates commands to container via lxc exec
+# =============================================================================
+- name: Configure vanilla-ubuntu container
+  hosts: lxd_hosts
+  become: true
+  gather_facts: false
+
+  vars:
+    container_name: vanilla-ubuntu
+    target_user: adam
+    cli_tools_profile: minimal
+
+  tasks:
+    - name: Gather facts from container
+      ansible.builtin.command: "lxc exec {{ container_name }} -- cat /etc/os-release"
+      register: container_os_release
+      changed_when: false
+
+    - name: Display container OS info
+      ansible.builtin.debug:
+        msg: |
+          Configuring container with prepare_ubuntu:
+          - Container: {{ container_name }}
+          - Target user: {{ target_user }}
+          - CLI profile: {{ cli_tools_profile }}
+
+    # =========================================================================
+    # Common role tasks (inline for container execution)
+    # =========================================================================
+    - name: Update apt cache in container
+      ansible.builtin.command: "lxc exec {{ container_name }} -- apt-get update"
+      changed_when: true
+
+    - name: Install essential packages in container
+      ansible.builtin.command: >
+        lxc exec {{ container_name }} -- apt-get install -y
+        locales
+        tzdata
+        sudo
+        curl
+        wget
+        git
+        vim
+        htop
+        tmux
+        tree
+        jq
+        unzip
+        zip
+        build-essential
+        ca-certificates
+        gnupg
+        lsb-release
+      changed_when: true
+
+    - name: Generate locale in container
+      ansible.builtin.command: "lxc exec {{ container_name }} -- locale-gen en_US.UTF-8"
+      changed_when: true
+
+    - name: Set timezone in container
+      ansible.builtin.command: "lxc exec {{ container_name }} -- timedatectl set-timezone Europe/Warsaw"
+      changed_when: true
+      failed_when: false
+
+    # =========================================================================
+    # User setup tasks
+    # =========================================================================
+    - name: Check if user exists in container
+      ansible.builtin.command: "lxc exec {{ container_name }} -- id {{ target_user }}"
+      register: user_check
+      failed_when: false
+      changed_when: false
+
+    - name: Create user in container
+      ansible.builtin.command: >
+        lxc exec {{ container_name }} -- useradd -m -s /bin/bash -G sudo {{ target_user }}
+      when: user_check.rc != 0
+      changed_when: true
+
+    - name: Set passwordless sudo for user
+      ansible.builtin.shell: |
+        echo '{{ target_user }} ALL=(ALL) NOPASSWD:ALL' | lxc exec {{ container_name }} -- tee /etc/sudoers.d/{{ target_user }}
+      changed_when: true
+
+    - name: Create .ssh directory for user
+      ansible.builtin.command: "lxc exec {{ container_name }} -- mkdir -p /home/{{ target_user }}/.ssh"
+      changed_when: true
+
+    - name: Set .ssh directory permissions
+      ansible.builtin.command: "lxc exec {{ container_name }} -- chmod 700 /home/{{ target_user }}/.ssh"
+      changed_when: true
+
+    - name: Set .ssh directory ownership
+      ansible.builtin.command: "lxc exec {{ container_name }} -- chown -R {{ target_user }}:{{ target_user }} /home/{{ target_user }}/.ssh"
+      changed_when: true
+
+    # =========================================================================
+    # SSH Key Generation and Authorization
+    # =========================================================================
+    - name: Generate SSH keypair for user in container
+      ansible.builtin.shell: |
+        lxc exec {{ container_name }} -- bash -c '
+          if [ ! -f /home/{{ target_user }}/.ssh/id_ed25519 ]; then
+            ssh-keygen -t ed25519 -f /home/{{ target_user }}/.ssh/id_ed25519 -N "" -C "{{ target_user }}@{{ container_name }}"
+            chown {{ target_user }}:{{ target_user }} /home/{{ target_user }}/.ssh/id_ed25519*
+            chmod 600 /home/{{ target_user }}/.ssh/id_ed25519
+            chmod 644 /home/{{ target_user }}/.ssh/id_ed25519.pub
+          fi
+        '
+      changed_when: true
+
+    - name: Find operator SSH public key files
+      ansible.builtin.find:
+        paths: "{{ playbook_dir }}/../roles/user_setup/files/ssh_keys"
+        patterns: "*.pub"
+      register: ssh_key_files
+      delegate_to: localhost
+      become: false
+
+    - name: Read operator SSH public keys
+      ansible.builtin.set_fact:
+        operator_ssh_keys: "{{ operator_ssh_keys | default([]) + [lookup('file', item.path)] }}"
+      loop: "{{ ssh_key_files.files }}"
+      delegate_to: localhost
+      become: false
+      when: ssh_key_files.files | length > 0
+
+    - name: Add operator SSH keys to authorized_keys
+      ansible.builtin.shell: |
+        echo '{{ item }}' | lxc exec {{ container_name }} -- tee -a /home/{{ target_user }}/.ssh/authorized_keys
+      loop: "{{ operator_ssh_keys | default([]) }}"
+      changed_when: true
+      when: operator_ssh_keys is defined and operator_ssh_keys | length > 0
+
+    - name: Get LXD host SSH public key
+      ansible.builtin.slurp:
+        src: "/home/{{ ansible_user }}/.ssh/id_ed25519.pub"
+      register: lxd_host_ssh_key
+      failed_when: false
+
+    - name: Add LXD host SSH key to container authorized_keys
+      ansible.builtin.shell: |
+        echo '{{ lxd_host_ssh_key.content | b64decode | trim }}' | lxc exec {{ container_name }} -- tee -a /home/{{ target_user }}/.ssh/authorized_keys
+      changed_when: true
+      when: lxd_host_ssh_key.content is defined
+
+    - name: Set authorized_keys permissions
+      ansible.builtin.command: "lxc exec {{ container_name }} -- chmod 600 /home/{{ target_user }}/.ssh/authorized_keys"
+      changed_when: true
+      failed_when: false
+
+    - name: Set authorized_keys ownership
+      ansible.builtin.command: "lxc exec {{ container_name }} -- chown {{ target_user }}:{{ target_user }} /home/{{ target_user }}/.ssh/authorized_keys"
+      changed_when: true
+      failed_when: false
+
+    - name: Install OpenSSH server in container
+      ansible.builtin.command: "lxc exec {{ container_name }} -- apt-get install -y openssh-server"
+      changed_when: true
+
+    - name: Enable and start SSH service in container
+      ansible.builtin.shell: |
+        lxc exec {{ container_name }} -- systemctl enable ssh
+        lxc exec {{ container_name }} -- systemctl start ssh
+      changed_when: true
+
+    # =========================================================================
+    # Bashrc.d setup
+    # =========================================================================
+    - name: Create bashrc.d directory for user
+      ansible.builtin.command: "lxc exec {{ container_name }} -- mkdir -p /home/{{ target_user }}/.bashrc.d"
+      changed_when: true
+
+    - name: Set bashrc.d ownership
+      ansible.builtin.command: "lxc exec {{ container_name }} -- chown -R {{ target_user }}:{{ target_user }} /home/{{ target_user }}/.bashrc.d"
+      changed_when: true
+
+    - name: Add bashrc.d sourcing to .bashrc
+      ansible.builtin.shell: |
+        lxc exec {{ container_name }} -- bash -c 'grep -q "bashrc.d" /home/{{ target_user }}/.bashrc || echo "
+        # Source all files in ~/.bashrc.d
+        if [ -d ~/.bashrc.d ]; then
+          for f in ~/.bashrc.d/*.sh; do
+            [ -r \"\$f\" ] && . \"\$f\"
+          done
+        fi
+        " >> /home/{{ target_user }}/.bashrc'
+      changed_when: true
+
+    # =========================================================================
+    # CLI tools (minimal profile)
+    # =========================================================================
+    - name: Install mise (polyglot runtime manager)
+      ansible.builtin.shell: |
+        lxc exec {{ container_name }} -- bash -c 'curl -fsSL https://mise.run | sudo -u {{ target_user }} bash'
+      changed_when: true
+      failed_when: false
+
+    - name: Install fzf
+      ansible.builtin.command: "lxc exec {{ container_name }} -- apt-get install -y fzf"
+      changed_when: true
+      failed_when: false
+
+    # =========================================================================
+    # Completion
+    # =========================================================================
+    - name: Get final container info
+      ansible.builtin.command: "lxc list {{ container_name }} --format json"
+      register: final_container_info
+      changed_when: false
+
+    - name: Display completion message
+      vars:
+        container_ipv4: "{{ (final_container_info.stdout | from_json)[0].state.network.eth0.addresses | selectattr('family', 'equalto', 'inet') | map(attribute='address') | first | default('No IP yet') }}"
+      ansible.builtin.debug:
+        msg: |
+          ============================================================
+          Container configuration complete!
+          ============================================================
+          - Container: {{ container_name }}
+          - Status: {{ (final_container_info.stdout | from_json)[0].status }}
+          - IPv4: {{ container_ipv4 }}
+          - User: {{ target_user }}
+          - CLI profile: {{ cli_tools_profile }}
+
+          Minimal profile includes:
+          - Basic CLI tools: htop, tmux, jq, git, vim, etc.
+          - mise (polyglot runtime manager)
+          - fzf (fuzzy finder)
+          - bashrc.d for modular shell configuration
+          - SSH server with authorized keys
+
+          SSH Access Methods:
+          -------------------
+          1. Via LXD host (recommended):
+              ssh {{ ansible_user }}@{{ ansible_host }}
+              ssh {{ target_user }}@{{ container_ipv4 }}
+
+          2. Direct LXC exec:
+              ssh {{ ansible_user }}@{{ ansible_host }}
+              lxc exec {{ container_name }} -- su - {{ target_user }}
+
+          3. SSH ProxyJump (from local machine):
+              ssh -J {{ ansible_user }}@{{ ansible_host }} {{ target_user }}@{{ container_ipv4 }}
+
+          Authorized SSH keys:
+          - All operator keys from roles/user_setup/files/ssh_keys/
+          - LXD host's SSH key ({{ ansible_user }}@{{ ansible_host }})
