@@ -1,0 +1,117 @@
+{% set ns = namespace(servers=[]) %}
+{% if claude_code_mcp_servers.mcp_pdb.enabled %}
+{% set _ = ns.servers.append('mcp-pdb') %}
+{% endif %}
+{% if claude_code_mcp_servers.remove_background.enabled %}
+{% set _ = ns.servers.append('remove-background') %}
+{% endif %}
+{% if claude_code_mcp_servers.svg_mcp.enabled %}
+{% set _ = ns.servers.append('svg-mcp') %}
+{% endif %}
+{% if claude_code_mcp_servers.imagen.enabled %}
+{% set _ = ns.servers.append('imagen') %}
+{% endif %}
+{% if claude_code_mcp_servers.ssh_server.enabled %}
+{% set _ = ns.servers.append('ssh-server') %}
+{% endif %}
+{% if claude_code_mcp_servers.chrome_devtools_mcp.enabled %}
+{% set _ = ns.servers.append('chrome-devtools-mcp') %}
+{% endif %}
+{% if claude_code_mcp_servers.browsermcp.enabled %}
+{% set _ = ns.servers.append('browsermcp') %}
+{% endif %}
+{% if claude_code_mcp_servers.pdf_reader_mcp.enabled %}
+{% set _ = ns.servers.append('pdf-reader-mcp') %}
+{% endif %}
+{% if claude_code_mcp_servers.github.enabled %}
+{% set _ = ns.servers.append('github') %}
+{% endif %}
+{% if claude_code_mcp_servers.hn.enabled %}
+{% set _ = ns.servers.append('hn') %}
+{% endif %}
+{% if claude_code_mcp_servers.paper_search.enabled %}
+{% set _ = ns.servers.append('paper-search') %}
+{% endif %}
+{% if claude_code_mcp_servers.claude_hierarchy.enabled %}
+{% set _ = ns.servers.append('claude-hierarchy') %}
+{% endif %}
+{
+  "permissions": {
+    "allow": {{ claude_code_mcp_permissions | to_nice_json(indent=6) }},
+    "deny": {{ claude_code_deny_permissions | to_nice_json(indent=6) }}
+  },
+  "mcpServers": {
+{% if 'mcp-pdb' in ns.servers %}
+    "mcp-pdb": {
+      "command": "{{ claude_code_user_home }}/.local/bin/uv",
+      "args": ["run", "--python", "3.13", "--with", "mcp-pdb", "mcp-pdb"]
+    }{{ ',' if ns.servers | reject('equalto', 'mcp-pdb') | list | length > 0 else '' }}
+{% endif %}
+{% if 'remove-background' in ns.servers %}
+    "remove-background": {
+      "url": "http://127.0.0.1:{{ claude_code_mcp_servers.remove_background.port }}/mcp"
+    }{{ ',' if ns.servers[ns.servers.index('remove-background')+1:] | length > 0 else '' }}
+{% endif %}
+{% if 'svg-mcp' in ns.servers %}
+    "svg-mcp": {
+      "url": "http://127.0.0.1:{{ claude_code_mcp_servers.svg_mcp.port }}/mcp"
+    }{{ ',' if ns.servers[ns.servers.index('svg-mcp')+1:] | length > 0 else '' }}
+{% endif %}
+{% if 'imagen' in ns.servers %}
+    "imagen": {
+      "url": "http://127.0.0.1:{{ claude_code_mcp_servers.imagen.port }}/mcp"
+    }{{ ',' if ns.servers[ns.servers.index('imagen')+1:] | length > 0 else '' }}
+{% endif %}
+{% if 'ssh-server' in ns.servers %}
+    "ssh-server": {
+      "command": "node",
+      "args": ["{{ claude_code_mcp_dir }}/mcp-ssh-server/dist/index.js"]
+    }{{ ',' if ns.servers[ns.servers.index('ssh-server')+1:] | length > 0 else '' }}
+{% endif %}
+{% if 'chrome-devtools-mcp' in ns.servers %}
+    "chrome-devtools-mcp": {
+      "command": "{{ claude_code_node_bin }}/chrome-devtools-mcp",
+      "args": []
+    }{{ ',' if ns.servers[ns.servers.index('chrome-devtools-mcp')+1:] | length > 0 else '' }}
+{% endif %}
+{% if 'browsermcp' in ns.servers %}
+    "browsermcp": {
+      "command": "{{ claude_code_node_bin }}/npx",
+      "args": ["{{ claude_code_mcp_servers.browsermcp.package_name }}"]
+    }{{ ',' if ns.servers[ns.servers.index('browsermcp')+1:] | length > 0 else '' }}
+{% endif %}
+{% if 'pdf-reader-mcp' in ns.servers %}
+    "pdf-reader-mcp": {
+      "command": "{{ claude_code_node_bin }}/pdf-reader-mcp",
+      "args": []
+    }{{ ',' if ns.servers[ns.servers.index('pdf-reader-mcp')+1:] | length > 0 else '' }}
+{% endif %}
+{% if 'github' in ns.servers %}
+    "github": {
+      "type": "http",
+      "url": "{{ claude_code_mcp_servers.github.url }}",
+      "headers": {
+        "Authorization": "Bearer ${GITHUB_PERSONAL_ACCESS_TOKEN}"
+      }
+    }{{ ',' if ns.servers[ns.servers.index('github')+1:] | length > 0 else '' }}
+{% endif %}
+{% if 'hn' in ns.servers %}
+    "hn": {
+      "command": "{{ claude_code_user_home }}/.local/bin/uv",
+      "args": ["run", "--python", "3.13", "--with", "mcp-hn", "mcp-hn"]
+    }{{ ',' if ns.servers[ns.servers.index('hn')+1:] | length > 0 else '' }}
+{% endif %}
+{% if 'paper-search' in ns.servers %}
+    "paper-search": {
+      "command": "{{ claude_code_user_home }}/.local/bin/uv",
+      "args": ["run", "--python", "3.13", "--with", "paper-search-mcp", "paper-search-mcp"]
+    }{{ ',' if ns.servers[ns.servers.index('paper-search')+1:] | length > 0 else '' }}
+{% endif %}
+{% if 'claude-hierarchy' in ns.servers %}
+    "claude-hierarchy": {
+      "command": "claude-hierarchy",
+      "args": []
+    }
+{% endif %}
+  }
+}

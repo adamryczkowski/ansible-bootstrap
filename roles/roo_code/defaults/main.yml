@@ -93,19 +93,11 @@ roo_code_http_ports:
 roo_code_deploy_custom_settings: true
 
 # AI Prompts repository configuration
-# This repository contains Roo-Code custom modes and AI prompts
+# Cloning is handled by the claude_code role; this role only creates Roo-Code symlinks
 roo_code_ai_prompts:
   enabled: true
-  # Remote source to clone from (SSH format: user@host:path)
-  source_remote: "adam@192.168.42.207:/home/adam/tmp/AI"
-  # GitHub remote to set as 'origin' for pushing changes
-  github_remote: "git@github.com:adamryczkowski/AI-prompts.git"
-  # Local destination directory on the target host
+  # Local destination directory on the target host (must match claude_code_ai_prompts.dest_dir)
   dest_dir: "~/.local/share/AI_prompts"
-  # Whether to add the target host to git-sync-hosts.txt
-  register_for_sync: true
-  # Whether to run synchronization after cloning (only runs on initial clone)
-  run_sync: true
   # Whether to deploy global prompts via symlinks to ~/.roo/
   # This creates symlinks so changes are immediately visible after git-sync
   deploy_global: true

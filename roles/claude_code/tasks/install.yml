@@ -1,0 +1,30 @@
+---
+# Install Claude Code CLI
+
+- name: Claude Code | Check if claude is already installed
+  ansible.builtin.stat:
+    path: "{{ claude_code_user_home }}/.local/bin/claude"
+  register: claude_code_binary
+
+- name: Claude Code | Install Claude Code via npm
+  ansible.builtin.shell: |
+    export PATH="{{ claude_code_user_home }}/.local/bin:{{ claude_code_user_home }}/.local/share/mise/shims:$PATH"
+    npm install -g @anthropic-ai/claude-code
+  become: true
+  become_user: "{{ claude_code_username }}"
+  when: not claude_code_binary.stat.exists
+  register: claude_code_npm_install
+  changed_when: "'added' in claude_code_npm_install.stdout | default('')"
+
+- name: Claude Code | Verify claude is available
+  ansible.builtin.shell: |
+    export PATH="{{ claude_code_user_home }}/.local/bin:{{ claude_code_user_home }}/.local/share/mise/shims:$PATH"
+    claude --version
+  become: true
+  become_user: "{{ claude_code_username }}"
+  register: claude_code_version
+  changed_when: false
+
+- name: Claude Code | Display installed version
+  ansible.builtin.debug:
+    msg: "Claude Code version: {{ claude_code_version.stdout }}"

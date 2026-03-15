@@ -1,0 +1,21 @@
+---
+# Destroy LXD container for Claude Code test
+
+- name: Destroy LXD container
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+    - name: Destroy LXD container
+      community.general.lxd_container:
+        name: claude-code-test
+        state: absent
+        force_stop: true
+      ignore_errors: true
+
+    - name: Remove instance config file
+      ansible.builtin.file:
+        path: "{{ molecule_instance_config }}"
+        state: absent
+      ignore_errors: true

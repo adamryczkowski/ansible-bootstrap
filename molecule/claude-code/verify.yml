@@ -1,0 +1,168 @@
+---
+# Verify Claude Code installation
+
+- name: Verify Claude Code
+  hosts: all
+  become: true
+  become_user: testuser
+  gather_facts: false
+
+  vars:
+    user_home: /home/testuser
+
+  tasks:
+    - name: Verify claude CLI is installed
+      ansible.builtin.command:
+        cmd: claude --version
+      environment:
+        PATH: "{{ user_home }}/.local/bin:{{ user_home }}/.local/share/mise/shims:/usr/bin:/bin"
+      register: claude_version
+      changed_when: false
+
+    - name: Assert claude version
+      ansible.builtin.assert:
+        that: "'Claude Code' in claude_version.stdout"
+        fail_msg: "Claude Code not installed correctly"
+
+    - name: Verify agents symlink
+      ansible.builtin.stat:
+        path: "{{ user_home }}/.claude/agents"
+      register: agents_link
+
+    - name: Assert agents is a symlink
+      ansible.builtin.assert:
+        that:
+          - agents_link.stat.exists
+          - agents_link.stat.islnk
+        fail_msg: "Agents directory is not symlinked"
+
+    - name: Verify commands symlink
+      ansible.builtin.stat:
+        path: "{{ user_home }}/.claude/commands"
+      register: commands_link
+
+    - name: Assert commands is a symlink
+      ansible.builtin.assert:
+        that:
+          - commands_link.stat.exists
+          - commands_link.stat.islnk
+        fail_msg: "Commands directory is not symlinked"
+
+    - name: Verify skills symlink
+      ansible.builtin.stat:
+        path: "{{ user_home }}/.claude/skills"
+      register: skills_link
+
+    - name: Assert skills is a symlink
+      ansible.builtin.assert:
+        that:
+          - skills_link.stat.exists
+          - skills_link.stat.islnk
+        fail_msg: "Skills directory is not symlinked"
+
+    - name: Verify settings.json exists and is a symlink
+      ansible.builtin.stat:
+        path: "{{ user_home }}/.claude/settings.json"
+      register: settings_link
+
+    - name: Assert settings.json is a symlink
+      ansible.builtin.assert:
+        that:
+          - settings_link.stat.exists
+          - settings_link.stat.islnk
+        fail_msg: "settings.json is not symlinked"
+
+    - name: Read settings.json content
+      ansible.builtin.slurp:
+        src: "{{ user_home }}/.claude/settings.json"
+      register: settings_content
+
+    - name: Parse settings.json
+      ansible.builtin.set_fact:
+        settings: "{{ settings_content.content | b64decode | from_json }}"
+
+    - name: Assert MCP servers are configured
+      ansible.builtin.assert:
+        that:
+          - "'mcp-pdb' in settings.mcpServers"
+          - "'ssh-server' in settings.mcpServers"
+          - "'chrome-devtools-mcp' in settings.mcpServers"
+          - "'browsermcp' in settings.mcpServers"
+          - "'pdf-reader-mcp' in settings.mcpServers"
+          - "'github' in settings.mcpServers"
+          - "'hn' in settings.mcpServers"
+          - "'paper-search' in settings.mcpServers"
+          - "'claude-hierarchy' in settings.mcpServers"
+        fail_msg: "Not all MCP servers are configured in settings.json"
+
+    - name: Assert permissions are configured
+      ansible.builtin.assert:
+        that:
+          - "'mcp__github__*' in settings.permissions.allow"
+          - "'mcp__hn__*' in settings.permissions.allow"
+          - "'mcp__paper-search__*' in settings.permissions.allow"
+        fail_msg: "MCP permissions not configured correctly"
+
+    - name: Verify mcp-ssh-server is built
+      ansible.builtin.stat:
+        path: "{{ user_home }}/.local/share/my-mcp/mcp-ssh-server/dist/index.js"
+      register: ssh_server_built
+
+    - name: Assert mcp-ssh-server is built
+      ansible.builtin.assert:
+        that: ssh_server_built.stat.exists
+        fail_msg: "mcp-ssh-server not built"
+
+    - name: Verify chrome-devtools-mcp is installed
+      ansible.builtin.command:
+        cmd: chrome-devtools-mcp --version
+      environment:
+        PATH: "{{ user_home }}/.local/share/mise/shims:/usr/bin:/bin"
+      changed_when: false
+      failed_when: false
+      register: chrome_devtools_check
+
+    - name: Verify pdf-reader-mcp is installed
+      ansible.builtin.command:
+        cmd: pdf-reader-mcp --version
+      environment:
+        PATH: "{{ user_home }}/.local/share/mise/shims:/usr/bin:/bin"
+      changed_when: false
+      failed_when: false
+      register: pdf_reader_check
+
+    - name: Verify claude mcp list finds registered servers
+      ansible.builtin.command:
+        cmd: claude mcp list
+      environment:
+        PATH: "{{ user_home }}/.local/bin:{{ user_home }}/.local/share/mise/shims:/usr/bin:/bin"
+      register: mcp_list_output
+      changed_when: false
+      failed_when: false
+
+    - name: Assert MCP servers appear in claude mcp list
+      ansible.builtin.assert:
+        that:
+          - "'mcp-pdb' in mcp_list_output.stdout"
+          - "'ssh-server' in mcp_list_output.stdout"
+          - "'chrome-devtools-mcp' in mcp_list_output.stdout"
+          - "'browsermcp' in mcp_list_output.stdout"
+          - "'pdf-reader-mcp' in mcp_list_output.stdout"
+          - "'github' in mcp_list_output.stdout"
+          - "'hn' in mcp_list_output.stdout"
+          - "'paper-search' in mcp_list_output.stdout"
+          - "'claude-hierarchy' in mcp_list_output.stdout"
+        fail_msg: "Not all MCP servers found by claude mcp list: {{ mcp_list_output.stdout }}"
+
+    - name: Display verification results
+      ansible.builtin.debug:
+        msg: |
+          Claude Code verification complete:
+          - CLI: {{ claude_version.stdout }}
+          - agents symlink: OK
+          - commands symlink: OK
+          - skills symlink: OK
+          - settings.json symlink: OK
+          - MCP servers in config: {{ settings.mcpServers.keys() | list | join(', ') }}
+          - MCP servers in claude mcp list: OK
+          - ssh-server built: OK

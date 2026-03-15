@@ -1,0 +1,115 @@
+---
+# Molecule LXD test for Claude Code role
+
+dependency:
+  name: galaxy
+  options:
+    requirements-file: requirements.yml
+
+driver:
+  name: default
+
+platforms:
+  - name: claude-code-test
+    groups:
+      - lxd_test
+
+provisioner:
+  name: ansible
+  env:
+    ANSIBLE_ROLES_PATH: ${MOLECULE_PROJECT_DIRECTORY}/roles
+    ANSIBLE_COLLECTIONS_PATH: ${MOLECULE_PROJECT_DIRECTORY}/collections
+  config_options:
+    defaults:
+      interpreter_python: auto_silent
+      callbacks_enabled: profile_tasks
+    connection:
+      pipelining: true
+  connection_options:
+    ansible_connection: community.general.lxd
+  inventory:
+    host_vars:
+      claude-code-test:
+        target_user: testuser
+        ansible_user: root
+        claude_code_username: testuser
+        # Disable MCP servers that need private git repos
+        claude_code_mcp_servers:
+          browsermcp:
+            enabled: true
+            install_method: npx
+            package_name: "@browsermcp/mcp@latest"
+          chrome_devtools_mcp:
+            enabled: true
+            install_method: npm_global
+            package_name: chrome-devtools-mcp
+          github:
+            enabled: true
+            type: http
+            url: "https://api.githubcopilot.com/mcp/"
+            token_env_var: GITHUB_PERSONAL_ACCESS_TOKEN
+          hn:
+            enabled: true
+            install_method: uv
+            package_name: mcp-hn
+          imagen:
+            enabled: false
+            type: http
+            port: 8082
+            git_repo: "https://github.com/adamryczkowski/Imagen-MCP.git"
+            install_method: poetry
+            systemd_service: true
+          mcp_pdb:
+            enabled: true
+            install_method: uv
+            package_name: mcp-pdb
+          paper_search:
+            enabled: true
+            install_method: uv
+            package_name: paper-search-mcp
+          pdf_reader_mcp:
+            enabled: true
+            install_method: npm_global
+            package_name: "@sylphx/pdf-reader-mcp"
+          remove_background:
+            enabled: false
+            type: http
+            port: 8083
+            git_repo: "https://github.com/adamryczkowski/MCP-remove-background.git"
+            install_method: poetry
+            systemd_service: true
+          ssh_server:
+            enabled: true
+            git_repo: "https://github.com/mahathirmuh/mcp-ssh-server.git"
+            install_method: npm
+          svg_mcp:
+            enabled: false
+            type: http
+            port: 8081
+            git_repo: "https://github.com/adamryczkowski/SVG-MCP.git"
+            install_method: poetry
+            systemd_service: true
+  playbooks:
+    create: create.yml
+    destroy: destroy.yml
+    converge: converge.yml
+    prepare: prepare.yml
+    verify: verify.yml
+
+verifier:
+  name: ansible
+
+scenario:
+  name: claude-code
+  test_sequence:
+    - dependency
+    - cleanup
+    - destroy
+    - syntax
+    - create
+    - prepare
+    - converge
+    - idempotence
+    - verify
+    - cleanup
+    - destroy

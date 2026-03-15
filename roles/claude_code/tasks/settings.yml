@@ -1,0 +1,48 @@
+---
+# Deploy Claude Code settings with MCP server configuration
+#
+# If settings.json is a symlink (to AI_prompts), we update the symlink target.
+# If it's a regular file or doesn't exist, we deploy the template directly.
+
+- name: Claude Code | Get mise node path
+  ansible.builtin.shell: |
+    export PATH="{{ claude_code_user_home }}/.local/share/mise/shims:$PATH"
+    dirname $(which node)
+  become: true
+  become_user: "{{ claude_code_username }}"
+  register: claude_code_mise_node_bin
+  changed_when: false
+
+- name: Claude Code | Set node bin path
+  ansible.builtin.set_fact:
+    claude_code_node_bin: "{{ claude_code_mise_node_bin.stdout | trim }}"
+
+- name: Claude Code | Resolve settings.json path
+  ansible.builtin.stat:
+    path: "{{ claude_code_user_home }}/.claude/settings.json"
+  register: claude_code_settings_stat
+
+- name: Claude Code | Determine settings.json target path
+  ansible.builtin.set_fact:
+    claude_code_settings_path: >-
+      {{ claude_code_settings_stat.stat.lnk_source
+      if (claude_code_settings_stat.stat.exists | default(false)) and (claude_code_settings_stat.stat.islnk | default(false))
+      else claude_code_user_home + '/.claude/settings.json' }}
+
+- name: Claude Code | Ensure settings directory exists
+  ansible.builtin.file:
+    path: "{{ claude_code_settings_path | trim | dirname }}"
+    state: directory
+    owner: "{{ claude_code_username }}"
+    mode: '0755'
+  become: true
+  become_user: "{{ claude_code_username }}"
+
+- name: Claude Code | Deploy settings.json
+  ansible.builtin.template:
+    src: settings.json.j2
+    dest: "{{ claude_code_settings_path | trim }}"
+    owner: "{{ claude_code_username }}"
+    mode: '0644'
+  become: true
+  become_user: "{{ claude_code_username }}"

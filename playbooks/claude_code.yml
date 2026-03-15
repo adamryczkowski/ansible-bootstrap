@@ -1,0 +1,54 @@
+---
+# Claude Code playbook - Install and configure Claude Code with MCP servers
+#
+# Usage:
+#   ansible-playbook playbooks/claude_code.yml -i inventory/staging/hosts.yml
+#   ansible-playbook playbooks/claude_code.yml --connection=local -i localhost,
+#
+# Prerequisites:
+#   - AI Prompts repository must be cloned (run roo_code role with ai_prompts first)
+#   - GITHUB_PERSONAL_ACCESS_TOKEN must be set for GitHub MCP
+
+- name: Configure Claude Code
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    target_user: "{{ ansible_user | default('adam') }}"
+
+  roles:
+    - role: claude_code
+      vars:
+        claude_code_username: "{{ target_user }}"
+      tags: [claude_code, ai]
+
+  post_tasks:
+    - name: Display completion message
+      ansible.builtin.debug:
+        msg: |
+          ============================================================
+          Claude Code configuration complete for {{ target_user }}!
+
+          MCP Servers configured:
+            - browsermcp (npx, on-demand)
+            - chrome-devtools-mcp (npm global)
+            - github (HTTP, requires GITHUB_PERSONAL_ACCESS_TOKEN)
+            - hn (uv, on-demand)
+            - imagen (HTTP, systemd service on port 8082)
+            - mcp-pdb (uv, on-demand)
+            - paper-search (uv, on-demand)
+            - pdf-reader-mcp (npm global)
+            - remove-background (HTTP, systemd service on port 8083)
+            - ssh-server (node, stdio)
+            - svg-mcp (HTTP, systemd service on port 8081)
+
+          Agents connected from:
+            ~/.local/share/AI_prompts/.claude/agents/
+
+          To start Claude Code:
+            claude
+
+          To start HTTP MCP services:
+            systemctl --user start svg-mcp imagen-mcp mcp-remove-background
+          ============================================================

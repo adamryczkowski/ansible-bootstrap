@@ -1,0 +1,56 @@
+---
+# Converge - Apply Claude Code role
+
+- name: Converge - Claude Code configuration
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    target_user: testuser
+
+  pre_tasks:
+    - name: Display test configuration
+      ansible.builtin.debug:
+        msg: |
+          Claude Code Test Configuration:
+          - Target user: {{ target_user }}
+          - OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+  roles:
+    - role: common
+      tags: [common]
+
+    - role: packages
+      tags: [packages]
+
+    - role: user_setup
+      vars:
+        user_setup_username: "{{ target_user }}"
+      tags: [user]
+
+    - role: bashrc
+      vars:
+        bashrc_username: "{{ target_user }}"
+      tags: [bashrc]
+
+    - role: rust
+      vars:
+        rust_username: "{{ target_user }}"
+      tags: [rust]
+
+    - role: cli_tools
+      vars:
+        cli_tools_username: "{{ target_user }}"
+        cli_tools_profile: minimal
+      tags: [cli_tools]
+
+    - role: claude_code
+      vars:
+        claude_code_username: "{{ target_user }}"
+      tags: [claude_code]

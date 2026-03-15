@@ -1,0 +1,126 @@
+---
+# Claude Code role defaults
+
+# Target user for Claude Code configuration
+claude_code_username: "{{ ansible_user | default('adam') }}"
+
+# Base directory for MCP server installations (shared with roo_code)
+claude_code_mcp_base_dir: "~/.local/share/my-mcp"
+
+# Node.js version to use (installed via mise)
+claude_code_node_version: "22"
+
+# Python version to use (installed via mise)
+claude_code_python_version: "3.12"
+
+# Install claude-code via npm (set false if already installed via standalone installer)
+claude_code_install_cli: true
+
+# AI Prompts repository configuration
+# This repository contains Claude Code agents, commands, skills, and settings
+claude_code_ai_prompts:
+  enabled: true
+  # Remote source to clone from (SSH format: user@host:path)
+  source_remote: "adam@192.168.42.207:/home/adam/tmp/AI"
+  # GitHub remote to set as 'origin' for pushing changes
+  github_remote: "git@github.com:adamryczkowski/AI-prompts.git"
+  # Local destination directory on the target host
+  dest_dir: "~/.local/share/AI_prompts"
+  # Whether to add the target host to git-sync-hosts.txt
+  register_for_sync: true
+  # Whether to run synchronization after cloning (only runs on initial clone)
+  run_sync: true
+
+# MCP Servers configuration
+claude_code_mcp_servers:
+  browsermcp:
+    enabled: true
+    install_method: npx
+    package_name: "@browsermcp/mcp@latest"
+
+  chrome_devtools_mcp:
+    enabled: true
+    install_method: npm_global
+    package_name: chrome-devtools-mcp
+
+  github:
+    enabled: true
+    type: http
+    url: "https://api.githubcopilot.com/mcp/"
+    # Token read from environment; set GITHUB_PERSONAL_ACCESS_TOKEN before running
+    token_env_var: GITHUB_PERSONAL_ACCESS_TOKEN
+
+  hn:
+    enabled: true
+    install_method: uv
+    package_name: mcp-hn
+
+  imagen:
+    enabled: true
+    type: http
+    port: 8082
+    git_repo: "https://github.com/adamryczkowski/Imagen-MCP.git"
+    install_method: poetry
+    systemd_service: true
+
+  mcp_pdb:
+    enabled: true
+    install_method: uv
+    package_name: mcp-pdb
+
+  paper_search:
+    enabled: true
+    install_method: uv
+    package_name: paper-search-mcp
+
+  pdf_reader_mcp:
+    enabled: true
+    install_method: npm_global
+    package_name: "@sylphx/pdf-reader-mcp"
+
+  remove_background:
+    enabled: true
+    type: http
+    port: 8083
+    git_repo: "https://github.com/adamryczkowski/MCP-remove-background.git"
+    install_method: poetry
+    systemd_service: true
+
+  ssh_server:
+    enabled: true
+    git_repo: "https://github.com/mahathirmuh/mcp-ssh-server.git"
+    install_method: npm
+
+  svg_mcp:
+    enabled: true
+    type: http
+    port: 8081
+    git_repo: "https://github.com/adamryczkowski/SVG-MCP.git"
+    install_method: poetry
+    systemd_service: true
+
+  claude_hierarchy:
+    enabled: true
+    install_method: npm_global_tgz
+    tgz_source: "~/tmp/claude-hierarchy/claude-hierarchy-0.1.0.tgz"
+
+# Claude Code settings to merge into settings.json
+# Permissions for MCP tools
+claude_code_mcp_permissions:
+  - "mcp__mcp-pdb__*"
+  - "mcp__remove-background__*"
+  - "mcp__svg-mcp__*"
+  - "mcp__imagen__*"
+  - "mcp__ssh-server__*"
+  - "mcp__chrome-devtools-mcp__*"
+  - "mcp__browsermcp__*"
+  - "mcp__pdf-reader-mcp__*"
+  - "mcp__github__*"
+  - "mcp__hn__*"
+  - "mcp__paper-search__*"
+  - "mcp__claude-hierarchy__*"
+
+claude_code_deny_permissions:
+  - "Read(./.env)"
+  - "Read(./.env.*)"
+  - "Bash(rm -rf /)"

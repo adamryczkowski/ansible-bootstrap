@@ -1,0 +1,93 @@
+---
+# Register MCP servers with Claude Code CLI
+#
+# Uses `claude mcp add-json -s user` to write servers into ~/.claude.json
+# so that `claude mcp list` discovers them. This complements settings.json
+# which is also read at runtime but not by `claude mcp list`.
+
+- name: Claude Code | Build MCP server JSON definitions
+  ansible.builtin.set_fact:
+    claude_code_mcp_json_defs:
+      mcp-pdb:
+        enabled: "{{ claude_code_mcp_servers.mcp_pdb.enabled }}"
+        json:
+          type: stdio
+          command: "{{ claude_code_user_home }}/.local/bin/uv"
+          args: ["run", "--python", "3.13", "--with", "mcp-pdb", "mcp-pdb"]
+      ssh-server:
+        enabled: "{{ claude_code_mcp_servers.ssh_server.enabled }}"
+        json:
+          type: stdio
+          command: node
+          args: ["{{ claude_code_mcp_dir }}/mcp-ssh-server/dist/index.js"]
+      chrome-devtools-mcp:
+        enabled: "{{ claude_code_mcp_servers.chrome_devtools_mcp.enabled }}"
+        json:
+          type: stdio
+          command: "{{ claude_code_node_bin }}/chrome-devtools-mcp"
+          args: []
+      browsermcp:
+        enabled: "{{ claude_code_mcp_servers.browsermcp.enabled }}"
+        json:
+          type: stdio
+          command: "{{ claude_code_node_bin }}/npx"
+          args: ["{{ claude_code_mcp_servers.browsermcp.package_name }}"]
+      pdf-reader-mcp:
+        enabled: "{{ claude_code_mcp_servers.pdf_reader_mcp.enabled }}"
+        json:
+          type: stdio
+          command: "{{ claude_code_node_bin }}/pdf-reader-mcp"
+          args: []
+      github:
+        enabled: "{{ claude_code_mcp_servers.github.enabled }}"
+        json:
+          type: http
+          url: "{{ claude_code_mcp_servers.github.url }}"
+          headers:
+            Authorization: "Bearer ${GITHUB_PERSONAL_ACCESS_TOKEN}"
+      hn:
+        enabled: "{{ claude_code_mcp_servers.hn.enabled }}"
+        json:
+          type: stdio
+          command: "{{ claude_code_user_home }}/.local/bin/uv"
+          args: ["run", "--python", "3.13", "--with", "mcp-hn", "mcp-hn"]
+      paper-search:
+        enabled: "{{ claude_code_mcp_servers.paper_search.enabled }}"
+        json:
+          type: stdio
+          command: "{{ claude_code_user_home }}/.local/bin/uv"
+          args: ["run", "--python", "3.13", "--with", "paper-search-mcp", "paper-search-mcp"]
+      claude-hierarchy:
+        enabled: "{{ claude_code_mcp_servers.claude_hierarchy.enabled }}"
+        json:
+          type: stdio
+          command: claude-hierarchy
+          args: []
+      remove-background:
+        enabled: "{{ claude_code_mcp_servers.remove_background.enabled }}"
+        json:
+          type: http
+          url: "http://127.0.0.1:{{ claude_code_mcp_servers.remove_background.port }}/mcp"
+      svg-mcp:
+        enabled: "{{ claude_code_mcp_servers.svg_mcp.enabled }}"
+        json:
+          type: http
+          url: "http://127.0.0.1:{{ claude_code_mcp_servers.svg_mcp.port }}/mcp"
+      imagen:
+        enabled: "{{ claude_code_mcp_servers.imagen.enabled }}"
+        json:
+          type: http
+          url: "http://127.0.0.1:{{ claude_code_mcp_servers.imagen.port }}/mcp"
+
+- name: Claude Code | Register MCP servers via CLI
+  ansible.builtin.shell: |
+    export PATH="{{ claude_code_user_home }}/.local/bin:{{ claude_code_user_home }}/.local/share/mise/shims:$PATH"
+    claude mcp remove -s user '{{ item.key }}' 2>/dev/null || true
+    claude mcp add-json -s user '{{ item.key }}' '{{ item.value.json | to_json }}'
+  become: true
+  become_user: "{{ claude_code_username }}"
+  loop: "{{ claude_code_mcp_json_defs | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  when: item.value.enabled | bool
+  changed_when: true

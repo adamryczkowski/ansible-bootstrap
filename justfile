@@ -77,6 +77,22 @@ test-lxd-e2e-verify:
 test-lxd-e2e-destroy:
 	molecule destroy -s lxd-e2e
 
+# Run Claude Code LXD test (full lifecycle: create, converge, verify, destroy)
+test-claude-code:
+	molecule test -s claude-code
+
+# Run Claude Code converge only (faster iteration)
+test-claude-code-converge:
+	molecule converge -s claude-code
+
+# Run Claude Code verify only
+test-claude-code-verify:
+	molecule verify -s claude-code
+
+# Destroy Claude Code test container
+test-claude-code-destroy:
+	molecule destroy -s claude-code
+
 # Run Molecule converge only (faster iteration)
 test-converge:
 	molecule converge

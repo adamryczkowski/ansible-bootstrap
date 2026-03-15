@@ -1,0 +1,240 @@
+---
+# Install and configure MCP servers for Claude Code
+
+# ============================================================================
+# SSH Server MCP (Node.js)
+# ============================================================================
+- name: Claude Code | Clone mcp-ssh-server
+  ansible.builtin.git:
+    repo: "{{ claude_code_mcp_servers.ssh_server.git_repo }}"
+    dest: "{{ claude_code_mcp_dir }}/mcp-ssh-server"
+    version: main
+    depth: 1
+  become: true
+  become_user: "{{ claude_code_username }}"
+  when: claude_code_mcp_servers.ssh_server.enabled
+
+- name: Claude Code | Install mcp-ssh-server dependencies
+  ansible.builtin.shell: |
+    export PATH="{{ claude_code_user_home }}/.local/bin:{{ claude_code_user_home }}/.local/share/mise/shims:$PATH"
+    cd {{ claude_code_mcp_dir }}/mcp-ssh-server
+    npm install
+    npm run build
+  become: true
+  become_user: "{{ claude_code_username }}"
+  args:
+    creates: "{{ claude_code_mcp_dir }}/mcp-ssh-server/node_modules"
+  when: claude_code_mcp_servers.ssh_server.enabled
+
+# ============================================================================
+# Chrome DevTools MCP (npm global)
+# ============================================================================
+- name: Claude Code | Install chrome-devtools-mcp globally
+  ansible.builtin.shell: |
+    export PATH="{{ claude_code_user_home }}/.local/bin:{{ claude_code_user_home }}/.local/share/mise/shims:$PATH"
+    npm install -g {{ claude_code_mcp_servers.chrome_devtools_mcp.package_name }}
+  become: true
+  become_user: "{{ claude_code_username }}"
+  when: claude_code_mcp_servers.chrome_devtools_mcp.enabled
+  register: claude_code_chrome_devtools_install
+  changed_when: "'added' in claude_code_chrome_devtools_install.stdout | default('')"
+
+# ============================================================================
+# PDF Reader MCP (npm global)
+# ============================================================================
+- name: Claude Code | Install pdf-reader-mcp globally
+  ansible.builtin.shell: |
+    export PATH="{{ claude_code_user_home }}/.local/bin:{{ claude_code_user_home }}/.local/share/mise/shims:$PATH"
+    npm install -g {{ claude_code_mcp_servers.pdf_reader_mcp.package_name }}
+  become: true
+  become_user: "{{ claude_code_username }}"
+  when: claude_code_mcp_servers.pdf_reader_mcp.enabled
+  register: claude_code_pdf_reader_install
+  changed_when: "'added' in claude_code_pdf_reader_install.stdout | default('')"
+
+# ============================================================================
+# SVG MCP (Python/Poetry with systemd)
+# ============================================================================
+- name: Claude Code | Clone SVG-MCP
+  ansible.builtin.git:
+    repo: "{{ claude_code_mcp_servers.svg_mcp.git_repo }}"
+    dest: "{{ claude_code_mcp_dir }}/SVG-MCP"
+    version: main
+    depth: 1
+  become: true
+  become_user: "{{ claude_code_username }}"
+  when: claude_code_mcp_servers.svg_mcp.enabled
+
+- name: Claude Code | Setup SVG-MCP
+  ansible.builtin.shell: |
+    export PATH="{{ claude_code_user_home }}/.local/bin:$PATH"
+    cd {{ claude_code_mcp_dir }}/SVG-MCP
+    just setup
+  become: true
+  become_user: "{{ claude_code_username }}"
+  args:
+    creates: "{{ claude_code_mcp_dir }}/SVG-MCP/.venv"
+  when: claude_code_mcp_servers.svg_mcp.enabled
+
+- name: Claude Code | Install SVG-MCP systemd service
+  ansible.builtin.shell: |
+    export PATH="{{ claude_code_user_home }}/.local/bin:$PATH"
+    cd {{ claude_code_mcp_dir }}/SVG-MCP
+    just install-systemd-service
+  become: true
+  become_user: "{{ claude_code_username }}"
+  args:
+    creates: "{{ claude_code_user_home }}/.config/systemd/user/svg-mcp.service"
+  when: claude_code_mcp_servers.svg_mcp.enabled and (claude_code_mcp_servers.svg_mcp.systemd_service | default(false))
+
+# ============================================================================
+# Imagen MCP (Python/Poetry with systemd)
+# ============================================================================
+- name: Claude Code | Clone Imagen-MCP
+  ansible.builtin.git:
+    repo: "{{ claude_code_mcp_servers.imagen.git_repo }}"
+    dest: "{{ claude_code_mcp_dir }}/Imagen-MCP"
+    version: main
+    depth: 1
+  become: true
+  become_user: "{{ claude_code_username }}"
+  when: claude_code_mcp_servers.imagen.enabled
+
+- name: Claude Code | Setup Imagen-MCP
+  ansible.builtin.shell: |
+    export PATH="{{ claude_code_user_home }}/.local/bin:$PATH"
+    cd {{ claude_code_mcp_dir }}/Imagen-MCP
+    just setup
+  become: true
+  become_user: "{{ claude_code_username }}"
+  args:
+    creates: "{{ claude_code_mcp_dir }}/Imagen-MCP/.venv"
+  when: claude_code_mcp_servers.imagen.enabled
+
+- name: Claude Code | Install Imagen-MCP systemd service
+  ansible.builtin.shell: |
+    export PATH="{{ claude_code_user_home }}/.local/bin:$PATH"
+    cd {{ claude_code_mcp_dir }}/Imagen-MCP
+    just install-systemd-service
+  become: true
+  become_user: "{{ claude_code_username }}"
+  args:
+    creates: "{{ claude_code_user_home }}/.config/systemd/user/imagen-mcp.service"
+  when: claude_code_mcp_servers.imagen.enabled and (claude_code_mcp_servers.imagen.systemd_service | default(false))
+
+# ============================================================================
+# Remove Background MCP (Python/Poetry with systemd)
+# ============================================================================
+- name: Claude Code | Clone MCP-remove-background
+  ansible.builtin.git:
+    repo: "{{ claude_code_mcp_servers.remove_background.git_repo }}"
+    dest: "{{ claude_code_mcp_dir }}/MCP-remove-background"
+    version: main
+    depth: 1
+  become: true
+  become_user: "{{ claude_code_username }}"
+  when: claude_code_mcp_servers.remove_background.enabled
+
+- name: Claude Code | Setup MCP-remove-background
+  ansible.builtin.shell: |
+    export PATH="{{ claude_code_user_home }}/.local/bin:$PATH"
+    cd {{ claude_code_mcp_dir }}/MCP-remove-background
+    just setup
+  become: true
+  become_user: "{{ claude_code_username }}"
+  args:
+    creates: "{{ claude_code_mcp_dir }}/MCP-remove-background/.venv"
+  when: claude_code_mcp_servers.remove_background.enabled
+
+- name: Claude Code | Install MCP-remove-background systemd service
+  ansible.builtin.shell: |
+    export PATH="{{ claude_code_user_home }}/.local/bin:$PATH"
+    cd {{ claude_code_mcp_dir }}/MCP-remove-background
+    just install-systemd-service
+  become: true
+  become_user: "{{ claude_code_username }}"
+  args:
+    creates: "{{ claude_code_user_home }}/.config/systemd/user/mcp-remove-background.service"
+  when: claude_code_mcp_servers.remove_background.enabled and (claude_code_mcp_servers.remove_background.systemd_service | default(false))
+
+# ============================================================================
+# mcp-pdb (via uv - runs on demand, no persistent installation)
+# ============================================================================
+- name: Claude Code | Verify mcp-pdb can be run via uv
+  ansible.builtin.shell: |
+    export PATH="{{ claude_code_user_home }}/.local/bin:$PATH"
+    uv run --python 3.13 --with mcp-pdb mcp-pdb --help
+  become: true
+  become_user: "{{ claude_code_username }}"
+  when: claude_code_mcp_servers.mcp_pdb.enabled
+  changed_when: false
+  failed_when: false
+
+# ============================================================================
+# Hacker News MCP (via uv - runs on demand)
+# ============================================================================
+- name: Claude Code | Verify mcp-hn can be run via uv
+  ansible.builtin.shell: |
+    export PATH="{{ claude_code_user_home }}/.local/bin:$PATH"
+    uv run --python 3.13 --with mcp-hn mcp-hn --help
+  become: true
+  become_user: "{{ claude_code_username }}"
+  when: claude_code_mcp_servers.hn.enabled
+  changed_when: false
+  failed_when: false
+
+# ============================================================================
+# Paper Search MCP (via uv - runs on demand)
+# ============================================================================
+- name: Claude Code | Verify paper-search-mcp can be run via uv
+  ansible.builtin.shell: |
+    export PATH="{{ claude_code_user_home }}/.local/bin:$PATH"
+    uv run --python 3.13 --with paper-search-mcp paper-search-mcp --help
+  become: true
+  become_user: "{{ claude_code_username }}"
+  when: claude_code_mcp_servers.paper_search.enabled
+  changed_when: false
+  failed_when: false
+
+# ============================================================================
+# Browser MCP (npx - runs on demand, no persistent installation)
+# ============================================================================
+- name: Claude Code | Verify browser-mcp can be run via npx
+  ansible.builtin.shell: |
+    export PATH="{{ claude_code_user_home }}/.local/bin:{{ claude_code_user_home }}/.local/share/mise/shims:$PATH"
+    npx {{ claude_code_mcp_servers.browsermcp.package_name }} --help || true
+  become: true
+  become_user: "{{ claude_code_username }}"
+  when: claude_code_mcp_servers.browsermcp.enabled
+  changed_when: false
+  failed_when: false
+
+# ============================================================================
+# Claude Hierarchy MCP (npm global - installed from local .tgz)
+# ============================================================================
+- name: Claude Code | Copy claude-hierarchy package to target
+  ansible.builtin.copy:
+    src: "{{ claude_code_mcp_servers.claude_hierarchy.tgz_source | replace('~', lookup('env', 'HOME')) }}"
+    dest: "/tmp/claude-hierarchy-0.1.0.tgz"
+    mode: '0644'
+  when: claude_code_mcp_servers.claude_hierarchy.enabled
+
+- name: Claude Code | Install claude-hierarchy globally from tgz
+  ansible.builtin.shell: |
+    export PATH="{{ claude_code_user_home }}/.local/bin:{{ claude_code_user_home }}/.local/share/mise/shims:$PATH"
+    npm install -g /tmp/claude-hierarchy-0.1.0.tgz
+  become: true
+  become_user: "{{ claude_code_username }}"
+  when: claude_code_mcp_servers.claude_hierarchy.enabled
+  register: claude_code_hierarchy_install
+  changed_when: "'added' in claude_code_hierarchy_install.stdout | default('')"
+
+# ============================================================================
+# GitHub MCP (HTTP-based, uses GitHub Copilot API - no local installation)
+# ============================================================================
+- name: Claude Code | Note GitHub MCP configuration
+  ansible.builtin.debug:
+    msg: >
+      GitHub MCP is HTTP-based and requires GITHUB_PERSONAL_ACCESS_TOKEN.
+      Ensure the token is set in environment or settings.json before use.
+  when: claude_code_mcp_servers.github.enabled

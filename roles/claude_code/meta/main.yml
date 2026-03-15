@@ -1,0 +1,26 @@
+---
+galaxy_info:
+  author: Adam Ryczkowski
+  description: Install and configure Claude Code CLI with MCP servers and agents
+  license: MIT
+  min_ansible_version: "2.14"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - noble
+        - jammy
+    - name: Debian
+      versions:
+        - bookworm
+        - bullseye
+  galaxy_tags:
+    - development
+    - ai
+    - mcp
+    - claude-code
+
+dependencies:
+  - role: cli_tools
+    vars:
+      cli_tools_profile: minimal
+      cli_tools_username: "{{ claude_code_username | default('adam') }}"

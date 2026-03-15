@@ -40,6 +40,10 @@
       tags: [cli_tools, tools]
       when: install_cli_tools | default(true)
 
+    - role: claude_code
+      tags: [claude_code, ai]
+      when: install_claude_code | default(false)
+
 - name: Configure desktop systems
   hosts: desktops
   become: true

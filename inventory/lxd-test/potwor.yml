@@ -1,0 +1,9 @@
+---
+all:
+  hosts:
+    potwor:
+      ansible_host: 192.168.10.106
+      ansible_user: adam
+      ansible_python_interpreter: /usr/bin/python3
+      target_user: adam
+      claude_code_username: adam

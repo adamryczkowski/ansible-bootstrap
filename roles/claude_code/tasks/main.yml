@@ -1,0 +1,51 @@
+---
+# Claude Code role - Install Claude Code CLI, configure MCP servers, and connect agents
+#
+# This role:
+# 1. Installs system dependencies (node, python, uv, poetry, just)
+# 2. Installs Claude Code CLI
+# 3. Sets up MCP servers (shared installation directory with roo_code)
+# 4. Connects agents, commands, skills from AI Prompts repository
+# 5. Deploys settings.json with MCP and permission configuration
+
+- name: Claude Code | Look up user home directory
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ claude_code_username }}"
+
+- name: Claude Code | Set user home directory
+  ansible.builtin.set_fact:
+    claude_code_user_home: "{{ ansible_facts.getent_passwd[claude_code_username][4] }}"
+
+- name: Claude Code | Expand MCP base directory
+  ansible.builtin.set_fact:
+    claude_code_mcp_dir: "{{ claude_code_mcp_base_dir | replace('~', claude_code_user_home) }}"
+
+- name: Claude Code | Install system dependencies
+  ansible.builtin.include_tasks: dependencies.yml
+
+- name: Claude Code | Install Claude Code CLI
+  ansible.builtin.include_tasks: install.yml
+  when: claude_code_install_cli
+
+- name: Claude Code | Create MCP base directory
+  ansible.builtin.file:
+    path: "{{ claude_code_mcp_dir }}"
+    state: directory
+    owner: "{{ claude_code_username }}"
+    mode: '0755'
+  become: true
+  become_user: "{{ claude_code_username }}"
+
+- name: Claude Code | Setup MCP servers
+  ansible.builtin.include_tasks: mcp_servers.yml
+
+- name: Claude Code | Connect agents from AI Prompts
+  ansible.builtin.include_tasks: agents.yml
+  when: claude_code_ai_prompts.enabled | default(false)
+
+- name: Claude Code | Deploy settings
+  ansible.builtin.include_tasks: settings.yml
+
+- name: Claude Code | Register MCP servers with CLI
+  ansible.builtin.include_tasks: register_mcp.yml

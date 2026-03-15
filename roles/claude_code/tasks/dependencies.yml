@@ -1,0 +1,81 @@
+---
+# Install system dependencies for Claude Code and MCP servers
+# Note: mise is installed by the cli_tools role (dependency)
+
+- name: Claude Code | Install apt dependencies
+  ansible.builtin.apt:
+    name:
+      - git
+      - curl
+      - build-essential
+      - python3-pip
+      - python3-venv
+      - pipx
+    state: present
+    update_cache: true
+  become: true
+
+- name: Claude Code | Ensure pipx path is configured
+  ansible.builtin.command:
+    cmd: pipx ensurepath
+  become: true
+  become_user: "{{ claude_code_username }}"
+  changed_when: false
+  failed_when: false
+
+# mise is installed by cli_tools role, we just need to install Node.js and Python
+- name: Claude Code | Install Node.js via mise
+  ansible.builtin.shell: |
+    export PATH="{{ claude_code_user_home }}/.local/bin:$PATH"
+    mise install node@{{ claude_code_node_version }}
+    mise use -g node@{{ claude_code_node_version }}
+  become: true
+  become_user: "{{ claude_code_username }}"
+  args:
+    creates: "{{ claude_code_user_home }}/.local/share/mise/installs/node"
+
+- name: Claude Code | Install Python via mise
+  ansible.builtin.shell: |
+    export PATH="{{ claude_code_user_home }}/.local/bin:$PATH"
+    mise install python@{{ claude_code_python_version }}
+    mise use -g python@{{ claude_code_python_version }}
+  become: true
+  become_user: "{{ claude_code_username }}"
+  args:
+    creates: "{{ claude_code_user_home }}/.local/share/mise/installs/python"
+
+- name: Claude Code | Install uv via pipx
+  ansible.builtin.command:
+    cmd: pipx install uv
+  become: true
+  become_user: "{{ claude_code_username }}"
+  register: claude_code_uv_install
+  changed_when: "'installed package' in claude_code_uv_install.stdout"
+  failed_when: false
+
+- name: Claude Code | Install poetry via pipx
+  ansible.builtin.command:
+    cmd: pipx install poetry
+  become: true
+  become_user: "{{ claude_code_username }}"
+  register: claude_code_poetry_install
+  changed_when: "'installed package' in claude_code_poetry_install.stdout"
+  failed_when: false
+
+- name: Claude Code | Install just via pipx
+  ansible.builtin.command:
+    cmd: pipx install rust-just
+  become: true
+  become_user: "{{ claude_code_username }}"
+  register: claude_code_just_install
+  changed_when: "'installed package' in claude_code_just_install.stdout"
+  failed_when: false
+
+- name: Claude Code | Disable Poetry keyring to prevent GUI popups
+  ansible.builtin.command:
+    cmd: poetry config keyring.enabled false
+  become: true
+  become_user: "{{ claude_code_username }}"
+  environment:
+    PATH: "{{ claude_code_user_home }}/.local/bin:{{ ansible_facts.env.PATH }}"
+  changed_when: false
