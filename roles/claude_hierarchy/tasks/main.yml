@@ -43,7 +43,7 @@
 # ── Check installed version (always) ──────────────────────────────────────────
 - name: Claude Hierarchy | Detect installed version on target
   ansible.builtin.shell: |
-    export PATH="{{ claude_hierarchy_node_bin }}:$PATH"
+    export PATH="{{ claude_hierarchy_node_bin }}:{{ claude_hierarchy_user_home }}/.local/bin:$PATH"
     npm list -g --depth=0 claude-hierarchy 2>/dev/null \
       | grep -oP 'claude-hierarchy@\K[^ ]+' || echo "none"
   args:
@@ -97,7 +97,7 @@
 
 - name: Claude Hierarchy | Install claude-hierarchy globally from tgz
   ansible.builtin.shell: |
-    export PATH="{{ claude_hierarchy_node_bin }}:$PATH"
+    export PATH="{{ claude_hierarchy_node_bin }}:{{ claude_hierarchy_user_home }}/.local/bin:$PATH"
     npm install -g /tmp/claude-hierarchy-{{ claude_hierarchy_src_ver }}.tgz
   args:
     executable: /bin/bash
@@ -109,7 +109,7 @@
 
 - name: Claude Hierarchy | Verify installation
   ansible.builtin.shell: |
-    export PATH="{{ claude_hierarchy_node_bin }}:$PATH"
+    export PATH="{{ claude_hierarchy_node_bin }}:{{ claude_hierarchy_user_home }}/.local/bin:$PATH"
     npm list -g --depth=0 claude-hierarchy 2>/dev/null \
       | grep -oP 'claude-hierarchy@\K[^ ]+'
   args:
