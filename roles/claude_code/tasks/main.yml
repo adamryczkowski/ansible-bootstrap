@@ -40,9 +40,30 @@
 - name: Claude Code | Setup MCP servers
   ansible.builtin.include_tasks: mcp_servers.yml
 
-- name: Claude Code | Connect agents from AI Prompts
-  ansible.builtin.include_tasks: agents.yml
+# ── New role: ai_config ───────────────────────────────────────────────────────
+- name: Claude Code | Configure AI prompts and hierarchy config
+  ansible.builtin.import_role:
+    name: ai_config
+  vars:
+    ai_config_username: "{{ claude_code_username }}"
+    ai_config_source_remote: "{{ claude_code_ai_prompts.source_remote }}"
+    ai_config_github_remote: "{{ claude_code_ai_prompts.github_remote }}"
+    ai_config_dest_dir: "{{ claude_code_ai_prompts.dest_dir }}"
+    ai_config_register_for_sync: "{{ claude_code_ai_prompts.register_for_sync | default(true) }}"
+    ai_config_run_sync: "{{ claude_code_ai_prompts.run_sync | default(true) }}"
+    ai_config_gotify_token: "{{ claude_code_gotify_token | default('') }}"
   when: claude_code_ai_prompts.enabled | default(false)
+
+# ── New role: claude_hierarchy ────────────────────────────────────────────────
+- name: Claude Code | Install claude-hierarchy MCP server
+  ansible.builtin.import_role:
+    name: claude_hierarchy
+  vars:
+    claude_hierarchy_username: "{{ claude_code_username }}"
+    claude_hierarchy_node_version: "{{ claude_code_node_version }}"
+    claude_hierarchy_source_dir: "{{ claude_code_mcp_servers.claude_hierarchy.source_dir | default('~/tmp/claude-hierarchy') }}"
+    claude_hierarchy_run_validate: false
+  when: claude_code_mcp_servers.claude_hierarchy.enabled | default(true)
 
 - name: Claude Code | Deploy settings
   ansible.builtin.include_tasks: settings.yml

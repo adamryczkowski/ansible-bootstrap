@@ -32,6 +32,7 @@
     cmd: python3 -c "import json; print(json.load(open('package.json'))['version'])"
     chdir: "{{ claude_hierarchy_source_dir | expanduser }}"
   delegate_to: localhost
+  become: false
   register: claude_hierarchy_src_version
   changed_when: false
 
@@ -68,6 +69,7 @@
     cmd: just validate
     chdir: "{{ claude_hierarchy_source_dir | expanduser }}"
   delegate_to: localhost
+  become: false
   changed_when: false
   when:
     - claude_hierarchy_run_validate | bool
@@ -80,6 +82,7 @@
     executable: /bin/bash
     chdir: "{{ claude_hierarchy_source_dir | expanduser }}"
   delegate_to: localhost
+  become: false
   register: claude_hierarchy_pack_result
   changed_when: true
   when: claude_hierarchy_needs_install

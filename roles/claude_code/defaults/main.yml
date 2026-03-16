@@ -16,6 +16,10 @@ claude_code_python_version: "3.12"
 # Install claude-code via npm (set false if already installed via standalone installer)
 claude_code_install_cli: true
 
+# Gotify notification token (Vault-encrypt in production; passed through to ai_config)
+# Empty string = skip config file deployment
+claude_code_gotify_token: ""
+
 # AI Prompts repository configuration
 # This repository contains Claude Code agents, commands, skills, and settings
 claude_code_ai_prompts:
@@ -101,8 +105,7 @@ claude_code_mcp_servers:
 
   claude_hierarchy:
     enabled: true
-    install_method: npm_global_tgz
-    tgz_source: "~/tmp/claude-hierarchy/claude-hierarchy-0.1.0.tgz"
+    source_dir: "~/tmp/claude-hierarchy"   # replaces tgz_source (dynamic; no hardcoded version)
 
 # Claude Code settings to merge into settings.json
 # Permissions for MCP tools

@@ -210,26 +210,6 @@
   failed_when: false
 
 # ============================================================================
-# Claude Hierarchy MCP (npm global - installed from local .tgz)
-# ============================================================================
-- name: Claude Code | Copy claude-hierarchy package to target
-  ansible.builtin.copy:
-    src: "{{ claude_code_mcp_servers.claude_hierarchy.tgz_source | replace('~', lookup('env', 'HOME')) }}"
-    dest: "/tmp/claude-hierarchy-0.1.0.tgz"
-    mode: '0644'
-  when: claude_code_mcp_servers.claude_hierarchy.enabled
-
-- name: Claude Code | Install claude-hierarchy globally from tgz
-  ansible.builtin.shell: |
-    export PATH="{{ claude_code_user_home }}/.local/bin:{{ claude_code_user_home }}/.local/share/mise/shims:$PATH"
-    npm install -g /tmp/claude-hierarchy-0.1.0.tgz
-  become: true
-  become_user: "{{ claude_code_username }}"
-  when: claude_code_mcp_servers.claude_hierarchy.enabled
-  register: claude_code_hierarchy_install
-  changed_when: "'added' in claude_code_hierarchy_install.stdout | default('')"
-
-# ============================================================================
 # GitHub MCP (HTTP-based, uses GitHub Copilot API - no local installation)
 # ============================================================================
 - name: Claude Code | Note GitHub MCP configuration
