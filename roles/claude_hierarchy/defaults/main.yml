@@ -1,0 +1,5 @@
+---
+claude_hierarchy_username: "{{ ansible_user | default('adam') }}"
+claude_hierarchy_node_version: "22"
+claude_hierarchy_source_dir: "~/tmp/claude-hierarchy"   # controller-side path
+claude_hierarchy_run_validate: true

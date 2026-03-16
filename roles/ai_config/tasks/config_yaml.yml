@@ -1,0 +1,7 @@
+---
+# ai_config/tasks/config_yaml.yml — Deploy ~/.config/claude-hierarchy/config.yaml
+# TODO: Full implementation in Milestone 3
+
+- name: AI Config | Config yaml placeholder
+  ansible.builtin.debug:
+    msg: "ai_config config_yaml tasks — implementation pending (Milestone 3)"

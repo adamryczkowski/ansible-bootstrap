@@ -1,0 +1,29 @@
+---
+# ai_config role defaults
+
+# Target user for AI configuration
+ai_config_username: "{{ ansible_user | default('adam') }}"
+
+# Remote source to clone AI_prompts from (SSH format: user@host:path)
+ai_config_source_remote: "adam@192.168.42.207:/home/adam/tmp/AI"
+
+# GitHub remote to set as 'origin' for pushing changes
+ai_config_github_remote: "git@github.com:adamryczkowski/AI-prompts.git"
+
+# Local destination directory for AI_prompts on the target host
+ai_config_dest_dir: "~/.local/share/AI_prompts"
+
+# Whether to add the target host to git-sync-hosts.txt
+ai_config_register_for_sync: true
+
+# Whether to run synchronization after cloning (only runs on initial clone)
+ai_config_run_sync: true
+
+# Gotify notification server URL
+ai_config_gotify_url: "http://139.162.226.242:1486"
+
+# Gotify application token — Vault-encrypt in production; empty = skip config file
+ai_config_gotify_token: ""
+
+# Whether Gotify notifications are enabled
+ai_config_gotify_enabled: true

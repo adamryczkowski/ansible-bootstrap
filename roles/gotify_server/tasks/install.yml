@@ -1,0 +1,94 @@
+---
+# Binary installation tasks for Gotify push notification server
+#
+# Purpose:
+#   Downloads the Gotify binary from GitHub releases, extracts it, and sets
+#   correct ownership and permissions. A stat guard prevents re-downloading on
+#   idempotent re-runs (i.e. when the binary is already in place).
+#
+# Stat Guard:
+#   The binary is checked before every download/extract step. If it already
+#   exists, all download and extract tasks are skipped — ensuring 0 changed
+#   tasks on idempotent re-runs.
+#
+# Checksum Verification:
+#   When gotify_checksum is set (non-empty), get_url enforces SHA256 integrity
+#   verification of the downloaded zip archive. Override gotify_checksum in
+#   group_vars or vault for production deployments.
+#
+# Variables consumed (see defaults/main.yml):
+#   - gotify_version      : Release version to download (e.g. "2.9.1")
+#   - gotify_checksum     : SHA256 of the zip archive, or "" to skip verification
+#   - gotify_install_dir  : Destination directory for the binary (e.g. /opt/gotify)
+
+# =============================================================================
+# Stat Guard — Check if binary is already installed
+# =============================================================================
+
+- name: Gotify Install | Check if binary already installed
+  ansible.builtin.stat:
+    path: "{{ gotify_install_dir }}/gotify-linux-amd64"
+  register: gotify_server_binary_stat
+
+# =============================================================================
+# Download — Fetch Gotify zip archive from GitHub releases
+# =============================================================================
+
+- name: Gotify Install | Download Gotify zip archive (with checksum)
+  ansible.builtin.get_url:
+    url: "https://github.com/gotify/server/releases/download/v{{ gotify_version }}/gotify-linux-amd64.zip"
+    dest: "/tmp/gotify-linux-amd64-{{ gotify_version }}.zip"
+    checksum: "sha256:{{ gotify_checksum }}"
+    mode: "0600"
+  become: true
+  when:
+    - not gotify_server_binary_stat.stat.exists
+    - gotify_checksum | length > 0
+
+- name: Gotify Install | Download Gotify zip archive (without checksum)
+  ansible.builtin.get_url:
+    url: "https://github.com/gotify/server/releases/download/v{{ gotify_version }}/gotify-linux-amd64.zip"
+    dest: "/tmp/gotify-linux-amd64-{{ gotify_version }}.zip"
+    mode: "0600"
+  become: true
+  when:
+    - not gotify_server_binary_stat.stat.exists
+    - gotify_checksum | length == 0
+
+# =============================================================================
+# Extract — Unarchive binary into installation directory
+# =============================================================================
+
+- name: Gotify Install | Extract Gotify binary from zip archive
+  ansible.builtin.unarchive:
+    src: "/tmp/gotify-linux-amd64-{{ gotify_version }}.zip"
+    dest: "{{ gotify_install_dir }}"
+    remote_src: true
+    include:
+      - "gotify-linux-amd64"
+  become: true
+  when: not gotify_server_binary_stat.stat.exists
+
+# =============================================================================
+# Permissions — Set binary ownership and mode
+# =============================================================================
+
+- name: Gotify Install | Set binary ownership and permissions
+  ansible.builtin.file:
+    path: "{{ gotify_install_dir }}/gotify-linux-amd64"
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+  when: not gotify_server_binary_stat.stat.exists
+
+# =============================================================================
+# Cleanup — Remove downloaded zip archive
+# =============================================================================
+
+- name: Gotify Install | Remove downloaded zip archive
+  ansible.builtin.file:
+    path: "/tmp/gotify-linux-amd64-{{ gotify_version }}.zip"
+    state: absent
+  become: true
+  when: not gotify_server_binary_stat.stat.exists

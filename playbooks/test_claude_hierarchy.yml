@@ -1,0 +1,40 @@
+---
+# Test playbook for claude_hierarchy role
+#
+# Usage:
+#   ansible-playbook -i '192.168.42.7,' playbooks/test_claude_hierarchy.yml
+#   ansible-playbook -i '192.168.42.7,' playbooks/test_claude_hierarchy.yml --syntax-check
+#
+# Pre-cleanup (run once before first-run test):
+#   ansible -i '192.168.42.7,' all -m shell \
+#     -a 'export PATH=~/.local/share/mise/shims:$PATH; npm uninstall -g claude-hierarchy || true' \
+#     -e ansible_user=adam --become --become-user=adam
+
+- name: Test claude_hierarchy role
+  hosts: all
+  gather_facts: true
+
+  roles:
+    - role: claude_hierarchy
+      vars:
+        claude_hierarchy_username: "{{ ansible_user | default('adam') }}"
+        claude_hierarchy_node_version: "22"
+        claude_hierarchy_source_dir: "~/tmp/claude-hierarchy"
+        claude_hierarchy_run_validate: true
+
+  post_tasks:
+    - name: Verify claude-hierarchy binary is callable
+      ansible.builtin.shell: |
+        export PATH="{{ ansible_facts.getent_passwd[ansible_user | default('adam')][4] }}/.local/share/mise/shims:$PATH"
+        claude-hierarchy --help
+      args:
+        executable: /bin/bash
+      become: true
+      become_user: "{{ ansible_user | default('adam') }}"
+      register: claude_hierarchy_help_result
+      changed_when: false
+      failed_when: claude_hierarchy_help_result.rc != 0
+
+    - name: Display installed version
+      ansible.builtin.debug:
+        msg: "claude-hierarchy installed successfully. Binary callable: OK"

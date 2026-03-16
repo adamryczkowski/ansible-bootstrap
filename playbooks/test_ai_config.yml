@@ -1,0 +1,13 @@
+---
+# Standalone test playbook for the ai_config role
+# Usage:
+#   ansible-playbook -i '192.168.42.7,' playbooks/test_ai_config.yml
+#   ansible-playbook -i '192.168.42.7,' playbooks/test_ai_config.yml --syntax-check
+#   ansible-playbook -i '192.168.42.7,' playbooks/test_ai_config.yml --check --list-tasks
+
+- name: Test ai_config role
+  hosts: all
+  gather_facts: true
+
+  roles:
+    - role: ai_config

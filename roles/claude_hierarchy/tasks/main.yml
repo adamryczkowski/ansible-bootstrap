@@ -1,0 +1,118 @@
+---
+# claude_hierarchy role — Build from source and install claude-hierarchy npm package
+
+- name: Claude Hierarchy | Look up user home directory
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ claude_hierarchy_username }}"
+
+- name: Claude Hierarchy | Set user home directory
+  ansible.builtin.set_fact:
+    claude_hierarchy_user_home: "{{ ansible_facts.getent_passwd[claude_hierarchy_username][4] }}"
+
+# STYLE FIX: executable: /bin/bash now alongside creates:
+- name: Claude Hierarchy | Install Node.js via mise
+  ansible.builtin.shell: |
+    export PATH="{{ claude_hierarchy_user_home }}/.local/bin:$PATH"
+    mise install node@{{ claude_hierarchy_node_version }}
+    mise use -g node@{{ claude_hierarchy_node_version }}
+  become: true
+  become_user: "{{ claude_hierarchy_username }}"
+  args:
+    executable: /bin/bash
+    creates: "{{ claude_hierarchy_user_home }}/.local/share/mise/installs/node/{{ claude_hierarchy_node_version }}"
+
+- name: Claude Hierarchy | Set node bin path
+  ansible.builtin.set_fact:
+    claude_hierarchy_node_bin: "{{ claude_hierarchy_user_home }}/.local/share/mise/shims"
+
+# ── Read source version (always) ──────────────────────────────────────────────
+- name: Claude Hierarchy | Read package.json version from controller
+  ansible.builtin.command:
+    cmd: python3 -c "import json; print(json.load(open('package.json'))['version'])"
+    chdir: "{{ claude_hierarchy_source_dir | expanduser }}"
+  delegate_to: localhost
+  register: claude_hierarchy_src_version
+  changed_when: false
+
+- name: Claude Hierarchy | Set source version fact
+  ansible.builtin.set_fact:
+    claude_hierarchy_src_ver: "{{ claude_hierarchy_src_version.stdout | trim }}"
+
+# ── Check installed version (always) ──────────────────────────────────────────
+- name: Claude Hierarchy | Detect installed version on target
+  ansible.builtin.shell: |
+    export PATH="{{ claude_hierarchy_node_bin }}:$PATH"
+    npm list -g --depth=0 claude-hierarchy 2>/dev/null \
+      | grep -oP 'claude-hierarchy@\K[^ ]+' || echo "none"
+  args:
+    executable: /bin/bash
+  become: true
+  become_user: "{{ claude_hierarchy_username }}"
+  register: claude_hierarchy_installed_version
+  changed_when: false
+
+- name: Claude Hierarchy | Set installed version fact
+  ansible.builtin.set_fact:
+    claude_hierarchy_inst_ver: "{{ claude_hierarchy_installed_version.stdout | trim }}"
+    claude_hierarchy_needs_install: "{{ claude_hierarchy_installed_version.stdout | trim != claude_hierarchy_src_version.stdout | trim }}"
+
+- name: Claude Hierarchy | Skip install if version matches
+  ansible.builtin.debug:
+    msg: "claude-hierarchy {{ claude_hierarchy_src_ver }} already installed — skipping build"
+  when: not claude_hierarchy_needs_install
+
+# ── Build on controller (gated) ───────────────────────────────────────────────
+- name: Claude Hierarchy | Validate source with just validate
+  ansible.builtin.command:
+    cmd: just validate
+    chdir: "{{ claude_hierarchy_source_dir | expanduser }}"
+  delegate_to: localhost
+  changed_when: false
+  when:
+    - claude_hierarchy_run_validate | bool
+    - claude_hierarchy_needs_install
+
+- name: Claude Hierarchy | Build and pack from source
+  ansible.builtin.shell: |
+    npm run build && npm pack
+  args:
+    executable: /bin/bash
+    chdir: "{{ claude_hierarchy_source_dir | expanduser }}"
+  delegate_to: localhost
+  register: claude_hierarchy_pack_result
+  changed_when: true
+  when: claude_hierarchy_needs_install
+
+# ── Deploy to target (gated) ──────────────────────────────────────────────────
+- name: Claude Hierarchy | Copy .tgz to target
+  ansible.builtin.copy:
+    src: "{{ claude_hierarchy_source_dir | expanduser }}/claude-hierarchy-{{ claude_hierarchy_src_ver }}.tgz"
+    dest: "/tmp/claude-hierarchy-{{ claude_hierarchy_src_ver }}.tgz"
+    mode: '0644'
+  when: claude_hierarchy_needs_install
+
+- name: Claude Hierarchy | Install claude-hierarchy globally from tgz
+  ansible.builtin.shell: |
+    export PATH="{{ claude_hierarchy_node_bin }}:$PATH"
+    npm install -g /tmp/claude-hierarchy-{{ claude_hierarchy_src_ver }}.tgz
+  args:
+    executable: /bin/bash
+  become: true
+  become_user: "{{ claude_hierarchy_username }}"
+  register: claude_hierarchy_install_result
+  changed_when: "'added' in claude_hierarchy_install_result.stdout | default('')"
+  when: claude_hierarchy_needs_install
+
+- name: Claude Hierarchy | Verify installation
+  ansible.builtin.shell: |
+    export PATH="{{ claude_hierarchy_node_bin }}:$PATH"
+    npm list -g --depth=0 claude-hierarchy 2>/dev/null \
+      | grep -oP 'claude-hierarchy@\K[^ ]+'
+  args:
+    executable: /bin/bash
+  become: true
+  become_user: "{{ claude_hierarchy_username }}"
+  register: claude_hierarchy_verify
+  changed_when: false
+  failed_when: claude_hierarchy_verify.stdout | trim != claude_hierarchy_src_ver

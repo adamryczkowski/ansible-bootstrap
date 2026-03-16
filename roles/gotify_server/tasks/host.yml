@@ -1,0 +1,135 @@
+---
+# tasks/host.yml — LXD host preparation tasks for gotify_server
+#
+# Purpose:
+#   Prepares the LXD host for deploying a Gotify container.
+#   1. Applies ZFS external tools fix idempotently (snap get pre-check,
+#      snap set only if needed, handler-driven snap restart lxd).
+#   2. Creates the LXD container (Ubuntu 22.04) if it does not already exist.
+#   3. Configures a TCP proxy device (myport{{ gotify_port }}tcp) with
+#      pre-check to skip if already present.
+#   4. Bootstraps Python3 inside the container (required for Ansible connection).
+#
+# Tags: gotify_host
+# Handlers used: Gotify Host | Restart LXD  (defined in handlers/main.yml)
+#
+# Variables used:
+#   gotify_host_fix_zfs     - Apply ZFS external tools fix (default: true)
+#   gotify_container_name   - LXD container name (default: gotify)
+#   gotify_container_image  - Ubuntu release alias (default: "22.04")
+#   gotify_port             - Port to expose via proxy device (default: 1486)
+
+# ---------------------------------------------------------------------------
+# ZFS External Tools Fix
+# ---------------------------------------------------------------------------
+
+- name: Gotify Host | Check current ZFS external tools setting
+  ansible.builtin.command:
+    cmd: snap get lxd zfs.external
+  register: gotify_server_host_zfs_external
+  changed_when: false
+  failed_when: false
+  become: true
+  when: gotify_host_fix_zfs | bool
+
+- name: Gotify Host | Enable ZFS external tools for LXD
+  ansible.builtin.command:
+    cmd: snap set lxd zfs.external=true
+  become: true
+  changed_when: true
+  notify: Gotify Host | Restart LXD
+  when:
+    - gotify_host_fix_zfs | bool
+    - gotify_server_host_zfs_external.stdout | default('') | trim != 'true'
+
+- name: Gotify Host | Flush handlers (apply LXD restart if needed)
+  ansible.builtin.meta: flush_handlers
+
+- name: Gotify Host | Wait for LXD to be ready after restart
+  ansible.builtin.command:
+    cmd: lxc list
+  register: gotify_server_host_lxd_ready
+  retries: 10
+  delay: 5
+  until: gotify_server_host_lxd_ready.rc == 0
+  changed_when: false
+  become: true
+
+# ---------------------------------------------------------------------------
+# LXD Container Creation
+# ---------------------------------------------------------------------------
+
+- name: Gotify Host | Check if Gotify container already exists
+  ansible.builtin.command:
+    cmd: lxc info {{ gotify_container_name }}
+  register: gotify_server_host_container_exists
+  changed_when: false
+  failed_when: false
+  become: true
+
+- name: Gotify Host | Create LXD container for Gotify (Ubuntu {{ gotify_container_image }})
+  community.general.lxd_container:
+    name: "{{ gotify_container_name }}"
+    state: started
+    source:
+      type: image
+      mode: pull
+      server: https://cloud-images.ubuntu.com/releases
+      protocol: simplestreams
+      alias: "{{ gotify_container_image }}"
+    wait_for_ipv4_addresses: true
+    timeout: 120
+  become: true
+  when: gotify_server_host_container_exists.rc != 0
+
+# ---------------------------------------------------------------------------
+# Proxy Device Setup
+# ---------------------------------------------------------------------------
+
+- name: Gotify Host | Check if proxy device already configured
+  ansible.builtin.command:
+    cmd: lxc config device show {{ gotify_container_name }}
+  register: gotify_server_host_proxy_check
+  changed_when: false
+  failed_when: false
+  become: true
+
+- name: Gotify Host | Add TCP proxy device for port {{ gotify_port }}
+  ansible.builtin.command:
+    cmd: >-
+      lxc config device add {{ gotify_container_name }}
+      myport{{ gotify_port }}tcp
+      proxy
+      listen=tcp:0.0.0.0:{{ gotify_port }}
+      connect=tcp:127.0.0.1:{{ gotify_port }}
+  become: true
+  changed_when: true
+  when: >-
+    gotify_server_host_proxy_check.rc == 0 and
+    ('myport' ~ gotify_port ~ 'tcp') not in (gotify_server_host_proxy_check.stdout | default(''))
+
+# ---------------------------------------------------------------------------
+# Python3 Bootstrap Inside Container
+# ---------------------------------------------------------------------------
+
+- name: Gotify Host | Check if Python3 is installed in container
+  ansible.builtin.command:
+    cmd: lxc exec {{ gotify_container_name }} -- which python3
+  register: gotify_server_host_python3_check
+  changed_when: false
+  failed_when: false
+  become: true
+
+- name: Gotify Host | Update apt cache in container
+  ansible.builtin.command:
+    cmd: lxc exec {{ gotify_container_name }} -- apt-get update -qq
+  become: true
+  changed_when: true
+  when: gotify_server_host_python3_check.rc != 0
+
+- name: Gotify Host | Bootstrap Python3 in container
+  ansible.builtin.command:
+    cmd: lxc exec {{ gotify_container_name }} -- apt-get install -y python3 python3-apt
+  become: true
+  changed_when: true
+  when: gotify_server_host_python3_check.rc != 0

@@ -1,0 +1,83 @@
+---
+# Gotify Deploy Playbook — Two-play LXD container orchestration
+#
+# Play 1: Prepares the LXD host (ZFS fix, container creation, proxy device,
+#          Python3 bootstrap inside the new container)
+# Play 2: Deploys the Gotify push notification server inside the container
+#          using the gotify_server role
+#
+# Usage:
+#   ansible-playbook playbooks/gotify.yml -i inventory/production
+#   ansible-playbook playbooks/gotify.yml -i inventory/production --check
+#   ansible-playbook playbooks/gotify.yml -i inventory/production --tags gotify_install
+#
+# Prerequisites:
+#   - SSH access to 139.162.226.242 (linode-gotify host)
+#   - LXD installed and initialized on the target host
+#   - gotify_default_pass set via Ansible Vault in group_vars/gotify.yml
+#   - gotify_restore_db_src points to a valid gotify.db on the Ansible controller
+#     (when gotify_restore_db: true)
+
+# =============================================================================
+# Play 1: Prepare LXD Host
+# =============================================================================
+
+- name: Prepare LXD host for Gotify container
+  hosts: gotify_hosts
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Gotify Host | Include host preparation tasks
+      ansible.builtin.include_role:
+        name: gotify_server
+        tasks_from: host.yml
+      tags:
+        - gotify_host
+
+    - name: Gotify Host | Register container in in-memory inventory
+      ansible.builtin.add_host:
+        name: "{{ gotify_container_name }}"
+        groups: gotify_container
+        ansible_connection: community.general.lxd
+        ansible_lxd_remote: local
+        ansible_python_interpreter: /usr/bin/python3
+
+# =============================================================================
+# Play 2: Deploy Gotify Inside Container
+# =============================================================================
+
+- name: Deploy Gotify inside LXD container
+  hosts: gotify_container
+  become: true
+  gather_facts: false
+
+  pre_tasks:
+    - name: Gotify Container | Gather facts
+      ansible.builtin.setup:
+
+  roles:
+    - role: gotify_server
+      tags: [gotify]
+
+  post_tasks:
+    - name: Gotify Container | Gather service facts
+      ansible.builtin.service_facts:
+
+    - name: Gotify Container | Verify service is running
+      ansible.builtin.assert:
+        that: ansible_facts.services['gotify.service'].state == 'running'
+        fail_msg: "Gotify service is not running (state: {{ ansible_facts.services['gotify.service'].state | default('unknown') }})"
+
+    - name: Gotify Container | Display deployment summary
+      ansible.builtin.debug:
+        msg: |
+          ============================================================
+          Gotify Deployment Complete!
+          ============================================================
+          Host:        {{ groups['gotify_hosts'][0] }} (139.162.226.242)
+          Container:   {{ gotify_container_name }}
+          Service:     {{ ansible_facts.services['gotify.service'].state }}
+          Port:        {{ gotify_port }} (proxied via LXD proxy device)
+          Health URL:  http://139.162.226.242:{{ gotify_port }}/health
+          ============================================================

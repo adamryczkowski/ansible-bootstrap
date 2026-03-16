@@ -1,0 +1,24 @@
+---
+# ai_config role — entry point
+
+- name: AI Config | Install git
+  ansible.builtin.apt:
+    name: git
+    state: present
+    update_cache: false
+  become: true
+
+- name: AI Config | Look up user home directory
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ ai_config_username }}"
+
+- name: AI Config | Set user home directory
+  ansible.builtin.set_fact:
+    ai_config_user_home: "{{ ansible_facts.getent_passwd[ai_config_username][4] }}"
+
+- name: AI Config | Setup AI_prompts repository and symlinks
+  ansible.builtin.include_tasks: agents.yml
+
+- name: AI Config | Deploy claude-hierarchy configuration
+  ansible.builtin.include_tasks: config_yaml.yml

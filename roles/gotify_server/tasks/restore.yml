@@ -1,0 +1,52 @@
+---
+# Gotify Server Role — Database Restore
+#
+# Purpose:
+#   Copies an existing Gotify SQLite database from the Ansible controller into
+#   the container BEFORE the service starts.  Gotify creates an empty database
+#   on first launch; restoring after that point would be silently skipped by
+#   the stat guard, so this file MUST be included before service.yml in main.yml.
+#
+# Gate variables (set in defaults/main.yml or override at runtime):
+#   gotify_restore_db     : Must be true to activate this block (default: false)
+#   gotify_restore_db_src : Absolute path on the Ansible controller to gotify.db
+#
+# Safety guards:
+#   1. Outer block when: gotify_restore_db   — skips entirely unless opted-in
+#   2. stat guard (force: false + when: not …exists) — never overwrites an
+#      existing database unless the operator explicitly removes it first
+#
+# no_log: true on the copy task because the database contains plaintext API
+# tokens that must not appear in Ansible output or log files.
+
+- name: Gotify Restore | Restore database from backup
+  when: gotify_restore_db | bool
+  block:
+
+    # -------------------------------------------------------------------------
+    # Stat guard — check whether the database file already exists
+    # -------------------------------------------------------------------------
+
+    - name: Gotify Restore | Check if database already exists
+      ansible.builtin.stat:
+        path: "{{ gotify_data_dir }}/gotify.db"
+      become: true
+      register: gotify_server_restore_db_stat
+
+    # -------------------------------------------------------------------------
+    # Copy — skipped if the database is already present
+    # no_log: true — DB contains plaintext API tokens
+    # -------------------------------------------------------------------------
+
+    - name: Gotify Restore | Copy database from controller
+      ansible.builtin.copy:
+        src: "{{ gotify_restore_db_src }}"
+        dest: "{{ gotify_data_dir }}/gotify.db"
+        owner: "{{ gotify_user }}"
+        group: "{{ gotify_user }}"
+        mode: "0600"
+        force: false
+      become: true
+      no_log: true
+      when: not gotify_server_restore_db_stat.stat.exists
+      notify: "Gotify | Restart gotify"

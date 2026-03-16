@@ -11,8 +11,11 @@ exclude_paths:
   - .git/
   - .molecule/
   - collections/
+  - docs/
   - molecule/
+  - plans/
   - ref/
+  - state/
 
 # Enable specific rules
 enable_list:

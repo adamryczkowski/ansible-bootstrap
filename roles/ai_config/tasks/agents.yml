@@ -1,0 +1,7 @@
+---
+# ai_config/tasks/agents.yml — AI_prompts clone, remote setup, sync registration, symlinks
+# TODO: Full implementation in Milestone 2
+
+- name: AI Config | Agents tasks placeholder
+  ansible.builtin.debug:
+    msg: "ai_config agents tasks — implementation pending (Milestone 2)"

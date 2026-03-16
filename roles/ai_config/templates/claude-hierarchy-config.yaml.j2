@@ -1,0 +1,6 @@
+# Managed by Ansible — do not edit manually
+notifications:
+  gotify:
+    url: "{{ ai_config_gotify_url }}"
+    app_token: "{{ ai_config_gotify_token }}"
+    enabled: {{ ai_config_gotify_enabled | lower }}
