@@ -147,7 +147,6 @@
       - agents
       - commands
       - skills
-      - settings.json
   block:
     - name: AI Config | Stat source entries in AI prompts
       ansible.builtin.stat:
@@ -177,4 +176,4 @@
     msg: |
       AI Config agents connected:
       Source: {{ ai_config_ai_prompts_dest }}/.claude/
-      Symlinks: agents, commands, skills, settings.json (where present)
+      Symlinks: agents, commands, skills (where present)

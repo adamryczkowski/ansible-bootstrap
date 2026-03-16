@@ -1,8 +1,8 @@
 ---
 # Deploy Claude Code settings with MCP server configuration
 #
-# If settings.json is a symlink (to AI_prompts), we update the symlink target.
-# If it's a regular file or doesn't exist, we deploy the template directly.
+# settings.json is machine-specific (contains absolute paths to MCP binaries)
+# so it is deployed as a regular file, not a symlink to AI_prompts.
 
 - name: Claude Code | Get mise node path
   ansible.builtin.shell: |
@@ -17,31 +17,25 @@
   ansible.builtin.set_fact:
     claude_code_node_bin: "{{ claude_code_mise_node_bin.stdout | trim }}"
 
-- name: Claude Code | Resolve settings.json path
+- name: Claude Code | Check if settings.json is a symlink (legacy)
   ansible.builtin.stat:
     path: "{{ claude_code_user_home }}/.claude/settings.json"
   register: claude_code_settings_stat
 
-- name: Claude Code | Determine settings.json target path
-  ansible.builtin.set_fact:
-    claude_code_settings_path: >-
-      {{ claude_code_settings_stat.stat.lnk_source
-      if (claude_code_settings_stat.stat.exists | default(false)) and (claude_code_settings_stat.stat.islnk | default(false))
-      else claude_code_user_home + '/.claude/settings.json' }}
-
-- name: Claude Code | Ensure settings directory exists
+- name: Claude Code | Remove legacy settings.json symlink
   ansible.builtin.file:
-    path: "{{ claude_code_settings_path | trim | dirname }}"
-    state: directory
-    owner: "{{ claude_code_username }}"
-    mode: '0755'
+    path: "{{ claude_code_user_home }}/.claude/settings.json"
+    state: absent
   become: true
   become_user: "{{ claude_code_username }}"
+  when:
+    - claude_code_settings_stat.stat.exists | default(false)
+    - claude_code_settings_stat.stat.islnk | default(false)
 
 - name: Claude Code | Deploy settings.json
   ansible.builtin.template:
     src: settings.json.j2
-    dest: "{{ claude_code_settings_path | trim }}"
+    dest: "{{ claude_code_user_home }}/.claude/settings.json"
     owner: "{{ claude_code_username }}"
     mode: '0644'
   become: true
