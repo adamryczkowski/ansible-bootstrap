@@ -1,7 +1,180 @@
 ---
 # ai_config/tasks/agents.yml — AI_prompts clone, remote setup, sync registration, symlinks
-# TODO: Full implementation in Milestone 2
 
-- name: AI Config | Agents tasks placeholder
+- name: AI Config | Expand AI prompts destination directory
+  ansible.builtin.set_fact:
+    ai_config_ai_prompts_dest: "{{ ai_config_dest_dir | replace('~', ai_config_user_home) }}"
+
+- name: AI Config | Check if AI prompts repository already exists
+  ansible.builtin.stat:
+    path: "{{ ai_config_ai_prompts_dest }}/.git"
+  register: ai_config_ai_prompts_git_dir
+
+- name: AI Config | Clone AI prompts repository from remote
+  ansible.builtin.git:
+    repo: "{{ ai_config_source_remote }}"
+    dest: "{{ ai_config_ai_prompts_dest }}"
+    accept_hostkey: true
+  become: true
+  become_user: "{{ ai_config_username }}"
+  when: not ai_config_ai_prompts_git_dir.stat.exists
+  register: ai_config_ai_prompts_clone_result
+
+- name: AI Config | Track if repository was just cloned
+  ansible.builtin.set_fact:
+    ai_config_ai_prompts_just_cloned: "{{ ai_config_ai_prompts_clone_result.changed | default(false) }}"
+
+# IDEMPOTENCY FIX: sentinel stdout pattern — rc==0 was wrong (always changed)
+- name: AI Config | Set git remote origin to GitHub
+  ansible.builtin.shell: |
+    set -e
+    cd "{{ ai_config_ai_prompts_dest }}"
+    current_url=$(git remote get-url origin 2>/dev/null || echo "__none__")
+    desired="{{ ai_config_github_remote }}"
+    if [ "$current_url" = "$desired" ]; then
+      echo "already-set"
+      exit 0
+    fi
+    if git remote | grep -q '^origin$'; then
+      git remote set-url origin "$desired"
+    else
+      git remote add origin "$desired"
+    fi
+    echo "changed"
+  args:
+    executable: /bin/bash
+  become: true
+  become_user: "{{ ai_config_username }}"
+  when: ai_config_github_remote | length > 0
+  register: ai_config_ai_prompts_set_remote_result
+  changed_when: "'changed' in ai_config_ai_prompts_set_remote_result.stdout"
+
+- name: AI Config | Get target hostname
+  ansible.builtin.command: hostname
+  register: ai_config_ai_prompts_target_hostname
+  changed_when: false
+
+- name: AI Config | Get target IP address
+  ansible.builtin.set_fact:
+    ai_config_ai_prompts_target_ip: "{{ ansible_default_ipv4.address | default(ansible_host) }}"
+
+- name: AI Config | Build sync entry for this host
+  ansible.builtin.set_fact:
+    ai_config_ai_prompts_sync_entry: "{{ ai_config_username }}@{{ ai_config_ai_prompts_target_ip }}:{{ ai_config_ai_prompts_dest }}"
+
+- name: AI Config | Read current git-sync-hosts.txt
+  ansible.builtin.slurp:
+    src: "{{ ai_config_ai_prompts_dest }}/git-sync-hosts.txt"
+  register: ai_config_ai_prompts_sync_hosts_content
+  become: true
+  become_user: "{{ ai_config_username }}"
+  failed_when: false
+
+- name: AI Config | Check if host is already registered
+  ansible.builtin.set_fact:
+    ai_config_ai_prompts_host_already_registered: >-
+      {{ (ai_config_ai_prompts_sync_hosts_content.content | default('') | b64decode).find(ai_config_ai_prompts_sync_entry | default('')) >= 0 }}
+  when: ai_config_ai_prompts_sync_hosts_content is not failed
+
+- name: AI Config | Add host to git-sync-hosts.txt
+  ansible.builtin.lineinfile:
+    path: "{{ ai_config_ai_prompts_dest }}/git-sync-hosts.txt"
+    line: "\n# {{ ai_config_ai_prompts_target_hostname.stdout }} (added by ansible)\n{{ ai_config_ai_prompts_sync_entry }}"
+    insertafter: EOF
+  become: true
+  become_user: "{{ ai_config_username }}"
+  when:
+    - ai_config_register_for_sync | bool
+    - ai_config_ai_prompts_sync_hosts_content is not failed
+    - not (ai_config_ai_prompts_host_already_registered | default(false))
+  register: ai_config_ai_prompts_host_registered
+
+- name: AI Config | Commit the host registration
+  ansible.builtin.shell: |
+    cd "{{ ai_config_ai_prompts_dest }}"
+    git add git-sync-hosts.txt
+    git commit -m "Add {{ ai_config_ai_prompts_target_hostname.stdout }} to sync hosts"
+  args:
+    executable: /bin/bash
+  become: true
+  become_user: "{{ ai_config_username }}"
+  when: ai_config_ai_prompts_host_registered.changed | default(false)
+  register: ai_config_ai_prompts_commit_result
+  changed_when: ai_config_ai_prompts_commit_result.rc == 0
+  failed_when: false
+
+# Only run sync on initial clone to avoid conflicts during non-interactive Ansible runs
+- name: AI Config | Run git-sync2.sh synchronization (initial clone only)
+  ansible.builtin.shell: |
+    cd "{{ ai_config_ai_prompts_dest }}"
+    ./deploy/git-sync2.sh 2>&1
+  args:
+    executable: /bin/bash
+  become: true
+  become_user: "{{ ai_config_username }}"
+  when:
+    - ai_config_run_sync | bool
+    - ai_config_ai_prompts_just_cloned
+  register: ai_config_ai_prompts_sync_result
+  changed_when: >-
+    'Sync complete' in ai_config_ai_prompts_sync_result.stdout
+    or 'All hosts synchronized' in ai_config_ai_prompts_sync_result.stdout
+# NOTE: No stdout-string assert — exit code is sufficient (simplicity-critic)
+
+- name: AI Config | Verify AI prompts .claude directory exists
+  ansible.builtin.stat:
+    path: "{{ ai_config_ai_prompts_dest }}/.claude"
+  register: ai_config_ai_prompts_claude_dir
+
+- name: AI Config | Fail if AI prompts .claude directory is missing
+  ansible.builtin.fail:
+    msg: "AI Prompts cloned to {{ ai_config_ai_prompts_dest }} but .claude directory not found."
+  when: not ai_config_ai_prompts_claude_dir.stat.exists
+
+- name: AI Config | Ensure ~/.claude directory exists
+  ansible.builtin.file:
+    path: "{{ ai_config_user_home }}/.claude"
+    state: directory
+    owner: "{{ ai_config_username }}"
+    mode: '0700'
+  become: true
+  become_user: "{{ ai_config_username }}"
+
+# IDEMPOTENCY FIX: no fileglob pre-removal; force:true handles all cases
+- name: AI Config | Process .claude symlink entries
+  vars:
+    ai_config_symlink_entries:
+      - agents
+      - commands
+      - skills
+      - settings.json
+  block:
+    - name: AI Config | Stat source entries in AI prompts
+      ansible.builtin.stat:
+        path: "{{ ai_config_ai_prompts_dest }}/.claude/{{ entry }}"
+      register: ai_config_ai_prompts_src_stat
+      loop: "{{ ai_config_symlink_entries }}"
+      loop_control:
+        loop_var: entry
+
+    # force: true handles: missing → create; correct symlink → no change;
+    # wrong symlink → replace; regular file/dir → remove and create
+    - name: AI Config | Create .claude symlinks
+      ansible.builtin.file:
+        src: "{{ ai_config_ai_prompts_dest }}/.claude/{{ entry.entry }}"
+        dest: "{{ ai_config_user_home }}/.claude/{{ entry.entry }}"
+        state: link
+        force: true
+      become: true
+      become_user: "{{ ai_config_username }}"
+      when: entry.stat.exists
+      loop: "{{ ai_config_ai_prompts_src_stat.results }}"
+      loop_control:
+        loop_var: entry
+
+- name: AI Config | Display agents connection status
   ansible.builtin.debug:
-    msg: "ai_config agents tasks — implementation pending (Milestone 2)"
+    msg: |
+      AI Config agents connected:
+      Source: {{ ai_config_ai_prompts_dest }}/.claude/
+      Symlinks: agents, commands, skills, settings.json (where present)
