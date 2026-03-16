@@ -56,7 +56,7 @@
 
 - name: AI Config | Get target IP address
   ansible.builtin.set_fact:
-    ai_config_ai_prompts_target_ip: "{{ ansible_default_ipv4.address | default(ansible_host) }}"
+    ai_config_ai_prompts_target_ip: "{{ ansible_facts['default_ipv4']['address'] | default(ansible_host) }}"
 
 - name: AI Config | Build sync entry for this host
   ansible.builtin.set_fact:

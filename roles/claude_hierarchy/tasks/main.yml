@@ -64,10 +64,26 @@
   when: not claude_hierarchy_needs_install
 
 # ── Build on controller (gated) ───────────────────────────────────────────────
+# Export a clean snapshot of the last committed code to avoid picking up
+# uncommitted changes or a dirty worktree from the live source directory.
+- name: Claude Hierarchy | Export clean source from git HEAD
+  ansible.builtin.shell: |
+    build_dir="/tmp/claude-hierarchy-build-{{ claude_hierarchy_src_ver }}"
+    rm -rf "$build_dir"
+    mkdir -p "$build_dir"
+    git -C "{{ claude_hierarchy_source_dir | expanduser }}" archive HEAD \
+      | tar -x -C "$build_dir"
+  args:
+    executable: /bin/bash
+  delegate_to: localhost
+  become: false
+  changed_when: true
+  when: claude_hierarchy_needs_install
+
 - name: Claude Hierarchy | Validate source with just validate
   ansible.builtin.command:
     cmd: just validate
-    chdir: "{{ claude_hierarchy_source_dir | expanduser }}"
+    chdir: "/tmp/claude-hierarchy-build-{{ claude_hierarchy_src_ver }}"
   delegate_to: localhost
   become: false
   changed_when: false
@@ -77,10 +93,10 @@
 
 - name: Claude Hierarchy | Build and pack from source
   ansible.builtin.shell: |
-    npm run build && npm pack
+    npm ci && npm run build && npm pack
   args:
     executable: /bin/bash
-    chdir: "{{ claude_hierarchy_source_dir | expanduser }}"
+    chdir: "/tmp/claude-hierarchy-build-{{ claude_hierarchy_src_ver }}"
   delegate_to: localhost
   become: false
   register: claude_hierarchy_pack_result
@@ -90,7 +106,7 @@
 # ── Deploy to target (gated) ──────────────────────────────────────────────────
 - name: Claude Hierarchy | Copy .tgz to target
   ansible.builtin.copy:
-    src: "{{ claude_hierarchy_source_dir | expanduser }}/claude-hierarchy-{{ claude_hierarchy_src_ver }}.tgz"
+    src: "/tmp/claude-hierarchy-build-{{ claude_hierarchy_src_ver }}/claude-hierarchy-{{ claude_hierarchy_src_ver }}.tgz"
     dest: "/tmp/claude-hierarchy-{{ claude_hierarchy_src_ver }}.tgz"
     mode: '0644'
   when: claude_hierarchy_needs_install
