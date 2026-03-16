@@ -1,0 +1,25 @@
+---
+# Targeted test for ai_config/tasks/config_yaml.yml (Milestone 3)
+- name: Test ai_config config_yaml tasks
+  hosts: all
+  gather_facts: false
+  vars:
+    ai_config_username: "adam"
+    ai_config_gotify_url: "http://139.162.226.242:1486"
+    ai_config_gotify_enabled: true
+    ai_config_gotify_token: ""
+
+  tasks:
+    - name: Look up user home directory
+      ansible.builtin.getent:
+        database: passwd
+        key: "{{ ai_config_username }}"
+
+    - name: Set user home directory
+      ansible.builtin.set_fact:
+        ai_config_user_home: "{{ ansible_facts.getent_passwd[ai_config_username][4] }}"
+
+    - name: Run ai_config config_yaml tasks
+      ansible.builtin.include_role:
+        name: ai_config
+        tasks_from: config_yaml

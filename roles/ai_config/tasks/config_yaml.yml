@@ -1,7 +1,23 @@
 ---
-# ai_config/tasks/config_yaml.yml — Deploy ~/.config/claude-hierarchy/config.yaml
-# TODO: Full implementation in Milestone 3
+# Deploy ~/.config/claude-hierarchy/config.yaml
+# Skipped entirely if ai_config_gotify_token is empty (the default)
 
-- name: AI Config | Config yaml placeholder
-  ansible.builtin.debug:
-    msg: "ai_config config_yaml tasks — implementation pending (Milestone 3)"
+- name: AI Config | Ensure claude-hierarchy config directory exists
+  ansible.builtin.file:
+    path: "{{ ai_config_user_home }}/.config/claude-hierarchy"
+    state: directory
+    owner: "{{ ai_config_username }}"
+    mode: '0700'
+  become: true
+  become_user: "{{ ai_config_username }}"
+  when: ai_config_gotify_token | length > 0
+
+- name: AI Config | Deploy claude-hierarchy config.yaml
+  ansible.builtin.template:
+    src: claude-hierarchy-config.yaml.j2
+    dest: "{{ ai_config_user_home }}/.config/claude-hierarchy/config.yaml"
+    owner: "{{ ai_config_username }}"
+    mode: '0600'
+  become: true
+  become_user: "{{ ai_config_username }}"
+  when: ai_config_gotify_token | length > 0
