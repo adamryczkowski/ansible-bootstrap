@@ -1,18 +1,47 @@
 ---
 # Conduwuit Server Role — Binary Installation Tasks
+#
+# Supports upgrades: checks installed version and replaces the binary
+# when conduwuit_version changes.
 
-- name: Conduwuit Install | Check if binary already installed
-  ansible.builtin.stat:
+- name: Conduwuit Install | Check installed version
+  ansible.builtin.command:
+    cmd: "{{ conduwuit_install_dir }}/conduwuit --version"
+  become: true
+  become_user: "{{ conduwuit_user }}"
+  register: conduwuit_installed_version
+  changed_when: false
+  failed_when: false
+
+- name: Conduwuit Install | Set upgrade needed fact
+  ansible.builtin.set_fact:
+    conduwuit_needs_install: >-
+      {{ conduwuit_installed_version.rc != 0
+      or conduwuit_version not in (conduwuit_installed_version.stdout | default('')) }}
+
+- name: Conduwuit Install | Stop service before upgrade
+  ansible.builtin.systemd:
+    name: conduwuit
+    state: stopped
+  become: true
+  when: conduwuit_needs_install | bool and conduwuit_installed_version.rc == 0
+  failed_when: false
+
+- name: Conduwuit Install | Download conduwuit binary v{{ conduwuit_version }}
+  ansible.builtin.command:
+    cmd: >-
+      wget -q -O {{ conduwuit_install_dir }}/conduwuit
+      https://github.com/{{ conduwuit_github_repo }}/releases/download/v{{ conduwuit_version }}/{{ conduwuit_binary_asset }}
+  become: true
+  when: conduwuit_needs_install | bool
+  changed_when: true
+  notify: "Conduwuit | Restart conduwuit"
+
+- name: Conduwuit Install | Set binary permissions
+  ansible.builtin.file:
     path: "{{ conduwuit_install_dir }}/conduwuit"
-  register: conduwuit_binary_stat
-
-- name: Conduwuit Install | Download conduwuit static binary v{{ conduwuit_version }}
-  ansible.builtin.get_url:
-    url: "https://github.com/{{ conduwuit_github_repo }}/releases/download/v{{ conduwuit_version }}/{{ conduwuit_binary_asset }}"
-    dest: "{{ conduwuit_install_dir }}/conduwuit"
-    mode: "0755"
     owner: root
     group: root
+    mode: "0755"
   become: true
-  when: not conduwuit_binary_stat.stat.exists
-  notify: "Conduwuit | Restart conduwuit"
+  when: conduwuit_needs_install | bool

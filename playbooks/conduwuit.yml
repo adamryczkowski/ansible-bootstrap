@@ -90,7 +90,7 @@
         groups: conduwuit_container
         ansible_host: "{{ conduwuit_container_ip }}"
         ansible_user: root
-        ansible_ssh_common_args: "-o ProxyJump=adam@192.168.10.5 -o StrictHostKeyChecking=no"
+        ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
         ansible_python_interpreter: /usr/bin/python3
 
 # =============================================================================

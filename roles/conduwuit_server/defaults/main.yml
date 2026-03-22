@@ -5,7 +5,7 @@
 # configuring it as a systemd service with hardened permissions.
 #
 # References:
-#   - https://github.com/x86pup/conduwuit
+#   - https://github.com/continuwuity/continuwuity
 #   - https://continuwuity.org/deploying/generic
 
 # =============================================================================
@@ -13,13 +13,14 @@
 # =============================================================================
 
 # conduwuit release version to install (pin in production via group_vars)
-conduwuit_version: "0.4.6"
+conduwuit_version: "0.5.3"
 
 # GitHub repository owner/name for binary downloads
-conduwuit_github_repo: "x86pup/conduwuit"
+# Original x86pup/conduwuit is archived; continuwuity is the active fork.
+conduwuit_github_repo: "continuwuity/continuwuity"
 
-# Binary asset name pattern (static musl build, no dependencies)
-conduwuit_binary_asset: "static-x86_64-unknown-linux-musl"
+# Binary asset name for the target architecture
+conduwuit_binary_asset: "conduwuit-linux-amd64"
 
 # =============================================================================
 # Matrix Server Identity
