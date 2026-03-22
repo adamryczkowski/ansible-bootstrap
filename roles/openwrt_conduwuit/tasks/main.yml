@@ -48,3 +48,8 @@
   ansible.builtin.include_tasks: acme.yml
   tags:
     - openwrt_conduwuit_acme
+
+- name: OpenWRT Conduwuit Proxy | Include reverse proxy tasks
+  ansible.builtin.include_tasks: proxy.yml
+  tags:
+    - openwrt_conduwuit_proxy

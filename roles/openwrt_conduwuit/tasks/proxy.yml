@@ -1,0 +1,85 @@
+---
+# {{ ansible_managed }}
+# OpenWRT Conduwuit Role — Reverse Proxy (nginx)
+#
+# Deploys an nginx TLS reverse proxy for the conduwuit Matrix homeserver:
+#
+#   1. Deploy matrix-proxy.conf.j2 to /etc/nginx/conf.d/matrix-proxy.conf
+#      - Port 443 (HTTPS): client API (/_matrix/) and .well-known delegation
+#      - Port 8448 (HTTPS): federation API (/_matrix/)
+#      - TLS via Let's Encrypt cert from ACME milestone
+#      - proxy_pass to conduwuit on 127.0.0.1:6167
+#
+#   2. Validate nginx configuration (nginx -t) before making any service changes
+#
+#   3. uhttpd→nginx migration with rescue rollback:
+#      - block: disable/stop uhttpd, enable/start nginx
+#      - rescue: re-enable/restart uhttpd, fail with clear message
+#
+# LuCI remains accessible via nginx-mod-luci (automatically configures nginx).
+#
+# Idempotent: template is only redeployed if changed; service management
+# tasks are no-ops when nginx is already running and uhttpd already stopped.
+#
+# Depends on: nginx-ssl, nginx-mod-luci packages (milestone 2),
+#             valid TLS cert at /etc/acme/{{ openwrt_conduwuit_acme_domain }}/ (milestone 5).
+
+- name: OpenWRT Conduwuit Proxy | Deploy nginx matrix proxy configuration
+  ansible.builtin.template:
+    src: matrix-proxy.conf.j2
+    dest: /etc/nginx/conf.d/matrix-proxy.conf
+    mode: "0644"
+    owner: root
+  notify: OpenWRT Conduwuit | Reload nginx
+  tags:
+    - openwrt_conduwuit_proxy
+
+- name: OpenWRT Conduwuit Proxy | Validate nginx configuration
+  ansible.builtin.command:
+    cmd: nginx -t
+  register: _nginx_config_test
+  changed_when: false
+  tags:
+    - openwrt_conduwuit_proxy
+
+- name: OpenWRT Conduwuit Proxy | Migrate uhttpd to nginx with rollback on failure
+  tags:
+    - openwrt_conduwuit_proxy
+  block:
+    - name: OpenWRT Conduwuit Proxy | Disable uhttpd service
+      community.general.openwrt_init:
+        name: uhttpd
+        enabled: false
+
+    - name: OpenWRT Conduwuit Proxy | Stop uhttpd service
+      community.general.openwrt_init:
+        name: uhttpd
+        state: stopped
+
+    - name: OpenWRT Conduwuit Proxy | Enable nginx service
+      community.general.openwrt_init:
+        name: nginx
+        enabled: true
+
+    - name: OpenWRT Conduwuit Proxy | Start nginx service
+      community.general.openwrt_init:
+        name: nginx
+        state: started
+
+  rescue:
+    - name: OpenWRT Conduwuit Proxy | Rollback — re-enable uhttpd after nginx failure
+      community.general.openwrt_init:
+        name: uhttpd
+        enabled: true
+
+    - name: OpenWRT Conduwuit Proxy | Rollback — restart uhttpd after nginx failure
+      community.general.openwrt_init:
+        name: uhttpd
+        state: restarted
+
+    - name: OpenWRT Conduwuit Proxy | Fail with migration error
+      ansible.builtin.fail:
+        msg: >-
+          nginx failed to start — rolled back to uhttpd. Check nginx configuration
+          with 'nginx -t' and review /etc/nginx/conf.d/matrix-proxy.conf.
+          Error: {{ ansible_failed_result | default('unknown error') }}

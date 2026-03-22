@@ -1,0 +1,47 @@
+# {{ ansible_managed }}
+# nginx reverse proxy for conduwuit Matrix homeserver
+
+# Client-facing server (port 443)
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name {{ openwrt_conduwuit_domain }};
+
+    ssl_certificate /etc/acme/{{ openwrt_conduwuit_acme_domain }}/fullchain.cer;
+    ssl_certificate_key /etc/acme/{{ openwrt_conduwuit_acme_domain }}/{{ openwrt_conduwuit_acme_domain }}.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    location /_matrix/ {
+        proxy_pass http://127.0.0.1:{{ openwrt_conduwuit_port }};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        client_max_body_size {{ (openwrt_conduwuit_max_request_size / 1048576) | int }}m;
+    }
+
+    location /.well-known/matrix/ {
+        proxy_pass http://127.0.0.1:{{ openwrt_conduwuit_port }};
+        proxy_set_header Host $host;
+    }
+}
+
+# Federation server (port 8448)
+server {
+    listen 8448 ssl;
+    listen [::]:8448 ssl;
+    server_name {{ openwrt_conduwuit_domain }};
+
+    ssl_certificate /etc/acme/{{ openwrt_conduwuit_acme_domain }}/fullchain.cer;
+    ssl_certificate_key /etc/acme/{{ openwrt_conduwuit_acme_domain }}/{{ openwrt_conduwuit_acme_domain }}.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    location /_matrix/ {
+        proxy_pass http://127.0.0.1:{{ openwrt_conduwuit_port }};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        client_max_body_size {{ (openwrt_conduwuit_max_request_size / 1048576) | int }}m;
+    }
+}
