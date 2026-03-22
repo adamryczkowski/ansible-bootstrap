@@ -1,0 +1,18 @@
+---
+# Conduwuit Server Role — Binary Installation Tasks
+
+- name: Conduwuit Install | Check if binary already installed
+  ansible.builtin.stat:
+    path: "{{ conduwuit_install_dir }}/conduwuit"
+  register: conduwuit_binary_stat
+
+- name: Conduwuit Install | Download conduwuit static binary v{{ conduwuit_version }}
+  ansible.builtin.get_url:
+    url: "https://github.com/{{ conduwuit_github_repo }}/releases/download/v{{ conduwuit_version }}/{{ conduwuit_binary_asset }}"
+    dest: "{{ conduwuit_install_dir }}/conduwuit"
+    mode: "0755"
+    owner: root
+    group: root
+  become: true
+  when: not conduwuit_binary_stat.stat.exists
+  notify: "Conduwuit | Restart conduwuit"

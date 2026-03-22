@@ -1,0 +1,57 @@
+---
+# Production variable overrides for the gotify_container group
+#
+# These values override role defaults (roles/gotify_server/defaults/main.yml)
+# for the production Gotify deployment on the Linode host (139.162.226.242).
+#
+# SECURITY NOTE: gotify_default_pass MUST be replaced with an Ansible Vault
+# encrypted string before running against production. See instructions below.
+
+# =============================================================================
+# Version and Download
+# =============================================================================
+
+# Pin the Gotify release version for reproducible production deployments
+gotify_version: "2.9.1"
+
+# SHA256 checksum of the downloaded zip archive — required for binary verification
+# Generate with: sha256sum gotify-linux-amd64.zip
+# Set via vault or override: "sha256:abcdef1234..."
+# gotify_checksum: "sha256:..."  # FIXME: populate before production deploy
+
+# =============================================================================
+# Network Configuration
+# =============================================================================
+
+# TCP port Gotify listens on inside the container (matches legacy deployment)
+gotify_port: 1486
+
+# =============================================================================
+# Database Restore
+# =============================================================================
+
+# Enable SQLite database restore from backup (set true for migration)
+# WARNING: restore.yml MUST run before Gotify starts (enforced by role task order)
+gotify_restore_db: true
+
+# Absolute path on the Ansible controller to the gotify.db backup
+# This file is copied into the container via ansible.builtin.copy (no /tmp staging)
+gotify_restore_db_src: /tmp/gotify-backup/gotify.db
+
+# =============================================================================
+# Initial Admin Credentials
+# =============================================================================
+
+# SECURITY: gotify_default_pass MUST be Ansible Vault encrypted.
+# Only used on fresh database initialisation; has no effect when restoring DB.
+#
+# To encrypt:
+#   ansible-vault encrypt_string 'your-strong-password' --name gotify_default_pass
+#
+# Then replace the placeholder below with the vault output, e.g.:
+#   gotify_default_pass: !vault |
+#     $ANSIBLE_VAULT;1.1;AES256
+#     <vault-encrypted-string-here>
+#
+# DO NOT commit a plaintext password to version control.
+gotify_default_pass: "CHANGE_ME_IN_VAULT"  # FIXME: replace with vault-encrypted string

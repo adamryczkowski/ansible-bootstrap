@@ -1,0 +1,17 @@
+# {{ ansible_managed }}
+# conduwuit Matrix homeserver configuration.
+# Deployed by the conduwuit_server Ansible role.
+
+[global]
+
+server_name = "{{ conduwuit_server_name }}"
+database_path = "{{ conduwuit_database_path }}"
+port = {{ conduwuit_port }}
+address = ["{{ conduwuit_address }}"]
+max_request_size = {{ conduwuit_max_request_size }}
+log = "{{ conduwuit_log }}"
+allow_registration = {{ conduwuit_allow_registration | lower }}
+allow_federation = {{ conduwuit_allow_federation | lower }}
+trusted_servers = {{ conduwuit_trusted_servers | to_json }}
+allow_encryption = true
+allow_room_creation = true

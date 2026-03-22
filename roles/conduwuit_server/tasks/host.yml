@@ -1,0 +1,52 @@
+---
+# Conduwuit Server Role — LXD Host Preparation Tasks
+
+- name: Conduwuit Host | Check if container already exists
+  ansible.builtin.command:
+    cmd: lxc info {{ conduwuit_container_name }}
+  register: conduwuit_host_container_exists
+  changed_when: false
+  failed_when: false
+
+- name: Conduwuit Host | Create LXD container (Ubuntu {{ conduwuit_container_image }})
+  community.general.lxd_container:
+    name: "{{ conduwuit_container_name }}"
+    state: started
+    source:
+      type: image
+      mode: pull
+      server: https://cloud-images.ubuntu.com/releases
+      protocol: simplestreams
+      alias: "{{ conduwuit_container_image }}"
+    profiles:
+      - "{{ conduwuit_container_profile }}"
+    wait_for_ipv4_addresses: true
+    timeout: 120
+  when: conduwuit_host_container_exists.rc != 0
+
+- name: Conduwuit Host | Start container if stopped
+  community.general.lxd_container:
+    name: "{{ conduwuit_container_name }}"
+    state: started
+    wait_for_ipv4_addresses: true
+    timeout: 120
+  when: conduwuit_host_container_exists.rc == 0
+
+- name: Conduwuit Host | Check if Python3 is installed in container
+  ansible.builtin.command:
+    cmd: lxc exec {{ conduwuit_container_name }} -- which python3
+  register: conduwuit_host_python3_check
+  changed_when: false
+  failed_when: false
+
+- name: Conduwuit Host | Update apt cache in container
+  ansible.builtin.command:
+    cmd: lxc exec {{ conduwuit_container_name }} -- apt-get update -qq
+  changed_when: true
+  when: conduwuit_host_python3_check.rc != 0
+
+- name: Conduwuit Host | Bootstrap Python3 in container
+  ansible.builtin.command:
+    cmd: lxc exec {{ conduwuit_container_name }} -- apt-get install -y python3 python3-apt
+  changed_when: true
+  when: conduwuit_host_python3_check.rc != 0

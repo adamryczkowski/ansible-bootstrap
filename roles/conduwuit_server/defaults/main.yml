@@ -1,0 +1,112 @@
+---
+# Default variables for conduwuit Matrix homeserver role
+#
+# This role deploys conduwuit inside a new LXD container on the host,
+# configuring it as a systemd service with hardened permissions.
+#
+# References:
+#   - https://github.com/x86pup/conduwuit
+#   - https://continuwuity.org/deploying/generic
+
+# =============================================================================
+# Version and Download
+# =============================================================================
+
+# conduwuit release version to install (pin in production via group_vars)
+conduwuit_version: "0.4.6"
+
+# GitHub repository owner/name for binary downloads
+conduwuit_github_repo: "x86pup/conduwuit"
+
+# Binary asset name pattern (static musl build, no dependencies)
+conduwuit_binary_asset: "static-x86_64-unknown-linux-musl"
+
+# =============================================================================
+# Matrix Server Identity
+# =============================================================================
+
+# The Matrix server name — forms part of user IDs (@user:server_name)
+# MUST be overridden in group_vars or host_vars for production.
+conduwuit_server_name: "matrix.example.com"
+
+# =============================================================================
+# Network Configuration
+# =============================================================================
+
+# TCP port conduwuit listens on inside the container
+conduwuit_port: 6167
+
+# Listen address inside the container
+conduwuit_address: "0.0.0.0"
+
+# =============================================================================
+# Directory Paths
+# =============================================================================
+
+# Base installation directory (binary)
+conduwuit_install_dir: /opt/conduwuit
+
+# Directory for conduwuit configuration file
+conduwuit_config_dir: /etc/conduwuit
+
+# Data directory containing the RocksDB database
+conduwuit_database_path: /var/lib/conduwuit
+
+# =============================================================================
+# Service User
+# =============================================================================
+
+# Dedicated system user that runs the conduwuit process
+conduwuit_user: conduwuit
+
+# =============================================================================
+# Matrix Server Settings
+# =============================================================================
+
+# Allow open registration (MUST be false for security)
+conduwuit_allow_registration: false
+
+# Allow federation with other Matrix servers (disabled for private bot server)
+conduwuit_allow_federation: false
+
+# Trusted servers list (empty when federation is disabled)
+conduwuit_trusted_servers: []
+
+# Maximum request body size in bytes (20 MB)
+conduwuit_max_request_size: 20971520
+
+# Log level (warn,conduwuit=info for production)
+conduwuit_log: "warn,conduwuit=info"
+
+# =============================================================================
+# Account Setup (post-deployment)
+# =============================================================================
+
+# Enable Matrix account creation via CS API after deployment
+# Set true only on first run or when accounts need to be recreated
+conduwuit_setup_accounts: false
+
+# Bot account credentials — MUST be Vault-encrypted in production
+conduwuit_bot_user: "claude-bot"
+conduwuit_bot_password: ""  # Override via Ansible Vault
+
+# Human (admin) account credentials — MUST be Vault-encrypted in production
+conduwuit_admin_user: "adam"
+conduwuit_admin_password: ""  # Override via Ansible Vault
+
+# Private room name for bot-human communication
+conduwuit_room_name: "claude-hierarchy-notifications"
+conduwuit_room_topic: "Agent notifications and replies"
+
+# =============================================================================
+# LXD Host Configuration
+# =============================================================================
+
+# Name of the LXD container to create on the host
+conduwuit_container_name: conduwuit
+
+# Ubuntu image version for the new LXD container
+conduwuit_container_image: "24.04"
+
+# LXD profile to use (bridged networking gives a LAN IP)
+conduwuit_container_profile: default

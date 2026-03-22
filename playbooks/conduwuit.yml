@@ -1,0 +1,146 @@
+---
+# Conduwuit Deploy Playbook — Two-play LXD container orchestration
+#
+# Play 1: Prepares the LXD host (container creation with bridged networking,
+#          Python3 bootstrap inside the new container)
+# Play 2: Deploys the conduwuit Matrix homeserver inside the container
+#          using the conduwuit_server role
+#
+# Usage:
+#   ansible-playbook playbooks/conduwuit.yml -i inventory/production
+#   ansible-playbook playbooks/conduwuit.yml -i inventory/production --check
+#   ansible-playbook playbooks/conduwuit.yml -i inventory/production --tags conduwuit_install
+#
+# Prerequisites:
+#   - SSH access to the LXD host (conduwuit_hosts group)
+#   - LXD installed and initialized on the target host
+#   - Bridged networking profile configured in LXD
+#   - conduwuit_bot_password and conduwuit_admin_password set via Ansible Vault
+#     (when conduwuit_setup_accounts: true)
+
+# =============================================================================
+# Play 1: Prepare LXD Host
+# =============================================================================
+
+- name: Prepare LXD host for conduwuit container
+  hosts: conduwuit_hosts
+  become: false
+  gather_facts: true
+
+  vars:
+    conduwuit_container_name: conduwuit
+    conduwuit_container_image: "24.04"
+    conduwuit_container_profile: default
+    conduwuit_port: 6167
+
+  tasks:
+    - name: Conduwuit Host | Include host preparation tasks
+      ansible.builtin.include_role:
+        name: conduwuit_server
+        tasks_from: host.yml
+      tags:
+        - conduwuit_host
+
+    - name: Conduwuit Host | Get container IP address
+      ansible.builtin.command:
+        cmd: >-
+          lxc list {{ conduwuit_container_name }}
+          --format=json
+      register: conduwuit_host_container_info
+      changed_when: false
+
+    - name: Conduwuit Host | Parse container IP
+      ansible.builtin.set_fact:
+        conduwuit_container_ip: >-
+          {{ (conduwuit_host_container_info.stdout | from_json)[0].state.network.eth0.addresses
+          | selectattr('family', 'equalto', 'inet')
+          | map(attribute='address')
+          | first }}
+
+    - name: Conduwuit Host | Display container IP
+      ansible.builtin.debug:
+        msg: "Container '{{ conduwuit_container_name }}' has IP: {{ conduwuit_container_ip }}"
+
+    - name: Conduwuit Host | Bootstrap SSH in container
+      ansible.builtin.command:
+        cmd: >-
+          lxc exec {{ conduwuit_container_name }} --
+          bash -c "
+            if ! dpkg -l openssh-server >/dev/null 2>&1; then
+              apt-get update -qq &&
+              apt-get install -y -qq openssh-server &&
+              mkdir -p /root/.ssh &&
+              chmod 700 /root/.ssh
+            fi
+          "
+      register: conduwuit_host_ssh_bootstrap
+      changed_when: "'Setting up openssh-server' in conduwuit_host_ssh_bootstrap.stdout"
+
+    - name: Conduwuit Host | Copy SSH authorized keys into container
+      ansible.builtin.command:
+        cmd: >-
+          lxc exec {{ conduwuit_container_name }} --
+          bash -c "cat > /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys"
+        stdin: "{{ lookup('file', '~/.ssh/id_ed25519.pub', errors='ignore') | default(lookup('file', '~/.ssh/id_rsa.pub', errors='ignore'), true) }}"
+      changed_when: false
+
+    - name: Conduwuit Host | Register container in in-memory inventory
+      ansible.builtin.add_host:
+        name: "{{ conduwuit_container_name }}"
+        groups: conduwuit_container
+        ansible_host: "{{ conduwuit_container_ip }}"
+        ansible_user: root
+        ansible_ssh_common_args: "-o ProxyJump=adam@192.168.10.5 -o StrictHostKeyChecking=no"
+        ansible_python_interpreter: /usr/bin/python3
+
+# =============================================================================
+# Play 2: Deploy conduwuit Inside Container
+# =============================================================================
+
+- name: Deploy conduwuit inside LXD container
+  hosts: conduwuit_container
+  become: true
+  gather_facts: false
+
+  pre_tasks:
+    - name: Conduwuit Container | Gather facts
+      ansible.builtin.setup:
+
+  roles:
+    - role: conduwuit_server
+      tags: [conduwuit]
+
+  post_tasks:
+    - name: Conduwuit Container | Gather service facts
+      ansible.builtin.service_facts:
+
+    - name: Conduwuit Container | Verify service is running
+      ansible.builtin.assert:
+        that: ansible_facts.services['conduwuit.service'].state == 'running'
+        fail_msg: >-
+          conduwuit service is not running
+          (state: {{ ansible_facts.services['conduwuit.service'].state | default('unknown') }})
+
+    - name: Conduwuit Container | Verify Matrix API is responding
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ conduwuit_port }}/_matrix/client/versions"
+        method: GET
+        status_code: 200
+      register: conduwuit_api_check
+      retries: 10
+      delay: 2
+      until: conduwuit_api_check.status == 200
+
+    - name: Conduwuit Container | Display deployment summary
+      ansible.builtin.debug:
+        msg: |
+          ============================================================
+          conduwuit Deployment Complete!
+          ============================================================
+          Host:           {{ groups['conduwuit_hosts'][0] }}
+          Container:      {{ conduwuit_container_name }}
+          Service:        {{ ansible_facts.services['conduwuit.service'].state }}
+          Server name:    {{ conduwuit_server_name }}
+          Port:           {{ conduwuit_port }}
+          Matrix API:     http://<container-ip>:{{ conduwuit_port }}/_matrix/client/versions
+          ============================================================

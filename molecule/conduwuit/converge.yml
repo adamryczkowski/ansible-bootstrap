@@ -1,0 +1,54 @@
+---
+# Molecule converge playbook for conduwuit Matrix homeserver test
+#
+# Runs the full conduwuit_server role with test-appropriate defaults.
+# Account setup is disabled (requires a real domain for Matrix user IDs).
+
+- name: Converge - conduwuit Matrix homeserver setup
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    # Test server name (not a real domain)
+    conduwuit_server_name: "test.example.com"
+
+    # Disable account setup — not applicable in molecule test
+    conduwuit_setup_accounts: false
+
+    # Use default port
+    conduwuit_port: 6167
+
+  pre_tasks:
+    - name: Display test configuration
+      ansible.builtin.debug:
+        msg: |
+          conduwuit Server Molecule Test
+          - Install dir: {{ conduwuit_install_dir | default('/opt/conduwuit') }}
+          - Config dir:  {{ conduwuit_config_dir | default('/etc/conduwuit') }}
+          - Port:        {{ conduwuit_port | default(6167) }}
+          - OS:          {{ ansible_distribution }} {{ ansible_distribution_version }}
+
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+  tasks:
+    - name: Include conduwuit_server role
+      ansible.builtin.include_role:
+        name: conduwuit_server
+
+  post_tasks:
+    - name: Display converge completion
+      ansible.builtin.debug:
+        msg: |
+          Molecule Converge Complete!
+
+          Deployed components:
+          - conduwuit binary      (/opt/conduwuit/conduwuit)
+          - Configuration file    (/etc/conduwuit/conduwuit.toml)
+          - System user           (conduwuit, nologin shell)
+          - Systemd unit          (/etc/systemd/system/conduwuit.service)
+          - Service state         (enabled and started)
+          - RocksDB database      (/var/lib/conduwuit/)

@@ -1,0 +1,41 @@
+---
+# Conduwuit Server Role — Task Entry Point
+#
+# Inclusion order is CRITICAL — do NOT reorder:
+#   1. prerequisites.yml  — apt packages (curl)
+#   2. user.yml           — conduwuit system user + directory tree
+#   3. install.yml        — download static binary, stat-guard
+#   4. configure.yml      — render conduwuit.toml from template
+#   5. service.yml        — systemd unit file, enable and start
+#   6. accounts.yml       — create Matrix accounts and room via CS API
+
+- name: Conduwuit Prerequisites | Include prerequisites tasks
+  ansible.builtin.include_tasks: prerequisites.yml
+  tags:
+    - conduwuit_prerequisites
+
+- name: Conduwuit User | Include user setup tasks
+  ansible.builtin.include_tasks: user.yml
+  tags:
+    - conduwuit_user
+
+- name: Conduwuit Install | Include binary installation tasks
+  ansible.builtin.include_tasks: install.yml
+  tags:
+    - conduwuit_install
+
+- name: Conduwuit Configure | Include configuration tasks
+  ansible.builtin.include_tasks: configure.yml
+  tags:
+    - conduwuit_configure
+
+- name: Conduwuit Service | Include systemd service tasks
+  ansible.builtin.include_tasks: service.yml
+  tags:
+    - conduwuit_service
+
+- name: Conduwuit Accounts | Include account setup tasks
+  ansible.builtin.include_tasks: accounts.yml
+  tags:
+    - conduwuit_accounts
+  when: conduwuit_setup_accounts | bool

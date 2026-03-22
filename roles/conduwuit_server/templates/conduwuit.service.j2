@@ -1,0 +1,24 @@
+# {{ ansible_managed }}
+# Systemd unit for the conduwuit Matrix homeserver.
+
+[Unit]
+Description=conduwuit Matrix Homeserver
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User={{ conduwuit_user }}
+Group={{ conduwuit_user }}
+ExecStart={{ conduwuit_install_dir }}/conduwuit --config {{ conduwuit_config_dir }}/conduwuit.toml
+Restart=on-failure
+RestartSec=5
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths={{ conduwuit_database_path }}
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

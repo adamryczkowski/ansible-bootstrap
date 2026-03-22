@@ -1,0 +1,31 @@
+---
+# conduwuit Matrix homeserver role metadata
+
+galaxy_info:
+  author: Adam
+  description: >-
+    Deploy the conduwuit Matrix homeserver inside a new LXD container.
+    Handles container creation, binary installation, configuration,
+    account setup, and hardened systemd service management.
+  company: ""
+  license: MIT
+  min_ansible_version: "2.14"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - noble  # 24.04 LTS
+
+  galaxy_tags:
+    - matrix
+    - conduwuit
+    - homeserver
+    - chat
+    - lxd
+    - container
+    - systemd
+    - ubuntu
+
+collections:
+  - community.general
+
+dependencies: []

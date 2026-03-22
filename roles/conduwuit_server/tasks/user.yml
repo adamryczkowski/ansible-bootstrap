@@ -1,0 +1,39 @@
+---
+# Conduwuit Server Role — User and Directory Tasks
+
+- name: Conduwuit User | Create dedicated conduwuit system user
+  ansible.builtin.user:
+    name: "{{ conduwuit_user }}"
+    system: true
+    shell: /usr/sbin/nologin
+    home: "{{ conduwuit_install_dir }}"
+    create_home: false
+    comment: conduwuit Matrix homeserver
+  become: true
+
+- name: Conduwuit User | Create install directory
+  ansible.builtin.file:
+    path: "{{ conduwuit_install_dir }}"
+    state: directory
+    owner: "{{ conduwuit_user }}"
+    group: "{{ conduwuit_user }}"
+    mode: "0755"
+  become: true
+
+- name: Conduwuit User | Create database directory
+  ansible.builtin.file:
+    path: "{{ conduwuit_database_path }}"
+    state: directory
+    owner: "{{ conduwuit_user }}"
+    group: "{{ conduwuit_user }}"
+    mode: "0700"
+  become: true
+
+- name: Conduwuit User | Create config directory
+  ansible.builtin.file:
+    path: "{{ conduwuit_config_dir }}"
+    state: directory
+    owner: root
+    group: "{{ conduwuit_user }}"
+    mode: "0750"
+  become: true

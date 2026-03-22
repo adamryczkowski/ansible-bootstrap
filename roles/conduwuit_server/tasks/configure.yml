@@ -1,0 +1,12 @@
+---
+# Conduwuit Server Role — Configuration Tasks
+
+- name: Conduwuit Configure | Deploy conduwuit.toml from template
+  ansible.builtin.template:
+    src: conduwuit.toml.j2
+    dest: "{{ conduwuit_config_dir }}/conduwuit.toml"
+    owner: root
+    group: "{{ conduwuit_user }}"
+    mode: "0640"
+  become: true
+  notify: "Conduwuit | Restart conduwuit"

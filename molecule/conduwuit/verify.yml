@@ -1,0 +1,211 @@
+---
+# Molecule verify playbook for conduwuit Matrix homeserver test
+#
+# Performs 8 assertion blocks to confirm the role deployed every component
+# correctly:
+#   1.  Binary exists with mode 0755
+#   2.  Config file exists with mode 0640
+#   3.  Config file contains server_name
+#   4.  conduwuit system user exists with nologin shell
+#   5.  Systemd unit file exists
+#   6.  Service is enabled
+#   7.  Service is active (running)
+#   8.  Port 6167 is listening and Matrix API responds
+
+- name: Verify - conduwuit Matrix homeserver
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    conduwuit_install_dir: /opt/conduwuit
+    conduwuit_config_dir: /etc/conduwuit
+    conduwuit_database_path: /var/lib/conduwuit
+    conduwuit_user: conduwuit
+    conduwuit_port: 6167
+
+  tasks:
+
+    # =========================================================================
+    # 1. Binary exists with mode 0755
+    # =========================================================================
+
+    - name: Verify | Stat conduwuit binary
+      ansible.builtin.stat:
+        path: "{{ conduwuit_install_dir }}/conduwuit"
+      register: verify_binary
+
+    - name: Verify | Assert binary exists with mode 0755
+      ansible.builtin.assert:
+        that:
+          - verify_binary.stat.exists
+          - verify_binary.stat.mode == '0755'
+        fail_msg: >-
+          conduwuit binary not found at {{ conduwuit_install_dir }}/conduwuit
+          or mode is not 0755 (got {{ verify_binary.stat.mode | default('missing') }})
+        success_msg: "conduwuit binary exists with mode 0755"
+
+    # =========================================================================
+    # 2. Config file exists with mode 0640
+    # =========================================================================
+
+    - name: Verify | Stat conduwuit config file
+      ansible.builtin.stat:
+        path: "{{ conduwuit_config_dir }}/conduwuit.toml"
+      register: verify_config
+
+    - name: Verify | Assert config file exists with mode 0640
+      ansible.builtin.assert:
+        that:
+          - verify_config.stat.exists
+          - verify_config.stat.mode == '0640'
+        fail_msg: >-
+          conduwuit config not found at {{ conduwuit_config_dir }}/conduwuit.toml
+          or mode is not 0640 (got {{ verify_config.stat.mode | default('missing') }})
+        success_msg: "conduwuit config exists with mode 0640"
+
+    # =========================================================================
+    # 3. Config file contains server_name
+    # =========================================================================
+
+    - name: Verify | Slurp conduwuit config file contents
+      ansible.builtin.slurp:
+        src: "{{ conduwuit_config_dir }}/conduwuit.toml"
+      register: verify_config_content
+
+    - name: Verify | Assert config contains server_name
+      ansible.builtin.assert:
+        that:
+          - "'test.example.com' in (verify_config_content.content | b64decode)"
+        fail_msg: "conduwuit config does not contain expected server_name"
+        success_msg: "conduwuit config contains server_name 'test.example.com'"
+
+    # =========================================================================
+    # 4. conduwuit user exists with nologin shell
+    # =========================================================================
+
+    - name: Verify | Look up conduwuit user in passwd database
+      ansible.builtin.getent:
+        database: passwd
+        key: "{{ conduwuit_user }}"
+      register: verify_user
+
+    - name: Verify | Assert conduwuit user exists with nologin shell
+      ansible.builtin.assert:
+        that:
+          - verify_user is not failed
+          - "'/nologin' in getent_passwd[conduwuit_user][5]"
+        fail_msg: >-
+          User '{{ conduwuit_user }}' not found or does not have a nologin shell
+        success_msg: "User '{{ conduwuit_user }}' exists with nologin shell"
+
+    # =========================================================================
+    # 5. Systemd unit file exists
+    # =========================================================================
+
+    - name: Verify | Stat conduwuit systemd unit file
+      ansible.builtin.stat:
+        path: /etc/systemd/system/conduwuit.service
+      register: verify_unit
+
+    - name: Verify | Assert systemd unit file exists
+      ansible.builtin.assert:
+        that:
+          - verify_unit.stat.exists
+        fail_msg: "conduwuit systemd unit file not found"
+        success_msg: "conduwuit systemd unit file exists"
+
+    # =========================================================================
+    # 6. Service is enabled
+    # =========================================================================
+
+    - name: Verify | Check if conduwuit service is enabled
+      ansible.builtin.command: systemctl is-enabled conduwuit
+      register: verify_service_enabled
+      changed_when: false
+      failed_when: false
+
+    - name: Verify | Assert conduwuit service is enabled
+      ansible.builtin.assert:
+        that:
+          - verify_service_enabled.rc == 0
+          - verify_service_enabled.stdout == 'enabled'
+        fail_msg: >-
+          conduwuit service is not enabled
+          (systemctl is-enabled returned: {{ verify_service_enabled.stdout | default('') }})
+        success_msg: "conduwuit service is enabled"
+
+    # =========================================================================
+    # 7. Service is active (running)
+    # =========================================================================
+
+    - name: Verify | Check if conduwuit service is active
+      ansible.builtin.command: systemctl is-active conduwuit
+      register: verify_service_active
+      changed_when: false
+      failed_when: false
+
+    - name: Verify | Assert conduwuit service is active
+      ansible.builtin.assert:
+        that:
+          - verify_service_active.rc == 0
+          - verify_service_active.stdout == 'active'
+        fail_msg: >-
+          conduwuit service is not active
+          (systemctl is-active returned: {{ verify_service_active.stdout | default('') }})
+        success_msg: "conduwuit service is active (running)"
+
+    # =========================================================================
+    # 8. Port 6167 is listening and Matrix API responds
+    # =========================================================================
+
+    - name: Verify | Check port 6167 is listening
+      ansible.builtin.command: ss -tlnp sport = :{{ conduwuit_port }}
+      register: verify_port
+      changed_when: false
+
+    - name: Verify | Assert port 6167 is listening
+      ansible.builtin.assert:
+        that:
+          - "':' ~ conduwuit_port | string in verify_port.stdout"
+        fail_msg: "Port {{ conduwuit_port }} is not listening"
+        success_msg: "Port {{ conduwuit_port }} is listening"
+
+    - name: Verify | Check Matrix client API responds
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ conduwuit_port }}/_matrix/client/versions"
+        method: GET
+        status_code: 200
+      register: verify_api
+
+    - name: Verify | Assert Matrix API returns versions
+      ansible.builtin.assert:
+        that:
+          - verify_api.status == 200
+          - "'versions' in verify_api.json"
+        fail_msg: "Matrix client API did not return expected versions response"
+        success_msg: "Matrix client API is responding correctly"
+
+    # =========================================================================
+    # Summary
+    # =========================================================================
+
+    - name: Verify | Display verification summary
+      ansible.builtin.debug:
+        msg: |
+          ============================================================
+          Molecule Verification Complete!
+          ============================================================
+
+          All checks passed:
+          1/8  Binary /opt/conduwuit/conduwuit exists, mode 0755
+          2/8  Config /etc/conduwuit/conduwuit.toml exists, mode 0640
+          3/8  Config contains server_name 'test.example.com'
+          4/8  User 'conduwuit' exists with nologin shell
+          5/8  Systemd unit /etc/systemd/system/conduwuit.service exists
+          6/8  Service conduwuit is enabled
+          7/8  Service conduwuit is active
+          8/8  Port 6167 is listening, Matrix API responds
+
+          The conduwuit_server role is correctly configured.
+          ============================================================

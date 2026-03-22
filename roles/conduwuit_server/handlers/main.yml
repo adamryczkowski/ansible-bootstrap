@@ -1,0 +1,15 @@
+---
+# conduwuit Matrix homeserver role handlers
+
+- name: Conduwuit | Reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: true
+  become: true
+  listen: "Conduwuit | Reload systemd"
+
+- name: Conduwuit | Restart conduwuit service
+  ansible.builtin.systemd:
+    name: conduwuit
+    state: restarted
+  become: true
+  listen: "Conduwuit | Restart conduwuit"
