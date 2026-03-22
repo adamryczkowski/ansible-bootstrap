@@ -1,0 +1,343 @@
+---
+# OpenWRT Conduwuit Role — Matrix Account Setup Tasks
+#
+# Gated by openwrt_conduwuit_setup_accounts in main.yml.
+# Handles both fresh setup and re-runs (existing accounts).
+#
+# Continuwuity v0.5+ uses registration tokens instead of the old
+# conduwuit admin API. This task flow:
+#   1. Temporarily enables registration with a one-time token
+#   2. Creates admin and bot accounts via the Matrix CS API
+#   3. Disables registration again
+#   4. Creates a private notification room (bot invites admin)
+#   5. Writes .env.matrix with bot credentials and room ID
+#
+# Idempotent: if .env.matrix already exists, skips room creation.
+# Account registration is gated per-user via login checks.
+
+# =========================================================================
+# Phase 0: Check if .env.matrix already exists (idempotency guard)
+# =========================================================================
+
+- name: OpenWRT Conduwuit Accounts | Check if .env.matrix already exists
+  ansible.builtin.stat:
+    path: "{{ openwrt_conduwuit_install_dir }}/.env.matrix"
+  register: _openwrt_conduwuit_env_matrix_stat
+  tags:
+    - openwrt_conduwuit_accounts
+
+# =========================================================================
+# Phase 1: Health check
+# =========================================================================
+
+- name: OpenWRT Conduwuit Accounts | Wait for homeserver to be ready
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ openwrt_conduwuit_port }}/_matrix/client/versions"
+    method: GET
+    status_code: 200
+  register: _openwrt_conduwuit_health
+  retries: 30
+  delay: 2
+  until: _openwrt_conduwuit_health.status == 200
+  tags:
+    - openwrt_conduwuit_accounts
+
+# =========================================================================
+# Phase 2: Enable registration temporarily
+# =========================================================================
+
+- name: OpenWRT Conduwuit Accounts | Generate one-time registration token
+  ansible.builtin.set_fact:
+    _openwrt_conduwuit_registration_token: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
+  no_log: true
+  tags:
+    - openwrt_conduwuit_accounts
+
+- name: OpenWRT Conduwuit Accounts | Deploy config with registration enabled
+  ansible.builtin.template:
+    src: conduwuit.toml.j2
+    dest: "{{ openwrt_conduwuit_config_dir }}/conduwuit.toml"
+    mode: "0640"
+  vars:
+    openwrt_conduwuit_allow_registration: true
+    openwrt_conduwuit_registration_token: "{{ _openwrt_conduwuit_registration_token }}"
+  tags:
+    - openwrt_conduwuit_accounts
+
+- name: OpenWRT Conduwuit Accounts | Restart conduwuit to apply registration config
+  ansible.builtin.command:
+    cmd: docker compose -f {{ openwrt_conduwuit_install_dir }}/docker-compose.yml restart
+  changed_when: true
+  tags:
+    - openwrt_conduwuit_accounts
+
+- name: OpenWRT Conduwuit Accounts | Wait for conduwuit to come back up
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ openwrt_conduwuit_port }}/_matrix/client/versions"
+    method: GET
+    status_code: 200
+  register: _openwrt_conduwuit_reg_health
+  retries: 30
+  delay: 2
+  until: _openwrt_conduwuit_reg_health.status == 200
+  tags:
+    - openwrt_conduwuit_accounts
+
+# =========================================================================
+# Phase 3: Create/verify accounts
+# =========================================================================
+
+- name: OpenWRT Conduwuit Accounts | Check if admin user already exists
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ openwrt_conduwuit_port }}/_matrix/client/v3/login"
+    method: POST
+    body_format: json
+    body:
+      type: "m.login.password"
+      identifier:
+        type: "m.id.user"
+        user: "{{ openwrt_conduwuit_admin_user }}"
+      password: "{{ openwrt_conduwuit_admin_password }}"
+    status_code: [200, 403]
+  register: _openwrt_conduwuit_admin_login_check
+  no_log: true
+  tags:
+    - openwrt_conduwuit_accounts
+
+# Registration with token requires a two-step UIA flow:
+# Step 1: POST without auth to get the session ID
+# Step 2: POST with auth including the token and session
+
+- name: OpenWRT Conduwuit Accounts | Register admin user (step 1 — get session)
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ openwrt_conduwuit_port }}/_matrix/client/v3/register"
+    method: POST
+    body_format: json
+    body:
+      username: "{{ openwrt_conduwuit_admin_user }}"
+      password: "{{ openwrt_conduwuit_admin_password }}"
+    status_code: [200, 401]
+  register: _openwrt_conduwuit_admin_reg_step1
+  no_log: true
+  when: _openwrt_conduwuit_admin_login_check.status != 200
+  tags:
+    - openwrt_conduwuit_accounts
+
+- name: OpenWRT Conduwuit Accounts | Register admin user (step 2 — with token)
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ openwrt_conduwuit_port }}/_matrix/client/v3/register"
+    method: POST
+    body_format: json
+    body:
+      username: "{{ openwrt_conduwuit_admin_user }}"
+      password: "{{ openwrt_conduwuit_admin_password }}"
+      auth:
+        type: "m.login.registration_token"
+        token: "{{ _openwrt_conduwuit_registration_token }}"
+        session: "{{ _openwrt_conduwuit_admin_reg_step1.json.session }}"
+    status_code: [200]
+  register: _openwrt_conduwuit_admin_created
+  no_log: true
+  when: _openwrt_conduwuit_admin_login_check.status != 200
+  tags:
+    - openwrt_conduwuit_accounts
+
+- name: OpenWRT Conduwuit Accounts | Check if bot user already exists
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ openwrt_conduwuit_port }}/_matrix/client/v3/login"
+    method: POST
+    body_format: json
+    body:
+      type: "m.login.password"
+      identifier:
+        type: "m.id.user"
+        user: "{{ openwrt_conduwuit_bot_user }}"
+      password: "{{ openwrt_conduwuit_bot_password }}"
+    status_code: [200, 403]
+  register: _openwrt_conduwuit_bot_login_check
+  no_log: true
+  tags:
+    - openwrt_conduwuit_accounts
+
+- name: OpenWRT Conduwuit Accounts | Register bot user (step 1 — get session)
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ openwrt_conduwuit_port }}/_matrix/client/v3/register"
+    method: POST
+    body_format: json
+    body:
+      username: "{{ openwrt_conduwuit_bot_user }}"
+      password: "{{ openwrt_conduwuit_bot_password }}"
+    status_code: [200, 401]
+  register: _openwrt_conduwuit_bot_reg_step1
+  no_log: true
+  when: _openwrt_conduwuit_bot_login_check.status != 200
+  tags:
+    - openwrt_conduwuit_accounts
+
+- name: OpenWRT Conduwuit Accounts | Register bot user (step 2 — with token)
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ openwrt_conduwuit_port }}/_matrix/client/v3/register"
+    method: POST
+    body_format: json
+    body:
+      username: "{{ openwrt_conduwuit_bot_user }}"
+      password: "{{ openwrt_conduwuit_bot_password }}"
+      auth:
+        type: "m.login.registration_token"
+        token: "{{ _openwrt_conduwuit_registration_token }}"
+        session: "{{ _openwrt_conduwuit_bot_reg_step1.json.session }}"
+    status_code: [200]
+  register: _openwrt_conduwuit_bot_created
+  no_log: true
+  when: _openwrt_conduwuit_bot_login_check.status != 200
+  tags:
+    - openwrt_conduwuit_accounts
+
+# =========================================================================
+# Phase 4: Disable registration
+# =========================================================================
+
+- name: OpenWRT Conduwuit Accounts | Deploy config with registration disabled
+  ansible.builtin.template:
+    src: conduwuit.toml.j2
+    dest: "{{ openwrt_conduwuit_config_dir }}/conduwuit.toml"
+    mode: "0640"
+  vars:
+    openwrt_conduwuit_allow_registration: false
+    openwrt_conduwuit_registration_token: ""
+  tags:
+    - openwrt_conduwuit_accounts
+
+- name: OpenWRT Conduwuit Accounts | Restart conduwuit with registration disabled
+  ansible.builtin.command:
+    cmd: docker compose -f {{ openwrt_conduwuit_install_dir }}/docker-compose.yml restart
+  changed_when: true
+  tags:
+    - openwrt_conduwuit_accounts
+
+- name: OpenWRT Conduwuit Accounts | Wait for conduwuit to come back up
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ openwrt_conduwuit_port }}/_matrix/client/versions"
+    method: GET
+    status_code: 200
+  register: _openwrt_conduwuit_final_health
+  retries: 30
+  delay: 2
+  until: _openwrt_conduwuit_final_health.status == 200
+  tags:
+    - openwrt_conduwuit_accounts
+
+# =========================================================================
+# Phase 5: Bot login, room creation, .env.matrix
+# =========================================================================
+
+- name: OpenWRT Conduwuit Accounts | Login as bot to get access token
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ openwrt_conduwuit_port }}/_matrix/client/v3/login"
+    method: POST
+    body_format: json
+    body:
+      type: "m.login.password"
+      identifier:
+        type: "m.id.user"
+        user: "{{ openwrt_conduwuit_bot_user }}"
+      password: "{{ openwrt_conduwuit_bot_password }}"
+  register: _openwrt_conduwuit_bot_login
+  no_log: true
+  tags:
+    - openwrt_conduwuit_accounts
+
+- name: OpenWRT Conduwuit Accounts | Create private notification room
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ openwrt_conduwuit_port }}/_matrix/client/v3/createRoom"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ _openwrt_conduwuit_bot_login.json.access_token }}"
+    body_format: json
+    body:
+      name: "{{ openwrt_conduwuit_room_name }}"
+      topic: "{{ openwrt_conduwuit_room_topic }}"
+      preset: "private_chat"
+      invite:
+        - "@{{ openwrt_conduwuit_admin_user }}:{{ openwrt_conduwuit_server_name }}"
+      creation_content:
+        m.federate: false
+    status_code: [200]
+  register: _openwrt_conduwuit_room_created
+  when: not _openwrt_conduwuit_env_matrix_stat.stat.exists
+  tags:
+    - openwrt_conduwuit_accounts
+
+- name: OpenWRT Conduwuit Accounts | Login as admin to accept room invite
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ openwrt_conduwuit_port }}/_matrix/client/v3/login"
+    method: POST
+    body_format: json
+    body:
+      type: "m.login.password"
+      identifier:
+        type: "m.id.user"
+        user: "{{ openwrt_conduwuit_admin_user }}"
+      password: "{{ openwrt_conduwuit_admin_password }}"
+  register: _openwrt_conduwuit_admin_login
+  no_log: true
+  when: not _openwrt_conduwuit_env_matrix_stat.stat.exists
+  tags:
+    - openwrt_conduwuit_accounts
+
+- name: OpenWRT Conduwuit Accounts | Admin accepts room invite
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ openwrt_conduwuit_port }}/_matrix/client/v3/join/{{ _openwrt_conduwuit_room_created.json.room_id }}"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ _openwrt_conduwuit_admin_login.json.access_token }}"
+    body_format: json
+    body: {}
+    status_code: [200]
+  when: not _openwrt_conduwuit_env_matrix_stat.stat.exists
+  tags:
+    - openwrt_conduwuit_accounts
+
+# =========================================================================
+# Phase 6: Write .env.matrix
+# =========================================================================
+
+- name: OpenWRT Conduwuit Accounts | Write .env.matrix file
+  ansible.builtin.copy:
+    content: |
+      # conduwuit bot access token — managed by Ansible
+      # Do NOT commit this file to version control
+      MATRIX_HOMESERVER_URL=http://{{ openwrt_conduwuit_lan_host }}:{{ openwrt_conduwuit_port }}
+      MATRIX_USER_ID=@{{ openwrt_conduwuit_bot_user }}:{{ openwrt_conduwuit_server_name }}
+      MATRIX_ACCESS_TOKEN={{ _openwrt_conduwuit_bot_login.json.access_token }}
+      MATRIX_ROOM_ID={{ _openwrt_conduwuit_room_created.json.room_id }}
+      MATRIX_OWNER_USER_ID=@{{ openwrt_conduwuit_admin_user }}:{{ openwrt_conduwuit_server_name }}
+    dest: "{{ openwrt_conduwuit_install_dir }}/.env.matrix"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  when: not _openwrt_conduwuit_env_matrix_stat.stat.exists
+  tags:
+    - openwrt_conduwuit_accounts
+
+# =========================================================================
+# Summary
+# =========================================================================
+
+- name: OpenWRT Conduwuit Accounts | Display setup summary
+  ansible.builtin.debug:
+    msg: |
+      ============================================================
+      Matrix Account Setup Complete!
+      ============================================================
+      Server:     {{ openwrt_conduwuit_server_name }}
+      Bot user:   @{{ openwrt_conduwuit_bot_user }}:{{ openwrt_conduwuit_server_name }}
+      Admin user: @{{ openwrt_conduwuit_admin_user }}:{{ openwrt_conduwuit_server_name }}
+      Room ID:    {{ _openwrt_conduwuit_room_created.json.room_id | default('(pre-existing)') }}
+      Room name:  {{ openwrt_conduwuit_room_name }}
+      Env file:   {{ openwrt_conduwuit_install_dir }}/.env.matrix
+      LAN URL:    http://{{ openwrt_conduwuit_lan_host }}:{{ openwrt_conduwuit_port }}
+      ============================================================
+  tags:
+    - openwrt_conduwuit_accounts

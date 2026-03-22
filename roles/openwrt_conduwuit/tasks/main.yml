@@ -63,3 +63,9 @@
   ansible.builtin.include_tasks: service.yml
   tags:
     - openwrt_conduwuit_service
+
+- name: OpenWRT Conduwuit Accounts | Include account setup tasks
+  ansible.builtin.include_tasks: accounts.yml
+  when: openwrt_conduwuit_setup_accounts | bool
+  tags:
+    - openwrt_conduwuit_accounts
