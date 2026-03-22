@@ -1,0 +1,20 @@
+---
+# {{ ansible_managed }}
+# Role metadata for openwrt_conduwuit
+
+galaxy_info:
+  role_name: openwrt_conduwuit
+  author: ansible-bootstrap
+  description: >
+    Deploy conduwuit Matrix homeserver on aarch64 OpenWRT router via Docker
+    with nginx-ssl TLS termination, DDNS (Cloudflare), and Let's Encrypt
+    certificates (DNS-01 challenge).
+  license: MIT
+  min_ansible_version: "2.14"
+
+  platforms:
+    - name: OpenWrt
+      versions:
+        - "24.10"
+
+dependencies: []

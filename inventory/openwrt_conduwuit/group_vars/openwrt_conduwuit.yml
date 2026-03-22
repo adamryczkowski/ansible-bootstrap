@@ -1,0 +1,17 @@
+---
+# OpenWRT Conduwuit group variables
+# Secrets MUST be encrypted with: ansible-vault encrypt_string
+
+openwrt_conduwuit_server_name: "statystyka.net"
+openwrt_conduwuit_domain: "matrix.statystyka.net"
+openwrt_conduwuit_acme_email: "admin@statystyka.net"
+
+# Vault-encrypted secrets (override with ansible-vault)
+# openwrt_conduwuit_cloudflare_api_token: !vault |
+#   ...
+# openwrt_conduwuit_cloudflare_zone_id: !vault |
+#   ...
+# openwrt_conduwuit_admin_password: !vault |
+#   ...
+# openwrt_conduwuit_bot_password: !vault |
+#   ...

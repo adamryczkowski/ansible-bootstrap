@@ -1,20 +1,15 @@
 ---
-# OpenWRT Conduwuit Deploy Playbook
-#
-# Deploys conduwuit Matrix homeserver on an aarch64 OpenWRT router using
-# Docker (ghcr.io/continuwuity/continuwuity:v0.5.3), nginx-ssl for TLS
-# termination, DDNS via Cloudflare, and Let's Encrypt certs (DNS-01).
+# OpenWRT Conduwuit Deploy Playbook — Single-play Docker deployment
 #
 # Usage:
 #   ansible-playbook playbooks/openwrt_conduwuit.yml -i inventory/openwrt_conduwuit
-#   ansible-playbook playbooks/openwrt_conduwuit.yml -i inventory/openwrt_conduwuit --tags openwrt_conduwuit_preflight
 #   ansible-playbook playbooks/openwrt_conduwuit.yml -i inventory/openwrt_conduwuit --check
+#   ansible-playbook playbooks/openwrt_conduwuit.yml -i inventory/openwrt_conduwuit --tags openwrt_conduwuit_install
 #
 # Prerequisites:
-#   - SSH access to OpenWRT router (openwrt_conduwuit group, typically root@192.168.10.10)
-#   - Docker installed and running on the router
-#   - openwrt_conduwuit_cloudflare_api_token and secrets set via Ansible Vault
-#     (in inventory/openwrt_conduwuit/group_vars/openwrt_conduwuit.yml)
+#   - SSH access to the router (root@192.168.10.10)
+#   - Cloudflare API token and Zone ID set via Ansible Vault
+#   - Account passwords set via Ansible Vault (when setup_accounts: true)
 
 - name: Deploy conduwuit Matrix homeserver on OpenWRT router
   hosts: openwrt_conduwuit
@@ -22,13 +17,23 @@
   gather_facts: false
 
   pre_tasks:
-    - name: OpenWRT Conduwuit Bootstrap | Ensure Python3 is installed
-      ansible.builtin.raw: >-
-        if ! command -v python3 >/dev/null 2>&1; then
-          opkg update && opkg install python3;
-        fi
-      register: openwrt_conduwuit_python_bootstrap
-      changed_when: "'Installing python3' in openwrt_conduwuit_python_bootstrap.stdout"
+    - name: OpenWRT Bootstrap | Check Python3 availability
+      ansible.builtin.raw: python3 --version
+      register: _python3_check
+      changed_when: false
+      failed_when: false
+      tags:
+        - always
+
+    - name: OpenWRT Bootstrap | Install Python3 if missing
+      ansible.builtin.raw: opkg update && opkg install python3-light python3-logging
+      when: _python3_check.rc != 0
+      changed_when: true
+      tags:
+        - always
+
+    - name: OpenWRT Bootstrap | Gather facts
+      ansible.builtin.setup:
       tags:
         - always
 
@@ -36,3 +41,47 @@
     - role: openwrt_conduwuit
       tags:
         - openwrt_conduwuit
+
+  post_tasks:
+    - name: OpenWRT Conduwuit | Verify Docker container running
+      ansible.builtin.command:
+        cmd: docker ps --format '{{ "{{.Status}}" }}' --filter name=conduwuit
+      register: openwrt_conduwuit_container_status
+      changed_when: false
+      failed_when: "'Up' not in openwrt_conduwuit_container_status.stdout"
+
+    - name: OpenWRT Conduwuit | Verify Matrix API responding
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ openwrt_conduwuit_port }}/_matrix/client/versions"
+        method: GET
+        status_code: 200
+      register: openwrt_conduwuit_api_check
+      retries: 10
+      delay: 3
+      until: openwrt_conduwuit_api_check.status == 200
+
+    - name: OpenWRT Conduwuit | Verify HTTPS through nginx
+      ansible.builtin.uri:
+        url: "https://{{ openwrt_conduwuit_domain }}/_matrix/client/versions"
+        method: GET
+        status_code: 200
+        validate_certs: true
+      register: openwrt_conduwuit_https_check
+      retries: 5
+      delay: 3
+      until: openwrt_conduwuit_https_check.status == 200
+
+    - name: OpenWRT Conduwuit | Display deployment summary
+      ansible.builtin.debug:
+        msg: |
+          ============================================================
+          conduwuit Deployment Complete!
+          ============================================================
+          Router:         {{ ansible_host }}
+          Server name:    {{ openwrt_conduwuit_server_name }}
+          Domain:         {{ openwrt_conduwuit_domain }}
+          Container:      conduwuit (Docker)
+          Matrix API:     https://{{ openwrt_conduwuit_domain }}/_matrix/client/versions
+          Federation:     {{ openwrt_conduwuit_allow_federation }}
+          Sliding Sync:   native (built-in)
+          ============================================================
