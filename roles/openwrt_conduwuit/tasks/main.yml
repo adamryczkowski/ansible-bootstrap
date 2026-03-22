@@ -58,3 +58,8 @@
   ansible.builtin.include_tasks: firewall.yml
   tags:
     - openwrt_conduwuit_firewall
+
+- name: OpenWRT Conduwuit Service | Include procd service tasks
+  ansible.builtin.include_tasks: service.yml
+  tags:
+    - openwrt_conduwuit_service

@@ -1,0 +1,27 @@
+#!/bin/sh /etc/rc.common
+# {{ ansible_managed }}
+# procd init script for conduwuit Matrix homeserver (Docker)
+#
+# Wraps docker compose up/down so that procd manages the lifecycle.
+# Docker's own restart policy is set to "no" — procd is responsible for
+# starting and stopping the container at system boot/shutdown.
+
+START=95
+STOP=10
+
+COMPOSE_FILE="{{ openwrt_conduwuit_install_dir }}/docker-compose.yml"
+
+start() {
+    logger -t conduwuit "Starting conduwuit via docker compose"
+    docker compose -f "$COMPOSE_FILE" up -d
+}
+
+stop() {
+    logger -t conduwuit "Stopping conduwuit via docker compose"
+    docker compose -f "$COMPOSE_FILE" down
+}
+
+restart() {
+    stop
+    start
+}

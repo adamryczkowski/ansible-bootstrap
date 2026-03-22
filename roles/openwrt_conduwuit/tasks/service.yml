@@ -1,0 +1,116 @@
+---
+# {{ ansible_managed }}
+# OpenWRT Conduwuit Role — Procd Service (Docker Compose)
+#
+# Deploys the conduwuit procd init script and starts the Docker container.
+#
+# Steps:
+#   1. Deploy conduwuit.init.j2 to /etc/init.d/conduwuit (mode 0755)
+#   2. Enable the conduwuit service (creates /etc/rc.d/S95conduwuit symlink)
+#   3. Start the conduwuit container via /etc/init.d/conduwuit start
+#      (which runs: docker compose -f /opt/conduwuit/docker-compose.yml up -d)
+#   4. Wait for the Docker container to reach "Up" status
+#   5. Verify Matrix endpoints:
+#      - Client API:    GET  http://127.0.0.1:6167/_matrix/client/versions  → 200
+#      - Federation:    GET  http://127.0.0.1:6167/_matrix/federation/v1/version → 200
+#      - Sliding sync:  POST http://127.0.0.1:6167/_matrix/client/unstable/…/sync → 401 (not 404)
+#      - .well-known:   GET  https://matrix.statystyka.net/.well-known/matrix/server (via nginx)
+#
+# Idempotency:
+#   - Template deploy is no-op when file content is unchanged
+#   - openwrt_init enable is no-op when symlink already exists
+#   - Container start is no-op when container is already running (docker compose up -d)
+#
+# Depends on: configure.yml (docker-compose.yml deployed), firewall.yml (ports open),
+#             proxy.yml (nginx running), acme.yml (TLS cert present).
+
+- name: OpenWRT Conduwuit Service | Deploy procd init script
+  ansible.builtin.template:
+    src: conduwuit.init.j2
+    dest: /etc/init.d/conduwuit
+    mode: "0755"
+    owner: root
+  tags:
+    - openwrt_conduwuit_service
+
+- name: OpenWRT Conduwuit Service | Enable conduwuit service at boot
+  community.general.openwrt_init:
+    name: conduwuit
+    enabled: true
+  tags:
+    - openwrt_conduwuit_service
+
+- name: OpenWRT Conduwuit Service | Start conduwuit container via procd
+  community.general.openwrt_init:
+    name: conduwuit
+    state: started
+  tags:
+    - openwrt_conduwuit_service
+
+- name: OpenWRT Conduwuit Service | Wait for Docker container to be running
+  ansible.builtin.command:
+    cmd: docker ps --format "{{ '{{.Status}}' }}" --filter name=conduwuit
+  register: _conduwuit_container_status
+  until: "'Up' in _conduwuit_container_status.stdout"
+  retries: 20
+  delay: 3
+  changed_when: false
+  tags:
+    - openwrt_conduwuit_service
+
+- name: OpenWRT Conduwuit Service | Verify Matrix client API responds
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ openwrt_conduwuit_port }}/_matrix/client/versions"
+    method: GET
+    status_code: 200
+  register: _conduwuit_client_api
+  until: _conduwuit_client_api.status == 200
+  retries: 10
+  delay: 3
+  tags:
+    - openwrt_conduwuit_service
+
+- name: OpenWRT Conduwuit Service | Verify Matrix federation endpoint responds
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ openwrt_conduwuit_port }}/_matrix/federation/v1/version"
+    method: GET
+    status_code: 200
+  register: _conduwuit_federation_api
+  until: _conduwuit_federation_api.status == 200
+  retries: 10
+  delay: 3
+  tags:
+    - openwrt_conduwuit_service
+
+- name: OpenWRT Conduwuit Service | Verify sliding sync endpoint returns 401 (not 404)
+  ansible.builtin.uri:
+    url: >-
+      http://127.0.0.1:{{ openwrt_conduwuit_port }}/_matrix/client/unstable/org.matrix.simplified_msc3575/sync
+    method: POST
+    body: "{}"
+    body_format: json
+    headers:
+      Content-Type: application/json
+    status_code: 401
+  register: _conduwuit_sliding_sync
+  until: _conduwuit_sliding_sync.status == 401
+  retries: 10
+  delay: 3
+  tags:
+    - openwrt_conduwuit_service
+
+- name: OpenWRT Conduwuit Service | Verify .well-known delegation via nginx
+  ansible.builtin.uri:
+    url: "https://{{ openwrt_conduwuit_domain }}/.well-known/matrix/server"
+    method: GET
+    status_code: 200
+    validate_certs: false
+  register: _conduwuit_wellknown
+  until: _conduwuit_wellknown.status == 200
+  retries: 5
+  delay: 3
+  failed_when: >-
+    _conduwuit_wellknown.status != 200 or
+    openwrt_conduwuit_well_known_server not in (_conduwuit_wellknown.json | default({}) | to_json)
+  tags:
+    - openwrt_conduwuit_service
