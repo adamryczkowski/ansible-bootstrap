@@ -1,0 +1,51 @@
+---
+# Android Emulator Role — AVD Creation
+
+- name: Android AVD | Check if AVD already exists
+  ansible.builtin.stat:
+    path: "/home/{{ android_emulator_username }}/.android/avd/{{ android_avd_name }}.avd"
+  register: android_avd_stat
+
+- name: Android AVD | Create AVD
+  ansible.builtin.command:
+    cmd: >-
+      {{ android_sdk_root }}/cmdline-tools/latest/bin/avdmanager
+      create avd
+      --name "{{ android_avd_name }}"
+      --package "{{ android_system_image }}"
+      --device "{{ android_avd_device }}"
+      --force
+    stdin: "no"
+  environment:
+    ANDROID_SDK_ROOT: "{{ android_sdk_root }}"
+    JAVA_HOME: "/usr/lib/jvm/java-17-openjdk-amd64"
+  become: true
+  become_user: "{{ android_emulator_username }}"
+  when: not android_avd_stat.stat.exists
+  changed_when: true
+
+- name: Android AVD | Configure AVD hardware settings
+  ansible.builtin.copy:
+    content: |
+      AvdId={{ android_avd_name }}
+      avd.ini.displayname={{ android_avd_name }}
+      abi.type=x86_64
+      hw.cpu.arch=x86_64
+      tag.id={{ android_system_image_type }}
+      tag.display=Google Play
+      hw.ramSize={{ android_emulator_ram }}
+      hw.cpu.ncore={{ android_emulator_cores }}
+      disk.dataPartition.size={{ android_emulator_disk }}M
+      hw.keyboard=yes
+      hw.gpu.enabled=yes
+      hw.gpu.mode=swiftshader_indirect
+      vm.heapSize=512
+      hw.lcd.density=420
+      hw.lcd.width=1080
+      hw.lcd.height=2400
+      image.sysdir.1={{ android_sdk_root }}/system-images/android-{{ android_api_level }}/{{ android_system_image_type }}/x86_64/
+    dest: "/home/{{ android_emulator_username }}/.android/avd/{{ android_avd_name }}.avd/config.ini"
+    owner: "{{ android_emulator_username }}"
+    group: "{{ android_emulator_username }}"
+    mode: "0644"
+  become: true

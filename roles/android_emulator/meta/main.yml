@@ -1,0 +1,21 @@
+---
+galaxy_info:
+  author: Adam
+  description: >-
+    Deploy a headless Android emulator with KVM acceleration,
+    Google Play Services, and sideloaded APKs. Provides a systemd
+    user service for start/stop and adb on PATH for interaction.
+  license: MIT
+  min_ansible_version: "2.14"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - noble
+
+  galaxy_tags:
+    - android
+    - emulator
+    - testing
+    - mobile
+
+dependencies: []

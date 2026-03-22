@@ -1,0 +1,38 @@
+---
+# Android Emulator Role — Install Emulator Packages via sdkmanager
+
+- name: Android Emulator Pkg | Install platform-tools
+  ansible.builtin.command:
+    cmd: >-
+      {{ android_sdk_root }}/cmdline-tools/latest/bin/sdkmanager
+      --install "platform-tools"
+    creates: "{{ android_sdk_root }}/platform-tools/adb"
+  environment:
+    ANDROID_SDK_ROOT: "{{ android_sdk_root }}"
+    JAVA_HOME: "/usr/lib/jvm/java-17-openjdk-amd64"
+  become: true
+  become_user: "{{ android_emulator_username }}"
+
+- name: Android Emulator Pkg | Install emulator
+  ansible.builtin.command:
+    cmd: >-
+      {{ android_sdk_root }}/cmdline-tools/latest/bin/sdkmanager
+      --install "emulator"
+    creates: "{{ android_sdk_root }}/emulator/emulator"
+  environment:
+    ANDROID_SDK_ROOT: "{{ android_sdk_root }}"
+    JAVA_HOME: "/usr/lib/jvm/java-17-openjdk-amd64"
+  become: true
+  become_user: "{{ android_emulator_username }}"
+
+- name: Android Emulator Pkg | Install system image
+  ansible.builtin.command:
+    cmd: >-
+      {{ android_sdk_root }}/cmdline-tools/latest/bin/sdkmanager
+      --install "{{ android_system_image }}"
+    creates: "{{ android_sdk_root }}/system-images/android-{{ android_api_level }}/{{ android_system_image_type }}/x86_64/system.img"
+  environment:
+    ANDROID_SDK_ROOT: "{{ android_sdk_root }}"
+    JAVA_HOME: "/usr/lib/jvm/java-17-openjdk-amd64"
+  become: true
+  become_user: "{{ android_emulator_username }}"

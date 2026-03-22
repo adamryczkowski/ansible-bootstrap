@@ -1,0 +1,10 @@
+---
+# Android Emulator Role — Java Installation
+
+- name: Android Java | Install OpenJDK 17 headless
+  ansible.builtin.apt:
+    name: "{{ android_java_package }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  become: true

@@ -1,0 +1,61 @@
+---
+# Android Emulator Role — APK Installation
+#
+# Starts the emulator (if not running), waits for boot, installs APKs.
+
+- name: Android Apps | Create APK download directory
+  ansible.builtin.file:
+    path: "/home/{{ android_emulator_username }}/.android-apks"
+    state: directory
+    owner: "{{ android_emulator_username }}"
+    group: "{{ android_emulator_username }}"
+    mode: "0755"
+  become: true
+
+- name: Android Apps | Download APKs
+  ansible.builtin.command:
+    cmd: "wget -q -O /home/{{ android_emulator_username }}/.android-apks/{{ item.name }}.apk {{ item.url }}"
+    creates: "/home/{{ android_emulator_username }}/.android-apks/{{ item.name }}.apk"
+  become: true
+  become_user: "{{ android_emulator_username }}"
+  loop: "{{ android_emulator_apks }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Android Apps | Start emulator service for APK installation
+  ansible.builtin.systemd:
+    name: android-emulator
+    scope: user
+    state: started
+  become: true
+  become_user: "{{ android_emulator_username }}"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ android_emulator_uid }}"
+    DBUS_SESSION_BUS_ADDRESS: "unix:path=/run/user/{{ android_emulator_uid }}/bus"
+
+- name: Android Apps | Wait for emulator to boot (adb)
+  ansible.builtin.command:
+    cmd: "{{ android_sdk_root }}/platform-tools/adb wait-for-device shell getprop sys.boot_completed"
+  become: true
+  become_user: "{{ android_emulator_username }}"
+  environment:
+    ANDROID_SDK_ROOT: "{{ android_sdk_root }}"
+  register: android_boot_check
+  retries: 60
+  delay: 5
+  until: android_boot_check.stdout | trim == "1"
+  changed_when: false
+
+- name: Android Apps | Install APKs via adb
+  ansible.builtin.command:
+    cmd: "{{ android_sdk_root }}/platform-tools/adb install -r /home/{{ android_emulator_username }}/.android-apks/{{ item.name }}.apk"
+  become: true
+  become_user: "{{ android_emulator_username }}"
+  environment:
+    ANDROID_SDK_ROOT: "{{ android_sdk_root }}"
+  loop: "{{ android_emulator_apks }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: android_apk_install
+  changed_when: "'Success' in android_apk_install.stdout"
+  failed_when: "'Failure' in android_apk_install.stdout or android_apk_install.rc != 0"

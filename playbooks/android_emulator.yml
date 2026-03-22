@@ -1,0 +1,45 @@
+---
+# Android Emulator Playbook — Deploy headless Android emulator
+#
+# Usage:
+#   ansible-playbook playbooks/android_emulator.yml --connection=local -i localhost,
+#   ansible-playbook playbooks/android_emulator.yml -i inventory/production -l potwor
+#
+# Prerequisites:
+#   - KVM support (/dev/kvm)
+#   - ~10 GB free disk space (SDK + system image + AVD)
+
+- name: Deploy headless Android emulator
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    target_user: "{{ ansible_user | default('adam') }}"
+
+  roles:
+    - role: android_emulator
+      vars:
+        android_emulator_username: "{{ target_user }}"
+      tags: [android]
+
+  post_tasks:
+    - name: Display completion summary
+      ansible.builtin.debug:
+        msg: |
+          ============================================================
+          Android Emulator Deployment Complete!
+          ============================================================
+          User:         {{ target_user }}
+          SDK Root:     /home/{{ target_user }}/.android-sdk
+          AVD:          {{ android_avd_name | default('pixel-test') }}
+          ADB Port:     {{ android_emulator_port | default(5554) }}
+
+          Commands:
+            systemctl --user start android-emulator
+            systemctl --user stop android-emulator
+            systemctl --user status android-emulator
+            adb devices
+            adb shell
+            adb exec-out screencap -p > screenshot.png
+          ============================================================

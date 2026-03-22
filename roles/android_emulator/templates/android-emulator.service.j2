@@ -1,0 +1,27 @@
+# {{ ansible_managed }}
+# Systemd user service for the headless Android emulator.
+# Deployed by the android_emulator Ansible role.
+
+[Unit]
+Description=Android Emulator (headless) - {{ android_avd_name }}
+After=default.target
+
+[Service]
+Type=simple
+Environment=ANDROID_SDK_ROOT={{ android_sdk_root }}
+Environment=JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+ExecStart={{ android_sdk_root }}/emulator/emulator \
+    -avd {{ android_avd_name }} \
+    -no-window \
+    -no-audio \
+    -no-boot-anim \
+    -gpu swiftshader_indirect \
+    -memory {{ android_emulator_ram }} \
+    -cores {{ android_emulator_cores }} \
+    -port {{ android_emulator_port }} \
+    -no-snapshot-save
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target

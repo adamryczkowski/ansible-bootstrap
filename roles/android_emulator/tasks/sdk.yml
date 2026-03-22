@@ -1,0 +1,85 @@
+---
+# Android Emulator Role — SDK Command-Line Tools Installation
+#
+# Downloads cmdline-tools and sets up sdkmanager.
+# The directory structure follows Google's convention:
+#   $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager
+
+- name: Android SDK | Install prerequisites
+  ansible.builtin.apt:
+    name:
+      - unzip
+      - curl
+      - wget
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  become: true
+
+- name: Android SDK | Create SDK root directory
+  ansible.builtin.file:
+    path: "{{ android_sdk_root }}"
+    state: directory
+    owner: "{{ android_emulator_username }}"
+    group: "{{ android_emulator_username }}"
+    mode: "0755"
+  become: true
+
+- name: Android SDK | Check if cmdline-tools already installed
+  ansible.builtin.stat:
+    path: "{{ android_sdk_root }}/cmdline-tools/latest/bin/sdkmanager"
+  register: android_sdkmanager_stat
+
+- name: Android SDK | Download cmdline-tools
+  ansible.builtin.command:
+    cmd: "wget -q -O /tmp/android-cmdline-tools.zip {{ android_cmdline_tools_url }}"
+    creates: "/tmp/android-cmdline-tools.zip"
+  become: true
+  become_user: "{{ android_emulator_username }}"
+  when: not android_sdkmanager_stat.stat.exists
+
+- name: Android SDK | Create cmdline-tools directory
+  ansible.builtin.file:
+    path: "{{ android_sdk_root }}/cmdline-tools"
+    state: directory
+    owner: "{{ android_emulator_username }}"
+    group: "{{ android_emulator_username }}"
+    mode: "0755"
+  become: true
+  when: not android_sdkmanager_stat.stat.exists
+
+- name: Android SDK | Extract cmdline-tools
+  ansible.builtin.unarchive:
+    src: "/tmp/android-cmdline-tools.zip"
+    dest: "{{ android_sdk_root }}/cmdline-tools"
+    remote_src: true
+    owner: "{{ android_emulator_username }}"
+    group: "{{ android_emulator_username }}"
+  become: true
+  when: not android_sdkmanager_stat.stat.exists
+
+# Google extracts to cmdline-tools/cmdline-tools/ — rename to cmdline-tools/latest/
+- name: Android SDK | Rename cmdline-tools to latest
+  ansible.builtin.command:
+    cmd: "mv {{ android_sdk_root }}/cmdline-tools/cmdline-tools {{ android_sdk_root }}/cmdline-tools/latest"
+  become: true
+  become_user: "{{ android_emulator_username }}"
+  when: not android_sdkmanager_stat.stat.exists
+  changed_when: true
+
+- name: Android SDK | Cleanup downloaded zip
+  ansible.builtin.file:
+    path: "/tmp/android-cmdline-tools.zip"
+    state: absent
+
+- name: Android SDK | Accept SDK licenses
+  ansible.builtin.shell:
+    cmd: "yes | {{ android_sdk_root }}/cmdline-tools/latest/bin/sdkmanager --licenses"
+  environment:
+    ANDROID_SDK_ROOT: "{{ android_sdk_root }}"
+    JAVA_HOME: "/usr/lib/jvm/java-17-openjdk-amd64"
+  become: true
+  become_user: "{{ android_emulator_username }}"
+  changed_when: true
+  register: android_sdk_licenses
+  failed_when: android_sdk_licenses.rc != 0

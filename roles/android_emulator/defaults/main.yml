@@ -1,0 +1,79 @@
+---
+# Default variables for Android emulator role
+#
+# Deploys a headless Android emulator with KVM acceleration,
+# Google Play Services, and sideloaded APKs (Element X, Gotify).
+#
+# References:
+#   - https://developer.android.com/studio/run/emulator-commandline
+#   - https://developer.android.com/tools/sdkmanager
+
+# =============================================================================
+# User Configuration
+# =============================================================================
+
+android_emulator_username: "{{ ansible_user | default('adam') }}"
+
+# =============================================================================
+# Android SDK
+# =============================================================================
+
+# Root directory for the Android SDK (user-scoped, no system pollution)
+android_sdk_root: "/home/{{ android_emulator_username }}/.android-sdk"
+
+# Command-line tools download (from developer.android.com/studio)
+android_cmdline_tools_url: "https://dl.google.com/android/repository/commandlinetools-linux-14742923_latest.zip"
+
+# =============================================================================
+# System Image and AVD
+# =============================================================================
+
+# Android API level
+android_api_level: 34
+
+# System image variant: google_apis_playstore includes Play Store (typical user experience)
+android_system_image_type: "google_apis_playstore"
+
+# Full system image path for sdkmanager
+android_system_image: "system-images;android-{{ android_api_level }};{{ android_system_image_type }};x86_64"
+
+# AVD (Android Virtual Device) name
+android_avd_name: "pixel-test"
+
+# Hardware profile (Pixel 6 for a modern, typical device)
+android_avd_device: "pixel_6"
+
+# =============================================================================
+# Emulator Resources
+# =============================================================================
+
+# RAM allocated to the emulator (MB)
+android_emulator_ram: 4096
+
+# CPU cores allocated
+android_emulator_cores: 4
+
+# Internal storage size (MB)
+android_emulator_disk: 8192
+
+# ADB port (emulator console on port, adb on port+1)
+android_emulator_port: 5554
+
+# =============================================================================
+# APK Sideloading
+# =============================================================================
+
+# List of APKs to install after emulator boots
+# Each entry: name, url, arch (optional, for multi-arch APKs)
+android_emulator_apks:
+  - name: element-x
+    url: "https://github.com/element-hq/element-x-android/releases/download/v26.03.2/app-fdroid-x86_64-release-signed.apk"
+  - name: gotify
+    url: "https://github.com/gotify/android/releases/download/v2.9.0/Gotify.apk"
+
+# =============================================================================
+# Java
+# =============================================================================
+
+# Java package to install (headless JDK 17)
+android_java_package: "openjdk-17-jdk-headless"

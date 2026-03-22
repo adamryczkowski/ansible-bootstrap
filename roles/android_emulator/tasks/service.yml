@@ -1,0 +1,42 @@
+---
+# Android Emulator Role — Systemd User Service
+
+- name: Android Service | Create systemd user service directory
+  ansible.builtin.file:
+    path: "/home/{{ android_emulator_username }}/.config/systemd/user"
+    state: directory
+    owner: "{{ android_emulator_username }}"
+    group: "{{ android_emulator_username }}"
+    mode: "0755"
+  become: true
+
+- name: Android Service | Deploy emulator systemd user service
+  ansible.builtin.template:
+    src: android-emulator.service.j2
+    dest: "/home/{{ android_emulator_username }}/.config/systemd/user/android-emulator.service"
+    owner: "{{ android_emulator_username }}"
+    group: "{{ android_emulator_username }}"
+    mode: "0644"
+  become: true
+  notify:
+    - Android Emulator | Reload user systemd
+    - Android Emulator | Restart emulator
+
+- name: Android Service | Enable lingering for user
+  ansible.builtin.command:
+    cmd: "loginctl enable-linger {{ android_emulator_username }}"
+  become: true
+  changed_when: true
+  register: android_linger
+  failed_when: android_linger.rc != 0
+
+- name: Android Service | Enable emulator user service
+  ansible.builtin.systemd:
+    name: android-emulator
+    scope: user
+    enabled: true
+  become: true
+  become_user: "{{ android_emulator_username }}"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ android_emulator_uid }}"
+    DBUS_SESSION_BUS_ADDRESS: "unix:path=/run/user/{{ android_emulator_uid }}/bus"

@@ -1,0 +1,55 @@
+---
+# Android Emulator Role — Task Entry Point
+#
+# Inclusion order:
+#   1. java.yml       — OpenJDK 17
+#   2. kvm.yml        — KVM access for the emulator user
+#   3. sdk.yml        — Android SDK cmdline-tools + sdkmanager
+#   4. emulator.yml   — system-image, platform-tools, emulator binary
+#   5. avd.yml        — Create AVD via avdmanager
+#   6. env.yml        — PATH and ANDROID_SDK_ROOT for the user
+#   7. service.yml    — systemd user service for headless emulator
+#   8. apps.yml       — Install APKs via adb (Element X, Gotify)
+
+- name: Android Emulator | Look up user UID
+  ansible.builtin.command:
+    cmd: "id -u {{ android_emulator_username }}"
+  register: android_emulator_uid_result
+  changed_when: false
+
+- name: Android Emulator | Set UID fact
+  ansible.builtin.set_fact:
+    android_emulator_uid: "{{ android_emulator_uid_result.stdout }}"
+
+- name: Android Emulator | Include Java installation
+  ansible.builtin.include_tasks: java.yml
+  tags: [android_java]
+
+- name: Android Emulator | Include KVM setup
+  ansible.builtin.include_tasks: kvm.yml
+  tags: [android_kvm]
+
+- name: Android Emulator | Include SDK installation
+  ansible.builtin.include_tasks: sdk.yml
+  tags: [android_sdk]
+
+- name: Android Emulator | Include emulator packages
+  ansible.builtin.include_tasks: emulator.yml
+  tags: [android_emulator_pkg]
+
+- name: Android Emulator | Include AVD creation
+  ansible.builtin.include_tasks: avd.yml
+  tags: [android_avd]
+
+- name: Android Emulator | Include environment setup
+  ansible.builtin.include_tasks: env.yml
+  tags: [android_env]
+
+- name: Android Emulator | Include systemd service
+  ansible.builtin.include_tasks: service.yml
+  tags: [android_service]
+
+- name: Android Emulator | Include APK installation
+  ansible.builtin.include_tasks: apps.yml
+  tags: [android_apps]
+  when: android_emulator_apks | length > 0

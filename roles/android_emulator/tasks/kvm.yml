@@ -1,0 +1,38 @@
+---
+# Android Emulator Role — KVM Access
+
+- name: Android KVM | Check /dev/kvm exists
+  ansible.builtin.stat:
+    path: /dev/kvm
+  register: android_kvm_dev
+
+- name: Android KVM | Fail if KVM not available
+  ansible.builtin.fail:
+    msg: >-
+      /dev/kvm not found. KVM hardware virtualization is required for
+      the Android emulator. Ensure your CPU supports VT-x/AMD-V and
+      the kvm module is loaded.
+  when: not android_kvm_dev.stat.exists
+
+- name: Android KVM | Ensure kvm group exists
+  ansible.builtin.group:
+    name: kvm
+    state: present
+  become: true
+
+- name: Android KVM | Add user to kvm group
+  ansible.builtin.user:
+    name: "{{ android_emulator_username }}"
+    groups: kvm
+    append: true
+  become: true
+  register: android_kvm_group_result
+
+- name: Android KVM | Warn if session re-login needed for KVM access
+  ansible.builtin.debug:
+    msg: >-
+      WARNING: User '{{ android_emulator_username }}' was just added to the
+      'kvm' group. The emulator service will not be able to access /dev/kvm
+      until the user session is restarted (log out and back in). After
+      re-login, run: systemctl --user restart android-emulator
+  when: android_kvm_group_result.changed
