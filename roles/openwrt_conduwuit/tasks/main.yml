@@ -53,3 +53,8 @@
   ansible.builtin.include_tasks: proxy.yml
   tags:
     - openwrt_conduwuit_proxy
+
+- name: OpenWRT Conduwuit Firewall | Include firewall rules tasks
+  ansible.builtin.include_tasks: firewall.yml
+  tags:
+    - openwrt_conduwuit_firewall

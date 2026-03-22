@@ -1,0 +1,71 @@
+---
+# {{ ansible_managed }}
+# OpenWRT Conduwuit Role — Firewall Rules
+#
+# Opens WAN TCP ports 443 (HTTPS client) and 8448 (Matrix federation) via
+# fw4/nftables UCI firewall rules. Two named rule sections are created:
+#
+#   matrix_https      — src=wan, dest_port=443,  proto=tcp, target=ACCEPT
+#   matrix_federation — src=wan, dest_port=8448, proto=tcp, target=ACCEPT
+#
+# Named UCI sections (not anonymous list entries) allow idempotent re-runs:
+# uci set with the same value that is already committed results in no pending
+# changes, so uci commit and fw4 reload are only triggered when something
+# actually changed.
+#
+# Idempotency mechanism:
+#   1. Set all rule attributes via uci set (staged only, not yet committed)
+#   2. Check 'uci changes firewall' for any pending diffs
+#   3. Commit + reload ONLY if there are pending changes
+#
+# Depends on: fw4/nftables available (standard on OpenWRT 24.x).
+
+- name: OpenWRT Conduwuit Firewall | Configure matrix_https rule via UCI
+  ansible.builtin.command:
+    cmd: "{{ item }}"
+  loop:
+    - uci set firewall.matrix_https=rule
+    - uci set firewall.matrix_https.src=wan
+    - uci set firewall.matrix_https.dest_port=443
+    - uci set firewall.matrix_https.proto=tcp
+    - uci set firewall.matrix_https.target=ACCEPT
+  changed_when: false
+  tags:
+    - openwrt_conduwuit_firewall
+
+- name: OpenWRT Conduwuit Firewall | Configure matrix_federation rule via UCI
+  ansible.builtin.command:
+    cmd: "{{ item }}"
+  loop:
+    - uci set firewall.matrix_federation=rule
+    - uci set firewall.matrix_federation.src=wan
+    - uci set firewall.matrix_federation.dest_port=8448
+    - uci set firewall.matrix_federation.proto=tcp
+    - uci set firewall.matrix_federation.target=ACCEPT
+  changed_when: false
+  tags:
+    - openwrt_conduwuit_firewall
+
+- name: OpenWRT Conduwuit Firewall | Check for pending UCI firewall changes
+  ansible.builtin.command:
+    cmd: uci changes firewall
+  register: _fw_uci_changes
+  changed_when: false
+  tags:
+    - openwrt_conduwuit_firewall
+
+- name: OpenWRT Conduwuit Firewall | Commit UCI firewall changes
+  ansible.builtin.command:
+    cmd: uci commit firewall
+  when: _fw_uci_changes.stdout | trim | length > 0
+  changed_when: true
+  tags:
+    - openwrt_conduwuit_firewall
+
+- name: OpenWRT Conduwuit Firewall | Reload fw4 to apply new firewall rules
+  ansible.builtin.command:
+    cmd: fw4 reload
+  when: _fw_uci_changes.stdout | trim | length > 0
+  changed_when: true
+  tags:
+    - openwrt_conduwuit_firewall
