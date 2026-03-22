@@ -12,3 +12,9 @@
     name: nginx
     state: reloaded
   listen: "OpenWRT Conduwuit | Reload nginx"
+
+- name: OpenWRT Conduwuit | Restart ddns
+  community.general.openwrt_init:
+    name: ddns
+    state: restarted
+  listen: "OpenWRT Conduwuit | Restart ddns"

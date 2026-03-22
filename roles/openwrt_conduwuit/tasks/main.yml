@@ -38,3 +38,8 @@
   ansible.builtin.include_tasks: configure.yml
   tags:
     - openwrt_conduwuit_configure
+
+- name: OpenWRT Conduwuit DDNS | Include DDNS setup tasks
+  ansible.builtin.include_tasks: ddns.yml
+  tags:
+    - openwrt_conduwuit_ddns

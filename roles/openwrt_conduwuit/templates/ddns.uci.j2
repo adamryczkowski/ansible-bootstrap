@@ -1,0 +1,27 @@
+# {{ ansible_managed }}
+# ddns-scripts UCI configuration for conduwuit Matrix homeserver
+# Updates matrix.statystyka.net A record with the router's current WAN IP
+# via Cloudflare API. Managed by the openwrt_conduwuit Ansible role.
+
+config globals 'globals'
+    option ddns_dateformat '%F %R'
+    option ddns_loglines '250'
+    option ddns_rundir '/var/run/ddns'
+    option ddns_logdir '/var/log/ddns'
+
+config service 'matrix_ddns'
+    option service_name '{{ openwrt_conduwuit_ddns_service }}'
+    option domain '{{ openwrt_conduwuit_ddns_domain }}'
+    option lookup_host '{{ openwrt_conduwuit_ddns_lookup_host }}'
+    option username 'Bearer'
+    option password '{{ openwrt_conduwuit_cloudflare_api_token }}'
+    option use_syslog '2'
+    option check_interval '10'
+    option check_unit 'minutes'
+    option update_interval '72'
+    option update_unit 'hours'
+    option retry_interval '60'
+    option retry_unit 'seconds'
+    option ip_source 'web'
+    option ip_url 'https://checkip.amazonaws.com'
+    option enabled '1'

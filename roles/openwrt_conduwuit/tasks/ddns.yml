@@ -1,0 +1,38 @@
+---
+# {{ ansible_managed }}
+# OpenWRT Conduwuit Role — DDNS Setup (Cloudflare)
+#
+# Configures ddns-scripts-cloudflare to update the matrix.statystyka.net
+# A record with the router's current WAN IP address. Uses Cloudflare API
+# token authentication (Bearer scheme). Service is enabled and started.
+#
+# Depends on: ddns-scripts and ddns-scripts-cloudflare packages installed
+# (milestone 2 prerequisites.yml).
+#
+# The ddns.uci.j2 template contains the Cloudflare API token — tasks that
+# render or apply it use no_log: true to prevent the secret from appearing
+# in Ansible output.
+
+- name: OpenWRT Conduwuit DDNS | Deploy DDNS UCI configuration
+  ansible.builtin.template:
+    src: ddns.uci.j2
+    dest: /etc/config/ddns
+    mode: "0600"
+  no_log: true
+  notify: OpenWRT Conduwuit | Restart ddns
+  tags:
+    - openwrt_conduwuit_ddns
+
+- name: OpenWRT Conduwuit DDNS | Enable DDNS service
+  community.general.openwrt_init:
+    name: ddns
+    enabled: true
+  tags:
+    - openwrt_conduwuit_ddns
+
+- name: OpenWRT Conduwuit DDNS | Start DDNS service
+  community.general.openwrt_init:
+    name: ddns
+    state: started
+  tags:
+    - openwrt_conduwuit_ddns
