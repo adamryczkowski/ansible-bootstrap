@@ -1,0 +1,20 @@
+---
+# OpenWRT Conduwuit Role — Task Entry Point
+#
+# Inclusion order is CRITICAL — do NOT reorder:
+#   1. preflight.yml      — verify router meets requirements + Docker running
+#   2. prerequisites.yml  — opkg packages (nginx, acme, ddns, ca-certs)
+#   3. directories.yml    — create host dirs for Docker volume mounts
+#   4. install.yml        — docker pull continuwuity image
+#   5. configure.yml      — conduwuit.toml + docker-compose.yml templates
+#   6. ddns.yml           — dynamic DNS for matrix.statystyka.net
+#   7. acme.yml           — Let's Encrypt cert via DNS-01 Cloudflare
+#   8. proxy.yml          — nginx reverse proxy (443 + 8448), uhttpd migration
+#   9. firewall.yml       — open WAN ports 443 + 8448
+#  10. service.yml        — procd init script, enable & start conduwuit container
+#  11. accounts.yml       — create Matrix accounts + .env.matrix (gated)
+
+- name: OpenWRT Conduwuit Preflight | Include preflight tasks
+  ansible.builtin.include_tasks: preflight.yml
+  tags:
+    - openwrt_conduwuit_preflight

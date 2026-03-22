@@ -1,0 +1,93 @@
+---
+# OpenWRT Conduwuit Role — Preflight Verification
+#
+# Checks that the target router meets minimum requirements before
+# any packages are installed or configuration is changed.
+# Fails fast with clear messages if requirements are not met.
+
+- name: OpenWRT Conduwuit Preflight | Gather hardware facts
+  ansible.builtin.setup:
+    gather_subset:
+      - hardware
+  tags:
+    - openwrt_conduwuit_preflight
+
+- name: OpenWRT Conduwuit Preflight | Register architecture fact
+  ansible.builtin.set_fact:
+    openwrt_conduwuit_arch: "{{ ansible_architecture }}"
+  tags:
+    - openwrt_conduwuit_preflight
+
+- name: OpenWRT Conduwuit Preflight | Check architecture is aarch64
+  ansible.builtin.fail:
+    msg: >-
+      Unsupported architecture: {{ openwrt_conduwuit_arch }}.
+      This role requires aarch64 (ARM 64-bit). Found: {{ openwrt_conduwuit_arch }}.
+  when: openwrt_conduwuit_arch != "aarch64"
+  tags:
+    - openwrt_conduwuit_preflight
+
+- name: OpenWRT Conduwuit Preflight | Get total RAM in MB
+  ansible.builtin.set_fact:
+    openwrt_conduwuit_ram_mb: "{{ (ansible_memtotal_mb | int) }}"
+  tags:
+    - openwrt_conduwuit_preflight
+
+- name: OpenWRT Conduwuit Preflight | Check RAM meets minimum requirement
+  ansible.builtin.fail:
+    msg: >-
+      Insufficient RAM: {{ openwrt_conduwuit_ram_mb }}MB available,
+      {{ openwrt_conduwuit_min_ram_mb }}MB required.
+      Increase RAM or lower openwrt_conduwuit_min_ram_mb threshold.
+  when: (openwrt_conduwuit_ram_mb | int) < (openwrt_conduwuit_min_ram_mb | int)
+  tags:
+    - openwrt_conduwuit_preflight
+
+- name: OpenWRT Conduwuit Preflight | Get overlay filesystem free storage
+  ansible.builtin.command:
+    cmd: df -m /overlay
+  register: openwrt_conduwuit_df_overlay
+  changed_when: false
+  failed_when: openwrt_conduwuit_df_overlay.rc != 0
+  tags:
+    - openwrt_conduwuit_preflight
+
+- name: OpenWRT Conduwuit Preflight | Parse overlay free storage in MB
+  ansible.builtin.set_fact:
+    openwrt_conduwuit_storage_free_mb: >-
+      {{ openwrt_conduwuit_df_overlay.stdout_lines[1].split()[3] | int }}
+  tags:
+    - openwrt_conduwuit_preflight
+
+- name: OpenWRT Conduwuit Preflight | Check storage meets minimum requirement
+  ansible.builtin.fail:
+    msg: >-
+      Insufficient free storage on /overlay: {{ openwrt_conduwuit_storage_free_mb }}MB available,
+      {{ openwrt_conduwuit_min_storage_mb }}MB required.
+      Free up space or lower openwrt_conduwuit_min_storage_mb threshold.
+  when: (openwrt_conduwuit_storage_free_mb | int) < (openwrt_conduwuit_min_storage_mb | int)
+  tags:
+    - openwrt_conduwuit_preflight
+
+- name: OpenWRT Conduwuit Preflight | Check Docker is available
+  ansible.builtin.command:
+    cmd: docker info
+  register: openwrt_conduwuit_docker_info
+  changed_when: false
+  failed_when: openwrt_conduwuit_docker_info.rc != 0
+  tags:
+    - openwrt_conduwuit_preflight
+
+- name: OpenWRT Conduwuit Preflight | Display preflight results
+  ansible.builtin.debug:
+    msg: |
+      ============================================================
+      OpenWRT Conduwuit Preflight Results
+      ============================================================
+      Architecture : {{ openwrt_conduwuit_arch }} (required: aarch64) ✓
+      RAM          : {{ openwrt_conduwuit_ram_mb }}MB (required: >= {{ openwrt_conduwuit_min_ram_mb }}MB) ✓
+      Overlay free : {{ openwrt_conduwuit_storage_free_mb }}MB (required: >= {{ openwrt_conduwuit_min_storage_mb }}MB) ✓
+      Docker       : available ✓
+      ============================================================
+  tags:
+    - openwrt_conduwuit_preflight

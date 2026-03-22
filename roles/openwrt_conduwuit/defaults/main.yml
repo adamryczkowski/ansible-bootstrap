@@ -1,0 +1,13 @@
+---
+# OpenWRT Conduwuit Role — Default Variables
+# All variables use the openwrt_conduwuit_* prefix.
+
+# =============================================================================
+# Preflight Thresholds
+# =============================================================================
+
+# Minimum RAM required (in MB) for conduwuit to run
+openwrt_conduwuit_min_ram_mb: 128
+
+# Minimum free storage on overlay filesystem (in MB)
+openwrt_conduwuit_min_storage_mb: 500

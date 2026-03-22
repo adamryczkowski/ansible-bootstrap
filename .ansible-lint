@@ -26,11 +26,13 @@ enable_list:
 # Skip specific rules
 skip_list:
   - yaml[line-length]  # Allow longer lines in YAML
+  - var-naming[no-role-prefix]  # Existing roles use shorter prefixes (e.g. conduwuit_ not conduwuit_server_)
 
 # Warn on specific rules (don't fail)
 warn_list:
   - experimental  # Warn on experimental rules
   - role-name  # Warn on role naming conventions
+  - command-instead-of-module  # Some tasks require raw commands (wget, docker, df)
 
 # Offline mode (don't download schemas)
 offline: false
