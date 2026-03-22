@@ -23,3 +23,18 @@
   ansible.builtin.include_tasks: prerequisites.yml
   tags:
     - openwrt_conduwuit_prerequisites
+
+- name: OpenWRT Conduwuit Directories | Include directory setup tasks
+  ansible.builtin.include_tasks: directories.yml
+  tags:
+    - openwrt_conduwuit_directories
+
+- name: OpenWRT Conduwuit Install | Include Docker image install tasks
+  ansible.builtin.include_tasks: install.yml
+  tags:
+    - openwrt_conduwuit_install
+
+- name: OpenWRT Conduwuit Configure | Include configuration tasks
+  ansible.builtin.include_tasks: configure.yml
+  tags:
+    - openwrt_conduwuit_configure

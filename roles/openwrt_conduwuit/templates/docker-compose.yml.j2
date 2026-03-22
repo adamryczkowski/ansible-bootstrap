@@ -1,0 +1,14 @@
+# {{ ansible_managed }}
+# Docker Compose for conduwuit Matrix homeserver on OpenWRT
+services:
+  conduwuit:
+    image: {{ openwrt_conduwuit_docker_image }}:v{{ openwrt_conduwuit_version }}
+    container_name: conduwuit
+    restart: "no"
+    ports:
+      - "127.0.0.1:{{ openwrt_conduwuit_port }}:6167"
+    volumes:
+      - {{ openwrt_conduwuit_config_dir }}/conduwuit.toml:/etc/conduwuit/conduwuit.toml:ro
+      - {{ openwrt_conduwuit_data_dir }}:/var/lib/conduwuit
+    environment:
+      CONDUWUIT_CONFIG: /etc/conduwuit/conduwuit.toml

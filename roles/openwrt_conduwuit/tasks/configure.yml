@@ -1,0 +1,24 @@
+---
+# OpenWRT Conduwuit Role — Configuration Deployment
+#
+# Deploys conduwuit.toml (homeserver config) and docker-compose.yml from
+# templates. Config changes notify the conduwuit handler to restart the
+# container if it is already running.
+
+- name: OpenWRT Conduwuit Configure | Deploy conduwuit.toml configuration
+  ansible.builtin.template:
+    src: conduwuit.toml.j2
+    dest: "{{ openwrt_conduwuit_config_dir }}/conduwuit.toml"
+    mode: "0640"
+  notify: OpenWRT Conduwuit | Restart conduwuit
+  tags:
+    - openwrt_conduwuit_configure
+
+- name: OpenWRT Conduwuit Configure | Deploy docker-compose.yml
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ openwrt_conduwuit_install_dir }}/docker-compose.yml"
+    mode: "0644"
+  notify: OpenWRT Conduwuit | Restart conduwuit
+  tags:
+    - openwrt_conduwuit_configure

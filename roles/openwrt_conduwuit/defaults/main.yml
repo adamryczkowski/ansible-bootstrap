@@ -3,6 +3,111 @@
 # All variables use the openwrt_conduwuit_* prefix.
 
 # =============================================================================
+# Version and Docker Image
+# =============================================================================
+
+# Conduwuit version to deploy (matches the continuwuity Docker image tag)
+openwrt_conduwuit_version: "0.5.3"
+
+# Docker image repository for conduwuit (arm64 variant pulled automatically)
+openwrt_conduwuit_docker_image: "ghcr.io/continuwuity/continuwuity"
+
+# =============================================================================
+# Matrix Server Identity
+# =============================================================================
+
+# Matrix server_name — the base domain used in Matrix IDs (e.g. @user:statystyka.net)
+openwrt_conduwuit_server_name: "statystyka.net"
+
+# Public FQDN for the Matrix homeserver (where clients connect)
+openwrt_conduwuit_domain: "matrix.statystyka.net"
+
+# =============================================================================
+# Network Configuration
+# =============================================================================
+
+# Port conduwuit listens on inside the container (and mapped to localhost)
+openwrt_conduwuit_port: 6167
+
+# Address conduwuit binds to inside the container
+openwrt_conduwuit_address: "0.0.0.0"
+
+# =============================================================================
+# Directory Paths (host filesystem — mounted into Docker container)
+# =============================================================================
+
+# Base installation directory on the host (overlay filesystem)
+openwrt_conduwuit_install_dir: /opt/conduwuit
+
+# Directory where conduwuit configuration files are stored on the host
+openwrt_conduwuit_config_dir: /opt/conduwuit
+
+# Persistent data directory for conduwuit database (mounted as /var/lib/conduwuit)
+openwrt_conduwuit_data_dir: /opt/conduwuit/data
+
+# =============================================================================
+# Matrix Server Settings
+# =============================================================================
+
+# Whether to allow public registration (should be false for private homeservers)
+openwrt_conduwuit_allow_registration: false
+
+# Whether to enable Matrix federation with other homeservers
+openwrt_conduwuit_allow_federation: true
+
+# List of Matrix servers to trust for key verification
+openwrt_conduwuit_trusted_servers:
+  - "matrix.org"
+
+# Maximum request body size in bytes (20MB default)
+openwrt_conduwuit_max_request_size: 20971520
+
+# Log level filter (warn for most, info for conduwuit itself)
+openwrt_conduwuit_log: "warn,conduwuit=info"
+
+# =============================================================================
+# Well-Known Delegation
+# =============================================================================
+
+# Client well-known URL returned at /.well-known/matrix/client
+openwrt_conduwuit_well_known_client: "https://matrix.statystyka.net"
+
+# Server well-known value returned at /.well-known/matrix/server
+openwrt_conduwuit_well_known_server: "matrix.statystyka.net:443"
+
+# =============================================================================
+# DDNS Configuration (Cloudflare)
+# =============================================================================
+
+# Whether to configure dynamic DNS (set false if using static IP)
+openwrt_conduwuit_ddns_enabled: true
+
+# DDNS service type for ddns-scripts
+openwrt_conduwuit_ddns_service: "cloudflare.com-v4"
+
+# DDNS domain in ddns-scripts format (subdomain@basedomain)
+openwrt_conduwuit_ddns_domain: "matrix@statystyka.net"
+
+# Hostname to verify DNS propagation against
+openwrt_conduwuit_ddns_lookup_host: "matrix.statystyka.net"
+
+# Cloudflare API token with DNS edit permissions — MUST override via Vault
+openwrt_conduwuit_cloudflare_api_token: ""  # MUST override via Vault
+
+# =============================================================================
+# ACME / TLS Configuration
+# =============================================================================
+
+# Email address for Let's Encrypt ACME account registration
+openwrt_conduwuit_acme_email: ""  # MUST override
+
+# Domain to obtain TLS certificate for
+openwrt_conduwuit_acme_domain: "matrix.statystyka.net"
+
+# Cloudflare Zone ID for DNS-01 challenge — MUST override via Vault
+openwrt_conduwuit_cloudflare_zone_id: ""  # MUST override via Vault
+
+# =============================================================================
 # Preflight Thresholds
 # =============================================================================
 
@@ -11,3 +116,31 @@ openwrt_conduwuit_min_ram_mb: 128
 
 # Minimum free storage on overlay filesystem (in MB)
 openwrt_conduwuit_min_storage_mb: 500
+
+# =============================================================================
+# Account Setup (gated by openwrt_conduwuit_setup_accounts)
+# =============================================================================
+
+# Set to true to create Matrix admin and bot accounts during deployment
+openwrt_conduwuit_setup_accounts: false
+
+# Matrix username for the admin account
+openwrt_conduwuit_admin_user: "adam"
+
+# Admin account password — MUST override via Vault
+openwrt_conduwuit_admin_password: ""  # Override via Vault
+
+# Matrix username for the bot account
+openwrt_conduwuit_bot_user: "claude-bot"
+
+# Bot account password — MUST override via Vault
+openwrt_conduwuit_bot_password: ""  # Override via Vault
+
+# Name of the Matrix room to create for family notifications
+openwrt_conduwuit_room_name: "family-notifications"
+
+# Topic for the family notifications room
+openwrt_conduwuit_room_topic: "Family notifications"
+
+# LAN IP address of the router (used for local API calls during account setup)
+openwrt_conduwuit_lan_host: "192.168.10.10"

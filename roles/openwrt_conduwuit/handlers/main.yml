@@ -1,0 +1,14 @@
+---
+# {{ ansible_managed }}
+# OpenWRT Conduwuit role handlers
+
+- name: OpenWRT Conduwuit | Restart conduwuit
+  ansible.builtin.command:
+    cmd: docker compose -f {{ openwrt_conduwuit_install_dir }}/docker-compose.yml restart
+  listen: "OpenWRT Conduwuit | Restart conduwuit"
+
+- name: OpenWRT Conduwuit | Reload nginx
+  community.general.openwrt_init:
+    name: nginx
+    state: reloaded
+  listen: "OpenWRT Conduwuit | Reload nginx"

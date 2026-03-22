@@ -1,0 +1,22 @@
+---
+# OpenWRT Conduwuit Role — Directory Setup
+#
+# Creates the host filesystem directories used as Docker volume mount points.
+# All directories live on the overlay filesystem (/opt) which persists across
+# reboots on this OpenWRT router.
+
+- name: OpenWRT Conduwuit Directories | Create base installation directory
+  ansible.builtin.file:
+    path: "{{ openwrt_conduwuit_install_dir }}"
+    state: directory
+    mode: "0755"
+  tags:
+    - openwrt_conduwuit_directories
+
+- name: OpenWRT Conduwuit Directories | Create data directory for database
+  ansible.builtin.file:
+    path: "{{ openwrt_conduwuit_data_dir }}"
+    state: directory
+    mode: "0755"
+  tags:
+    - openwrt_conduwuit_directories

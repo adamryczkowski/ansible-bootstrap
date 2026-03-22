@@ -1,0 +1,27 @@
+---
+# OpenWRT Conduwuit Role — Docker Image Installation
+#
+# Pulls the continuwuity Docker image for arm64. The image is pulled once and
+# cached locally; subsequent runs are idempotent (docker pull is a no-op when
+# the image is already up to date).
+
+- name: OpenWRT Conduwuit Install | Pull continuwuity Docker image
+  ansible.builtin.command:
+    cmd: >-
+      docker pull
+      {{ openwrt_conduwuit_docker_image }}:v{{ openwrt_conduwuit_version }}
+  register: openwrt_conduwuit_docker_pull
+  changed_when: "'Status: Downloaded newer image' in openwrt_conduwuit_docker_pull.stdout"
+  tags:
+    - openwrt_conduwuit_install
+
+- name: OpenWRT Conduwuit Install | Verify Docker image is present
+  ansible.builtin.command:
+    cmd: >-
+      docker images --format '{{ "{{" }}.Repository{{ "}}" }}:{{ "{{" }}.Tag{{ "}}" }}'
+      --filter reference={{ openwrt_conduwuit_docker_image }}:v{{ openwrt_conduwuit_version }}
+  register: openwrt_conduwuit_image_check
+  changed_when: false
+  failed_when: openwrt_conduwuit_image_check.stdout | length == 0
+  tags:
+    - openwrt_conduwuit_install
