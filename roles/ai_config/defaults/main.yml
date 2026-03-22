@@ -5,7 +5,7 @@
 ai_config_username: "{{ ansible_user | default('adam') }}"
 
 # Remote source to clone AI_prompts from (SSH format: user@host:path)
-ai_config_source_remote: "adam@192.168.42.207:/home/adam/tmp/AI"
+ai_config_source_remote: "adam@192.168.10.5:/home/adam/tmp/AI"
 
 # GitHub remote to set as 'origin' for pushing changes
 ai_config_github_remote: "git@github.com:adamryczkowski/AI-prompts.git"
