@@ -18,3 +18,8 @@
   ansible.builtin.include_tasks: preflight.yml
   tags:
     - openwrt_conduwuit_preflight
+
+- name: OpenWRT Conduwuit Prerequisites | Include prerequisites tasks
+  ansible.builtin.include_tasks: prerequisites.yml
+  tags:
+    - openwrt_conduwuit_prerequisites

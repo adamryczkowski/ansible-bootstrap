@@ -1,0 +1,41 @@
+---
+# {{ ansible_managed }}
+# OpenWRT Conduwuit Role — Package Prerequisites
+#
+# Installs required opkg packages for conduwuit deployment:
+#   nginx-ssl, nginx-mod-luci, acme-acmesh, acme-acmesh-dnsapi,
+#   ddns-scripts, ddns-scripts-cloudflare, curl, ca-bundle
+#
+# Disables uhttpd (keeps the package, stops and disables the service)
+# so that nginx-ssl can take over ports 80 and 443 for Matrix and LuCI.
+
+- name: OpenWRT Conduwuit Prerequisites | Update opkg package lists
+  ansible.builtin.command:
+    cmd: opkg update
+  changed_when: false
+  tags:
+    - openwrt_conduwuit_prerequisites
+
+- name: OpenWRT Conduwuit Prerequisites | Install required packages
+  community.general.opkg:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - nginx-ssl
+    - nginx-mod-luci
+    - acme-acmesh
+    - acme-acmesh-dnsapi
+    - ddns-scripts
+    - ddns-scripts-cloudflare
+    - curl
+    - ca-bundle
+  tags:
+    - openwrt_conduwuit_prerequisites
+
+- name: OpenWRT Conduwuit Prerequisites | Stop and disable uhttpd
+  community.general.openwrt_init:
+    name: uhttpd
+    state: stopped
+    enabled: false
+  tags:
+    - openwrt_conduwuit_prerequisites
