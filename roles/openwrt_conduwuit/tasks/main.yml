@@ -43,3 +43,8 @@
   ansible.builtin.include_tasks: ddns.yml
   tags:
     - openwrt_conduwuit_ddns
+
+- name: OpenWRT Conduwuit ACME | Include ACME / TLS certificate tasks
+  ansible.builtin.include_tasks: acme.yml
+  tags:
+    - openwrt_conduwuit_acme

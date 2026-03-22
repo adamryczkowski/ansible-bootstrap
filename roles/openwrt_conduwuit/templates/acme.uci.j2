@@ -1,0 +1,20 @@
+# {{ ansible_managed }}
+# OpenWRT ACME (acme-acmesh) UCI configuration.
+# DNS-01 challenge via Cloudflare dns_cf plugin for {{ openwrt_conduwuit_acme_domain }}.
+#
+# This file is deployed to /etc/config/acme by the openwrt_conduwuit role.
+# Certificates are stored in /etc/acme/<domain>/ by acme.sh.
+
+config acme
+  option state_dir '/etc/acme'
+  option account_email '{{ openwrt_conduwuit_acme_email }}'
+  option debug '0'
+
+config cert 'matrix_cert'
+  option enabled '1'
+  option use_staging '0'
+  list domains '{{ openwrt_conduwuit_acme_domain }}'
+  option validation 'dns'
+  option dns 'dns_cf'
+  option credentials '/etc/acme/cloudflare.env'
+  option keylength 'ec-256'

@@ -1,0 +1,96 @@
+---
+# {{ ansible_managed }}
+# OpenWRT Conduwuit Role — ACME / TLS Certificate
+#
+# Configures acme-acmesh with DNS-01 via Cloudflare to obtain a Let's Encrypt
+# TLS certificate for matrix.statystyka.net. Key steps:
+#
+#   1. Create /etc/acme/ state directory (mode 0700)
+#   2. Deploy Cloudflare credentials to /etc/acme/cloudflare.env (mode 0600)
+#   3. Deploy /etc/config/acme UCI configuration with dns_cf DNS-01 settings
+#   4. Issue the certificate via /etc/init.d/acme start (skip if already valid)
+#   5. Verify the certificate file exists and is not expired
+#   6. Enable ACME renewal service (cron-based, run by acme init.d)
+#
+# DNS-01 is used instead of HTTP-01: the dns_cf plugin creates a TXT record
+# via the Cloudflare API. acme.sh handles DNS propagation wait internally.
+# The retry loop (retries: 3, delay: 60s) covers transient API failures.
+#
+# Idempotent: certificate issuance is skipped if a valid (non-expired) cert
+# already exists. Renewal is handled by the enabled acme cron job, not this
+# task file.
+#
+# Depends on: acme-acmesh and acme-acmesh-dnsapi packages (milestone 2).
+
+- name: OpenWRT Conduwuit ACME | Create ACME state directory
+  ansible.builtin.file:
+    path: /etc/acme
+    state: directory
+    mode: "0700"
+    owner: root
+  tags:
+    - openwrt_conduwuit_acme
+
+- name: OpenWRT Conduwuit ACME | Deploy Cloudflare credentials file
+  ansible.builtin.template:
+    src: cloudflare-creds.env.j2
+    dest: /etc/acme/cloudflare.env
+    mode: "0600"
+    owner: root
+  no_log: true
+  tags:
+    - openwrt_conduwuit_acme
+
+- name: OpenWRT Conduwuit ACME | Deploy ACME UCI configuration
+  ansible.builtin.template:
+    src: acme.uci.j2
+    dest: /etc/config/acme
+    mode: "0644"
+    owner: root
+  no_log: true
+  tags:
+    - openwrt_conduwuit_acme
+
+- name: OpenWRT Conduwuit ACME | Check if existing certificate is valid
+  ansible.builtin.command:
+    cmd: openssl x509 -in /etc/acme/{{ openwrt_conduwuit_acme_domain }}/fullchain.cer -noout -checkend 0
+  register: _acme_cert_check
+  changed_when: false
+  failed_when: false
+  tags:
+    - openwrt_conduwuit_acme
+
+- name: OpenWRT Conduwuit ACME | Issue Let's Encrypt certificate via DNS-01
+  ansible.builtin.command:
+    cmd: /etc/init.d/acme start
+  register: _acme_issue
+  retries: 3
+  delay: 60
+  until: _acme_issue.rc == 0
+  when: _acme_cert_check.rc != 0
+  changed_when: _acme_issue.rc == 0
+  no_log: true
+  tags:
+    - openwrt_conduwuit_acme
+
+- name: OpenWRT Conduwuit ACME | Verify certificate file exists
+  ansible.builtin.stat:
+    path: /etc/acme/{{ openwrt_conduwuit_acme_domain }}/fullchain.cer
+  register: _acme_cert_verify
+  failed_when: not _acme_cert_verify.stat.exists
+  tags:
+    - openwrt_conduwuit_acme
+
+- name: OpenWRT Conduwuit ACME | Verify certificate is not expired
+  ansible.builtin.command:
+    cmd: openssl x509 -in /etc/acme/{{ openwrt_conduwuit_acme_domain }}/fullchain.cer -noout -checkend 0
+  changed_when: false
+  tags:
+    - openwrt_conduwuit_acme
+
+- name: OpenWRT Conduwuit ACME | Enable ACME renewal service
+  community.general.openwrt_init:
+    name: acme
+    enabled: true
+  tags:
+    - openwrt_conduwuit_acme
