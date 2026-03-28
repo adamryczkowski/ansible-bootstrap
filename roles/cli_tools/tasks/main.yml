@@ -76,10 +76,9 @@
       when: cli_tools_nerd_font_check.rc != 0
 
     - name: CLI Tools | Download Nerd Font
-      ansible.builtin.get_url:
-        url: "{{ cli_tools_nerd_font_url }}"
-        dest: /tmp/{{ cli_tools_nerd_font_name }}.tar.xz
-        mode: "0644"
+      ansible.builtin.command:
+        cmd: "wget -q -O /tmp/{{ cli_tools_nerd_font_name }}.tar.xz {{ cli_tools_nerd_font_url }}"
+        creates: "/tmp/{{ cli_tools_nerd_font_name }}.tar.xz"
       when: cli_tools_nerd_font_check.rc != 0
 
     - name: CLI Tools | Extract Nerd Font
@@ -115,9 +114,14 @@
       register: cli_tools_mise_installed
 
     - name: CLI Tools | Download mise installer
-      ansible.builtin.get_url:
-        url: https://mise.run
-        dest: /tmp/mise-install.sh
+      ansible.builtin.command:
+        cmd: "wget -q -O /tmp/mise-install.sh https://mise.run"
+        creates: /tmp/mise-install.sh
+      when: not cli_tools_mise_installed.stat.exists
+
+    - name: CLI Tools | Make mise installer executable
+      ansible.builtin.file:
+        path: /tmp/mise-install.sh
         mode: "0755"
       when: not cli_tools_mise_installed.stat.exists
 

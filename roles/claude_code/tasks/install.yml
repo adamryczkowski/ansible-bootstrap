@@ -9,7 +9,10 @@
 - name: Claude Code | Install Claude Code via npm
   ansible.builtin.shell: |
     export PATH="{{ claude_code_user_home }}/.local/bin:{{ claude_code_user_home }}/.local/share/mise/shims:$PATH"
+    eval "$(mise activate bash 2>/dev/null)" || true
     npm install -g @anthropic-ai/claude-code
+  args:
+    executable: /bin/bash
   become: true
   become_user: "{{ claude_code_username }}"
   when: not claude_code_binary.stat.exists
@@ -19,7 +22,10 @@
 - name: Claude Code | Verify claude is available
   ansible.builtin.shell: |
     export PATH="{{ claude_code_user_home }}/.local/bin:{{ claude_code_user_home }}/.local/share/mise/shims:$PATH"
+    eval "$(mise activate bash 2>/dev/null)" || true
     claude --version
+  args:
+    executable: /bin/bash
   become: true
   become_user: "{{ claude_code_username }}"
   register: claude_code_version
