@@ -1,17 +1,41 @@
 # {{ ansible_managed }}
 # conduwuit Matrix homeserver configuration.
 # Deployed by the conduwuit_server Ansible role.
+#
+# Reference: https://continuwuity.org/configuration
 
 [global]
 
+# The server name — forms part of all user IDs (@user:server_name)
 server_name = "{{ conduwuit_server_name }}"
+
+# Database path (RocksDB)
 database_path = "{{ conduwuit_database_path }}"
+
+# Network binding
 port = {{ conduwuit_port }}
 address = ["{{ conduwuit_address }}"]
+
+# Maximum request body size (bytes)
 max_request_size = {{ conduwuit_max_request_size }}
+
+# Logging
 log = "{{ conduwuit_log }}"
+
+# Registration — disabled; accounts created via admin API
 allow_registration = {{ conduwuit_allow_registration | lower }}
+{% if conduwuit_registration_token is defined and conduwuit_registration_token %}
+registration_token = "{{ conduwuit_registration_token }}"
+{% endif %}
+
+# Federation — disabled for private bot server
 allow_federation = {{ conduwuit_allow_federation | lower }}
+
+# Trusted servers (empty when federation is off)
 trusted_servers = {{ conduwuit_trusted_servers | to_json }}
+
+# Allow encryption (needed for E2EE if enabled later)
 allow_encryption = true
+
+# Allow room creation
 allow_room_creation = true

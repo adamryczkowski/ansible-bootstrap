@@ -99,6 +99,12 @@ conduwuit_admin_password: ""  # Override via Ansible Vault
 conduwuit_room_name: "claude-hierarchy-notifications"
 conduwuit_room_topic: "Agent notifications and replies"
 
+# Registration token for account creation (used temporarily during setup)
+# conduwuit_registration_token: ""  # Set only when conduwuit_setup_accounts is true
+
+# LAN-routable host address for .env.matrix (container IP is not routable)
+conduwuit_lan_host: "192.168.10.5"
+
 # =============================================================================
 # LXD Host Configuration
 # =============================================================================

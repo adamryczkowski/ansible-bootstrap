@@ -2,7 +2,18 @@
 # Conduwuit Server Role — Matrix Account Setup Tasks
 #
 # Gated by conduwuit_setup_accounts in main.yml.
-# Only run once (first deployment) or when accounts need recreation.
+# Handles both fresh setup and re-runs (existing accounts).
+#
+# Continuwuity v0.5+ uses registration tokens instead of the old
+# conduwuit admin API. This task flow:
+#   1. Temporarily enables registration with a token
+#   2. Creates accounts via the standard Matrix CS API
+#   3. Disables registration again
+#   4. Writes .env.matrix with LAN-routable homeserver URL
+
+# =========================================================================
+# Phase 1: Health check
+# =========================================================================
 
 - name: Conduwuit Accounts | Wait for homeserver to be ready
   ansible.builtin.uri:
@@ -14,7 +25,47 @@
   delay: 2
   until: conduwuit_health.status == 200
 
-- name: Conduwuit Accounts | Check if admin user exists
+# =========================================================================
+# Phase 2: Enable registration temporarily
+# =========================================================================
+
+- name: Conduwuit Accounts | Generate one-time registration token
+  ansible.builtin.set_fact:
+    conduwuit_registration_token: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
+  no_log: true
+
+- name: Conduwuit Accounts | Deploy config with registration enabled
+  ansible.builtin.template:
+    src: conduwuit.toml.j2
+    dest: "{{ conduwuit_config_dir }}/conduwuit.toml"
+    owner: root
+    group: "{{ conduwuit_user }}"
+    mode: "0640"
+  become: true
+  vars:
+    conduwuit_allow_registration: true
+
+- name: Conduwuit Accounts | Restart conduwuit to apply registration config
+  ansible.builtin.systemd:
+    name: conduwuit
+    state: restarted
+  become: true
+
+- name: Conduwuit Accounts | Wait for conduwuit to come back up
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ conduwuit_port }}/_matrix/client/versions"
+    method: GET
+    status_code: 200
+  register: conduwuit_reg_health
+  retries: 30
+  delay: 2
+  until: conduwuit_reg_health.status == 200
+
+# =========================================================================
+# Phase 3: Create/verify accounts
+# =========================================================================
+
+- name: Conduwuit Accounts | Check if admin user already exists
   ansible.builtin.uri:
     url: "http://127.0.0.1:{{ conduwuit_port }}/_matrix/client/v3/login"
     method: POST
@@ -29,21 +80,40 @@
   register: conduwuit_admin_login_check
   no_log: true
 
-- name: Conduwuit Accounts | Create admin user via registration
+# Registration with token requires a two-step UIA flow:
+# Step 1: POST without auth to get the session ID
+# Step 2: POST with auth including the token and session
+- name: Conduwuit Accounts | Register admin user (step 1 — get session)
   ansible.builtin.uri:
-    url: "http://127.0.0.1:{{ conduwuit_port }}/_conduwuit/v1/admin/user/register"
+    url: "http://127.0.0.1:{{ conduwuit_port }}/_matrix/client/v3/register"
     method: POST
     body_format: json
     body:
       username: "{{ conduwuit_admin_user }}"
       password: "{{ conduwuit_admin_password }}"
-      admin: true
-    status_code: [200, 201]
+    status_code: [200, 401]
+  register: conduwuit_admin_reg_step1
+  no_log: true
+  when: conduwuit_admin_login_check.status != 200
+
+- name: Conduwuit Accounts | Register admin user (step 2 — with token)
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ conduwuit_port }}/_matrix/client/v3/register"
+    method: POST
+    body_format: json
+    body:
+      username: "{{ conduwuit_admin_user }}"
+      password: "{{ conduwuit_admin_password }}"
+      auth:
+        type: "m.login.registration_token"
+        token: "{{ conduwuit_registration_token }}"
+        session: "{{ conduwuit_admin_reg_step1.json.session }}"
+    status_code: [200]
   register: conduwuit_admin_created
   no_log: true
   when: conduwuit_admin_login_check.status != 200
 
-- name: Conduwuit Accounts | Check if bot user exists
+- name: Conduwuit Accounts | Check if bot user already exists
   ansible.builtin.uri:
     url: "http://127.0.0.1:{{ conduwuit_port }}/_matrix/client/v3/login"
     method: POST
@@ -58,19 +128,71 @@
   register: conduwuit_bot_login_check
   no_log: true
 
-- name: Conduwuit Accounts | Create bot user via registration
+- name: Conduwuit Accounts | Register bot user (step 1 — get session)
   ansible.builtin.uri:
-    url: "http://127.0.0.1:{{ conduwuit_port }}/_conduwuit/v1/admin/user/register"
+    url: "http://127.0.0.1:{{ conduwuit_port }}/_matrix/client/v3/register"
     method: POST
     body_format: json
     body:
       username: "{{ conduwuit_bot_user }}"
       password: "{{ conduwuit_bot_password }}"
-      admin: false
-    status_code: [200, 201]
+    status_code: [200, 401]
+  register: conduwuit_bot_reg_step1
+  no_log: true
+  when: conduwuit_bot_login_check.status != 200
+
+- name: Conduwuit Accounts | Register bot user (step 2 — with token)
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ conduwuit_port }}/_matrix/client/v3/register"
+    method: POST
+    body_format: json
+    body:
+      username: "{{ conduwuit_bot_user }}"
+      password: "{{ conduwuit_bot_password }}"
+      auth:
+        type: "m.login.registration_token"
+        token: "{{ conduwuit_registration_token }}"
+        session: "{{ conduwuit_bot_reg_step1.json.session }}"
+    status_code: [200]
   register: conduwuit_bot_created
   no_log: true
   when: conduwuit_bot_login_check.status != 200
+
+# =========================================================================
+# Phase 4: Disable registration
+# =========================================================================
+
+- name: Conduwuit Accounts | Deploy config with registration disabled
+  ansible.builtin.template:
+    src: conduwuit.toml.j2
+    dest: "{{ conduwuit_config_dir }}/conduwuit.toml"
+    owner: root
+    group: "{{ conduwuit_user }}"
+    mode: "0640"
+  become: true
+  vars:
+    conduwuit_allow_registration: false
+    conduwuit_registration_token: ""
+
+- name: Conduwuit Accounts | Restart conduwuit with registration disabled
+  ansible.builtin.systemd:
+    name: conduwuit
+    state: restarted
+  become: true
+
+- name: Conduwuit Accounts | Wait for conduwuit to come back up
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ conduwuit_port }}/_matrix/client/versions"
+    method: GET
+    status_code: 200
+  register: conduwuit_final_health
+  retries: 30
+  delay: 2
+  until: conduwuit_final_health.status == 200
+
+# =========================================================================
+# Phase 5: Bot login, room creation, .env.matrix
+# =========================================================================
 
 - name: Conduwuit Accounts | Login as bot to get access token
   ansible.builtin.uri:
@@ -84,22 +206,6 @@
         user: "{{ conduwuit_bot_user }}"
       password: "{{ conduwuit_bot_password }}"
   register: conduwuit_bot_login
-  no_log: true
-
-- name: Conduwuit Accounts | Save bot access token
-  ansible.builtin.copy:
-    content: |
-      # conduwuit bot access token — managed by Ansible
-      # Do NOT commit this file to version control
-      MATRIX_HOMESERVER_URL=http://{{ ansible_facts['default_ipv4']['address'] }}:{{ conduwuit_port }}
-      MATRIX_USER_ID=@{{ conduwuit_bot_user }}:{{ conduwuit_server_name }}
-      MATRIX_ACCESS_TOKEN={{ conduwuit_bot_login.json.access_token }}
-      MATRIX_OWNER_USER_ID=@{{ conduwuit_admin_user }}:{{ conduwuit_server_name }}
-    dest: "{{ conduwuit_install_dir }}/.env.matrix"
-    owner: root
-    group: root
-    mode: "0600"
-  become: true
   no_log: true
 
 - name: Conduwuit Accounts | Create private notification room
@@ -120,13 +226,55 @@
     status_code: [200]
   register: conduwuit_room_created
 
-- name: Conduwuit Accounts | Append room ID to env file
-  ansible.builtin.lineinfile:
-    path: "{{ conduwuit_install_dir }}/.env.matrix"
-    line: "MATRIX_ROOM_ID={{ conduwuit_room_created.json.room_id }}"
-    create: false
+# Accept the room invite as the admin user
+- name: Conduwuit Accounts | Login as admin to accept invite
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ conduwuit_port }}/_matrix/client/v3/login"
+    method: POST
+    body_format: json
+    body:
+      type: "m.login.password"
+      identifier:
+        type: "m.id.user"
+        user: "{{ conduwuit_admin_user }}"
+      password: "{{ conduwuit_admin_password }}"
+  register: conduwuit_admin_login
+  no_log: true
+
+- name: Conduwuit Accounts | Admin accepts room invite
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ conduwuit_port }}/_matrix/client/v3/join/{{ conduwuit_room_created.json.room_id }}"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ conduwuit_admin_login.json.access_token }}"
+    body_format: json
+    body: {}
+    status_code: [200]
+
+# =========================================================================
+# Phase 6: Write .env.matrix
+# =========================================================================
+
+- name: Conduwuit Accounts | Write .env.matrix file
+  ansible.builtin.copy:
+    content: |
+      # conduwuit bot access token — managed by Ansible
+      # Do NOT commit this file to version control
+      MATRIX_HOMESERVER_URL=http://{{ conduwuit_lan_host }}:{{ conduwuit_port }}
+      MATRIX_USER_ID=@{{ conduwuit_bot_user }}:{{ conduwuit_server_name }}
+      MATRIX_ACCESS_TOKEN={{ conduwuit_bot_login.json.access_token }}
+      MATRIX_ROOM_ID={{ conduwuit_room_created.json.room_id }}
+      MATRIX_OWNER_USER_ID=@{{ conduwuit_admin_user }}:{{ conduwuit_server_name }}
+    dest: "{{ conduwuit_install_dir }}/.env.matrix"
+    owner: root
+    group: root
+    mode: "0600"
   become: true
   no_log: true
+
+# =========================================================================
+# Summary
+# =========================================================================
 
 - name: Conduwuit Accounts | Display setup summary
   ansible.builtin.debug:
@@ -140,4 +288,5 @@
       Room ID:    {{ conduwuit_room_created.json.room_id }}
       Room name:  {{ conduwuit_room_name }}
       Env file:   {{ conduwuit_install_dir }}/.env.matrix
+      LAN URL:    http://{{ conduwuit_lan_host }}:{{ conduwuit_port }}
       ============================================================
