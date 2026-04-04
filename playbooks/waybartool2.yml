@@ -1,0 +1,221 @@
+---
+# Waybartool2 Deployment Playbook
+#
+# Pulls latest sources from the legion remote, builds the project on
+# the controller (potwor), then deploys binaries, waybar scripts, and
+# the systemd user service to any target host.
+#
+# Usage:
+#   ansible-playbook playbooks/waybartool2.yml -i <host>, -u adam -e target_user=adam
+#   ansible-playbook playbooks/waybartool2.yml -i <host>, -u adam --ask-become-pass
+#
+# Prerequisites:
+#   - Rust toolchain on the controller (for cross-compilation or native build)
+#   - SSH access to the target host
+#   - target host must have a graphical session (for waybar integration)
+
+- name: Build waybartool2 from latest sources
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: false
+
+  vars:
+    waybartool2_src: "{{ lookup('env', 'HOME') }}/tmp/waybar-tool-2"
+    waybartool2_remote: legion
+
+  tasks:
+    - name: Build | Pull latest sources from remote
+      ansible.builtin.command:
+        cmd: "git pull {{ waybartool2_remote }} main --ff-only"
+        chdir: "{{ waybartool2_src }}"
+      register: waybartool2_pull
+      changed_when: "'Already up to date' not in waybartool2_pull.stdout"
+      failed_when: false
+
+    - name: Build | Show pull result
+      ansible.builtin.debug:
+        msg: "{{ waybartool2_pull.stdout | default('pull skipped') }}"
+
+    - name: Build | Compile release binaries
+      ansible.builtin.shell:
+        cmd: "source ~/.cargo/env && cargo build --release"
+        chdir: "{{ waybartool2_src }}"
+      args:
+        executable: /bin/bash
+      register: waybartool2_build
+      changed_when: "'Compiling' in waybartool2_build.stderr"
+
+    - name: Build | Verify daemon binary exists
+      ansible.builtin.stat:
+        path: "{{ waybartool2_src }}/target/release/waybartool2"
+      register: waybartool2_daemon_stat
+      failed_when: not waybartool2_daemon_stat.stat.exists
+
+    - name: Build | Verify client binary exists
+      ansible.builtin.stat:
+        path: "{{ waybartool2_src }}/target/release/waybartool2-client"
+      register: waybartool2_client_stat
+      failed_when: not waybartool2_client_stat.stat.exists
+
+- name: Deploy waybartool2
+  hosts: all:!localhost
+  become: true
+  gather_facts: true
+
+  vars:
+    target_user: "{{ ansible_user | default('adam') }}"
+    target_home: "/home/{{ target_user }}"
+    waybartool2_src: "{{ hostvars['localhost']['waybartool2_src'] | default(lookup('env', 'HOME') + '/tmp/waybar-tool-2') }}"
+    waybartool2_bin_dir: "{{ target_home }}/.local/bin"
+    waybartool2_systemd_dir: "{{ target_home }}/.config/systemd/user"
+    waybartool2_version: >-
+      {{ lookup('pipe', 'grep -m1 "^version" ' + waybartool2_src + '/Cargo.toml') | regex_replace('.*"(.*)".*', '\1') }}
+
+  tasks:
+    # =========================================================================
+    # Install binaries
+    # =========================================================================
+
+    - name: Deploy | Ensure bin directory exists
+      ansible.builtin.file:
+        path: "{{ waybartool2_bin_dir }}"
+        state: directory
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+        mode: "0755"
+
+    - name: Deploy | Copy waybartool2 daemon
+      ansible.builtin.copy:
+        src: "{{ waybartool2_src }}/target/release/waybartool2"
+        dest: "{{ waybartool2_bin_dir }}/waybartool2"
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+        mode: "0755"
+      notify: Restart waybartool2
+
+    - name: Deploy | Copy waybartool2-client
+      ansible.builtin.copy:
+        src: "{{ waybartool2_src }}/target/release/waybartool2-client"
+        dest: "{{ waybartool2_bin_dir }}/waybartool2-client"
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+        mode: "0755"
+
+    # =========================================================================
+    # Set capabilities
+    # =========================================================================
+
+    - name: Deploy | Set Linux capabilities on daemon
+      community.general.capabilities:
+        path: "{{ waybartool2_bin_dir }}/waybartool2"
+        capability: "{{ item }}"
+        state: present
+      loop:
+        - cap_net_raw+ep
+        - cap_net_admin+ep
+        - cap_dac_read_search+ep
+        - cap_sys_ptrace+ep
+      failed_when: false
+
+    # =========================================================================
+    # Waybar wrapper scripts
+    # =========================================================================
+
+    - name: Deploy | Find waybar wrapper scripts
+      ansible.builtin.find:
+        paths: "{{ waybartool2_src }}/scripts/waybar"
+        patterns: "wt2-*.sh"
+      delegate_to: localhost
+      become: false
+      register: waybartool2_wrapper_scripts
+
+    - name: Deploy | Copy waybar wrapper scripts
+      ansible.builtin.copy:
+        src: "{{ item.path }}"
+        dest: "{{ waybartool2_bin_dir }}/{{ item.path | basename }}"
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+        mode: "0755"
+      loop: "{{ waybartool2_wrapper_scripts.files }}"
+      loop_control:
+        label: "{{ item.path | basename }}"
+
+    # =========================================================================
+    # Systemd user service
+    # =========================================================================
+
+    - name: Deploy | Ensure systemd user directory exists
+      ansible.builtin.file:
+        path: "{{ waybartool2_systemd_dir }}"
+        state: directory
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+        mode: "0755"
+
+    - name: Deploy | Install systemd user service
+      ansible.builtin.copy:
+        src: "{{ waybartool2_src }}/scripts/systemd/waybartool2.service"
+        dest: "{{ waybartool2_systemd_dir }}/waybartool2.service"
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+        mode: "0644"
+      notify: Restart waybartool2
+
+    - name: Deploy | Enable lingering for user
+      ansible.builtin.command:
+        cmd: "loginctl enable-linger {{ target_user }}"
+      changed_when: true
+
+    - name: Deploy | Look up user UID
+      ansible.builtin.command:
+        cmd: "id -u {{ target_user }}"
+      register: waybartool2_uid
+      changed_when: false
+
+    - name: Deploy | Enable waybartool2 service
+      ansible.builtin.systemd:
+        name: waybartool2
+        scope: user
+        enabled: true
+        state: started
+      become: true
+      become_user: "{{ target_user }}"
+      environment:
+        XDG_RUNTIME_DIR: "/run/user/{{ waybartool2_uid.stdout }}"
+        DBUS_SESSION_BUS_ADDRESS: "unix:path=/run/user/{{ waybartool2_uid.stdout }}/bus"
+
+    # =========================================================================
+    # Summary
+    # =========================================================================
+
+    - name: Deploy | Show deployment summary
+      ansible.builtin.debug:
+        msg: |
+          ============================================================
+          Waybartool2 v{{ waybartool2_version }} deployed!
+          ============================================================
+          Host:       {{ inventory_hostname }}
+          User:       {{ target_user }}
+          Daemon:     {{ waybartool2_bin_dir }}/waybartool2
+          Client:     {{ waybartool2_bin_dir }}/waybartool2-client
+          Scripts:    {{ waybartool2_wrapper_scripts.files | length }} waybar wrappers
+          Service:    waybartool2.service (user)
+
+          Verify:
+            systemctl --user status waybartool2
+            waybartool2-client cpu --format text
+          ============================================================
+
+  handlers:
+    - name: Restart waybartool2
+      ansible.builtin.systemd:
+        name: waybartool2
+        scope: user
+        state: restarted
+        daemon_reload: true
+      become: true
+      become_user: "{{ target_user }}"
+      environment:
+        XDG_RUNTIME_DIR: "/run/user/{{ waybartool2_uid.stdout }}"
+        DBUS_SESSION_BUS_ADDRESS: "unix:path=/run/user/{{ waybartool2_uid.stdout }}/bus"
