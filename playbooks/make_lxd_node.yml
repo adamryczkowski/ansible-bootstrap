@@ -1,0 +1,369 @@
+---
+# Make LXD Node Playbook — Create and configure an LXD container
+#
+# Called by make-lxd-node.sh wrapper script. Can also be invoked directly:
+#
+#   ansible-playbook playbooks/make_lxd_node.yml -i localhost, -c local \
+#     -e lxd_node_container_name=mybox \
+#     -e lxd_node_username=adam
+#
+# Required variables:
+#   lxd_node_container_name  — name of the container to create
+#
+# Optional variables (with defaults):
+#   lxd_node_release         — Ubuntu release (default: "24.04")
+#   lxd_node_username        — user to create inside (default: "adam")
+#   lxd_node_hostname        — container hostname (default: container name)
+#   lxd_node_config          — LXD config dict (default: {security.nesting: "true"})
+#   lxd_node_devices         — LXD devices dict (default: {})
+#   lxd_node_ssh_pubkey_file — SSH public key file to authorize (default: ~/.ssh/id_ed25519.pub)
+#   lxd_node_bare            — skip CLI tools, only SSH + locale (default: false)
+#   lxd_node_private_key_path — install this private key in container
+#   lxd_node_authorized_keys — list of additional SSH public key strings
+#   cli_tools_profile        — "minimal" or "full" (default: "full")
+
+# =============================================================================
+# Play 1: Create the LXD container
+# =============================================================================
+- name: Create LXD container
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: true
+
+  vars:
+    container_name: "{{ lxd_node_container_name }}"
+    container_release: "{{ lxd_node_release | default('24.04') }}"
+    container_config: "{{ lxd_node_config | default({'security.nesting': 'true'}) }}"
+    container_devices: "{{ lxd_node_devices | default({}) }}"
+    container_hostname: "{{ lxd_node_hostname | default(container_name) }}"
+
+  tasks:
+    - name: Container | Check if container already exists
+      ansible.builtin.command: "lxc info {{ container_name }}"
+      register: lxd_node_check
+      failed_when: false
+      changed_when: false
+
+    - name: Container | Create container (stopped)
+      community.general.lxd_container:
+        name: "{{ container_name }}"
+        state: stopped
+        source:
+          type: image
+          mode: pull
+          server: https://cloud-images.ubuntu.com/releases/
+          protocol: simplestreams
+          alias: "{{ container_release }}"
+        profiles:
+          - default
+        config: "{{ container_config }}"
+        timeout: 600
+      when: lxd_node_check.rc != 0
+
+    # When bridging to an external bridge, the profile's eth0 (using
+    # LXD-managed "network" property) conflicts with nictype=bridged.
+    # Remove the profile's eth0 override and add a fresh one with nictype.
+    - name: Container | Replace profile eth0 with custom bridge device
+      ansible.builtin.shell: |
+        lxc config device remove {{ container_name }} eth0 2>/dev/null || true
+        lxc config device add {{ container_name }} eth0 nic nictype=bridged parent={{ container_devices.eth0.parent }} name=eth0
+      when:
+        - lxd_node_check.rc != 0
+        - container_devices.eth0 is defined
+        - container_devices.eth0.parent is defined
+      changed_when: true
+
+    - name: Container | Apply non-eth0 devices
+      ansible.builtin.command: >-
+        lxc config device add {{ container_name }} {{ item.key }}
+        {{ item.value.type }}
+        {% for k, v in item.value.items() if k != 'type' %}{{ k }}={{ v }} {% endfor %}
+      loop: "{{ container_devices | dict2items | rejectattr('key', 'equalto', 'eth0') | list }}"
+      loop_control:
+        label: "{{ item.key }}"
+      when:
+        - lxd_node_check.rc != 0
+        - container_devices | length > 0
+      changed_when: true
+
+    - name: Container | Start container
+      community.general.lxd_container:
+        name: "{{ container_name }}"
+        state: started
+        wait_for_ipv4_addresses: true
+        timeout: 120
+      when: lxd_node_check.rc != 0
+
+    - name: Container | Apply config to existing container
+      ansible.builtin.command: "lxc config set {{ container_name }} {{ item.key }} '{{ item.value }}'"
+      loop: "{{ container_config | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+      when: lxd_node_check.rc == 0
+      changed_when: true
+
+    - name: Container | Apply devices to existing container
+      when:
+        - lxd_node_check.rc == 0
+        - container_devices | length > 0
+      block:
+        - name: Container | Check existing devices
+          ansible.builtin.command: "lxc config device show {{ container_name }}"
+          register: lxd_node_existing_devices
+          changed_when: false
+
+        - name: Container | Add/update devices
+          ansible.builtin.command: >-
+            lxc config device add {{ container_name }} {{ item.key }}
+            {{ item.value.type }}
+            {% for k, v in item.value.items() if k != 'type' %}{{ k }}={{ v }} {% endfor %}
+          loop: "{{ container_devices | dict2items }}"
+          loop_control:
+            label: "{{ item.key }}"
+          when: "item.key not in lxd_node_existing_devices.stdout"
+          changed_when: true
+
+    - name: Container | Ensure container is started
+      community.general.lxd_container:
+        name: "{{ container_name }}"
+        state: started
+        wait_for_ipv4_addresses: true
+        timeout: 120
+
+    - name: Container | Wait for container networking
+      ansible.builtin.pause:
+        seconds: 5
+      when: lxd_node_check.rc != 0
+
+    # When the router sends DHCP option 121 (classless static routes),
+    # RFC 3442 requires the client to ignore the default gateway.
+    # This ensures the default route exists regardless.
+    - name: Container | Ensure default route exists
+      ansible.builtin.shell: |
+        lxc exec {{ container_name }} -- bash -c '
+          if ! ip route | grep -q "^default"; then
+            GW=$(journalctl -u systemd-networkd --no-pager 2>/dev/null | grep -oP "gateway \K[0-9.]+" | tail -1)
+            if [ -n "$GW" ]; then
+              ip route add default via $GW
+            fi
+          fi'
+      changed_when: true
+
+    # =========================================================================
+    # Bootstrap Python3 and SSH
+    # =========================================================================
+
+    - name: Container | Install Python3 and SSH server
+      ansible.builtin.command: >-
+        lxc exec {{ container_name }} --
+        bash -c "apt-get update -qq && apt-get install -y -qq python3 openssh-server sudo locales > /dev/null 2>&1; true"
+      changed_when: true
+
+    - name: Container | Generate locale
+      ansible.builtin.command: "lxc exec {{ container_name }} -- locale-gen en_US.UTF-8"
+      changed_when: true
+      failed_when: false
+
+    - name: Container | Set timezone
+      ansible.builtin.command: "lxc exec {{ container_name }} -- timedatectl set-timezone Europe/Warsaw"
+      changed_when: true
+      failed_when: false
+
+    - name: Container | Set hostname
+      ansible.builtin.shell: "echo '{{ container_hostname }}' | lxc exec {{ container_name }} -- tee /etc/hostname > /dev/null"
+      changed_when: true
+
+    # =========================================================================
+    # User setup
+    # =========================================================================
+
+    - name: User | Check if user exists
+      ansible.builtin.command: "lxc exec {{ container_name }} -- id {{ lxd_node_username | default('adam') }}"
+      register: lxd_node_user_check
+      failed_when: false
+      changed_when: false
+
+    - name: User | Create user
+      ansible.builtin.command: >-
+        lxc exec {{ container_name }} --
+        useradd -m -s /bin/bash -G sudo {{ lxd_node_username | default('adam') }}
+      when: lxd_node_user_check.rc != 0
+      changed_when: true
+
+    - name: User | Set passwordless sudo
+      ansible.builtin.shell: >-
+        echo '{{ lxd_node_username | default("adam") }} ALL=(ALL) NOPASSWD:ALL'
+        | lxc exec {{ container_name }} -- tee /etc/sudoers.d/{{ lxd_node_username | default("adam") }} > /dev/null
+      changed_when: true
+
+    - name: User | Set sudoers permissions
+      ansible.builtin.command: "lxc exec {{ container_name }} -- chmod 440 /etc/sudoers.d/{{ lxd_node_username | default('adam') }}"
+      changed_when: true
+
+    # =========================================================================
+    # SSH key injection
+    # =========================================================================
+
+    - name: SSH | Create .ssh directory
+      ansible.builtin.command: >-
+        lxc exec {{ container_name }} -- bash -c
+        "mkdir -p /home/{{ lxd_node_username | default('adam') }}/.ssh &&
+        chmod 700 /home/{{ lxd_node_username | default('adam') }}/.ssh &&
+        chown {{ lxd_node_username | default('adam') }}:{{ lxd_node_username | default('adam') }} /home/{{ lxd_node_username | default('adam') }}/.ssh"
+      changed_when: true
+
+    - name: SSH | Read operator public key
+      ansible.builtin.set_fact:
+        lxd_node_ssh_pubkey: "{{ lookup('file', lxd_node_ssh_pubkey_file | default('~/.ssh/id_ed25519.pub')) }}"
+
+    - name: SSH | Inject operator SSH key
+      ansible.builtin.shell: >-
+        echo '{{ lxd_node_ssh_pubkey }}'
+        | lxc exec {{ container_name }} -- tee /home/{{ lxd_node_username | default('adam') }}/.ssh/authorized_keys > /dev/null
+      changed_when: true
+
+    - name: SSH | Inject additional authorized keys
+      ansible.builtin.shell: >-
+        echo '{{ item }}'
+        | lxc exec {{ container_name }} -- tee -a /home/{{ lxd_node_username | default('adam') }}/.ssh/authorized_keys > /dev/null
+      loop: "{{ lxd_node_authorized_keys | default([]) }}"
+      changed_when: true
+
+    - name: SSH | Set authorized_keys permissions
+      ansible.builtin.command: >-
+        lxc exec {{ container_name }} -- bash -c
+        "chmod 600 /home/{{ lxd_node_username | default('adam') }}/.ssh/authorized_keys &&
+        chown {{ lxd_node_username | default('adam') }}:{{ lxd_node_username | default('adam') }} /home/{{ lxd_node_username | default('adam') }}/.ssh/authorized_keys"
+      changed_when: true
+
+    - name: SSH | Install private key in container
+      ansible.builtin.shell: >-
+        lxc file push {{ lxd_node_private_key_path }} {{ container_name }}/home/{{ lxd_node_username | default('adam') }}/.ssh/
+      when: lxd_node_private_key_path is defined
+      changed_when: true
+
+    - name: SSH | Set private key permissions
+      ansible.builtin.command: >-
+        lxc exec {{ container_name }} -- bash -c
+        "chown {{ lxd_node_username | default('adam') }}:{{ lxd_node_username | default('adam') }} /home/{{ lxd_node_username | default('adam') }}/.ssh/$(basename {{ lxd_node_private_key_path }}) &&
+        chmod 600 /home/{{ lxd_node_username | default('adam') }}/.ssh/$(basename {{ lxd_node_private_key_path }})"
+      when: lxd_node_private_key_path is defined
+      changed_when: true
+
+    - name: SSH | Install public key in container
+      ansible.builtin.shell: >-
+        lxc file push {{ lxd_node_public_key_path }} {{ container_name }}/home/{{ lxd_node_username | default('adam') }}/.ssh/
+      when: lxd_node_public_key_path is defined
+      changed_when: true
+
+    - name: SSH | Generate SSH keypair if no private key provided
+      ansible.builtin.command: >-
+        lxc exec {{ container_name }} -- su -l {{ lxd_node_username | default('adam') }} -c
+        "ssh-keygen -t ed25519 -a 100 -f ~/.ssh/id_ed25519 -N ''"
+      when: lxd_node_private_key_path is not defined
+      register: lxd_node_keygen
+      failed_when: false
+      changed_when: "'Generating' in lxd_node_keygen.stdout | default('')"
+
+    - name: SSH | Enable SSH service
+      ansible.builtin.command: >-
+        lxc exec {{ container_name }} -- bash -c
+        "systemctl enable ssh && systemctl start ssh"
+      changed_when: true
+
+    # =========================================================================
+    # Update host known_hosts
+    # =========================================================================
+
+    - name: SSH | Get container IP
+      ansible.builtin.command: "lxc list {{ container_name }} --format json"
+      register: lxd_node_container_info
+      changed_when: false
+
+    - name: SSH | Parse container IP
+      ansible.builtin.set_fact:
+        lxd_node_container_ip: >-
+          {{ (lxd_node_container_info.stdout | from_json)[0].state.network.eth0.addresses
+          | selectattr('family', 'equalto', 'inet')
+          | map(attribute='address')
+          | first }}
+
+    - name: SSH | Remove old known_hosts entries
+      ansible.builtin.command: "ssh-keygen -f {{ ansible_facts.env.HOME }}/.ssh/known_hosts -R {{ item }}"
+      loop:
+        - "{{ container_name }}"
+        - "{{ lxd_node_container_ip }}"
+      failed_when: false
+      changed_when: true
+
+    - name: SSH | Add new known_hosts entries
+      ansible.builtin.shell: "ssh-keyscan -H {{ item }} >> {{ ansible_facts.env.HOME }}/.ssh/known_hosts 2>/dev/null"
+      loop:
+        - "{{ container_name }}"
+        - "{{ lxd_node_container_ip }}"
+      failed_when: false
+      changed_when: true
+
+    # =========================================================================
+    # Register container for Play 2
+    # =========================================================================
+
+    - name: Container | Register for configuration play
+      ansible.builtin.add_host:
+        name: "{{ container_name }}"
+        groups: lxd_node_containers
+        ansible_host: "{{ lxd_node_container_ip }}"
+        ansible_connection: ssh
+        ansible_user: "{{ lxd_node_username | default('adam') }}"
+        ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+        ansible_python_interpreter: /usr/bin/python3
+
+# =============================================================================
+# Play 2: Configure the container (unless --bare)
+# =============================================================================
+- name: Configure LXD container
+  hosts: lxd_node_containers
+  become: true
+  gather_facts: true
+
+  vars:
+    target_user: "{{ lxd_node_username | default('adam') }}"
+    cli_tools_profile: "{{ hostvars['localhost']['cli_tools_profile'] | default('full') }}"
+
+  roles:
+    - role: bashrc
+      vars:
+        bashrc_username: "{{ target_user }}"
+      tags: [bashrc]
+
+    - role: rust
+      vars:
+        rust_username: "{{ target_user }}"
+        rust_packages: "{{ cli_tools_rust_packages | default([]) }}"
+      tags: [rust, cli]
+      when:
+        - not (lxd_node_bare | default(false) | bool)
+        - cli_tools_profile == 'full'
+
+    - role: cli_tools
+      vars:
+        cli_tools_username: "{{ target_user }}"
+      tags: [cli_tools]
+      when: not (lxd_node_bare | default(false) | bool)
+
+  post_tasks:
+    - name: Summary | Display container info
+      ansible.builtin.debug:
+        msg: |
+          ============================================================
+          LXD Container Ready!
+          ============================================================
+          Name:       {{ lxd_node_container_name }}
+          IP:         {{ hostvars['localhost']['lxd_node_container_ip'] }}
+          User:       {{ target_user }}
+          CLI tools:  {{ 'skipped (--bare)' if (lxd_node_bare | default(false) | bool) else cli_tools_profile }}
+
+          SSH access:
+            ssh {{ target_user }}@{{ hostvars['localhost']['lxd_node_container_ip'] }}
+          ============================================================
