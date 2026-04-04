@@ -22,6 +22,17 @@
 #         - zoxide
 #         - starship
 
+- name: Rust | Install system dependencies
+  ansible.builtin.apt:
+    name:
+      - pkgconf
+      - libssl-dev
+      - zlib1g-dev
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  become: true
+
 - name: Rust | Check if rustup is installed
   ansible.builtin.stat:
     path: "/home/{{ rust_username }}/.cargo/bin/rustup"
