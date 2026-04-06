@@ -136,19 +136,68 @@
         seconds: 5
       when: lxd_node_check.rc != 0
 
-    # When the router sends DHCP option 121 (classless static routes),
-    # RFC 3442 requires the client to ignore the default gateway.
-    # This ensures the default route exists regardless.
-    - name: Container | Ensure default route exists
+    # When the router sends DHCP option 121 (classless static routes)
+    # without including 0.0.0.0/0, RFC 3442 requires the client to
+    # ignore option 3 (default gateway). systemd-networkd enforces this
+    # strictly, so the container loses its default route.
+    #
+    # Fix: push a netplan override that adds the default route
+    # persistently, and disable cloud-init network regeneration.
+    - name: Container | Check if default route exists
+      ansible.builtin.command: "lxc exec {{ container_name }} -- ip route show default"
+      register: lxd_node_default_route
+      changed_when: false
+      failed_when: false
+
+    - name: Container | Detect DHCP gateway from networkctl
       ansible.builtin.shell: |
         lxc exec {{ container_name }} -- bash -c '
-          if ! ip route | grep -q "^default"; then
+          GW=$(networkctl status eth0 2>/dev/null | grep -oP "Gateway:\s+\K[0-9.]+")
+          if [ -z "$GW" ]; then
             GW=$(journalctl -u systemd-networkd --no-pager 2>/dev/null | grep -oP "gateway \K[0-9.]+" | tail -1)
-            if [ -n "$GW" ]; then
-              ip route add default via $GW
-            fi
-          fi'
-      changed_when: true
+          fi
+          echo "$GW"'
+      register: lxd_node_detected_gw
+      changed_when: false
+      when: lxd_node_default_route.stdout | trim == ''
+
+    - name: Container | Apply persistent default route via netplan
+      when:
+        - lxd_node_default_route.stdout | trim == ''
+        - lxd_node_detected_gw.stdout | default('') | trim != ''
+      block:
+        - name: Container | Write netplan default-route override
+          ansible.builtin.shell: |
+            cat > /tmp/99-default-route.yaml <<'EOF'
+            network:
+              version: 2
+              ethernets:
+                eth0:
+                  routes:
+                    - to: default
+                      via: {{ lxd_node_detected_gw.stdout | trim }}
+                      on-link: true
+            EOF
+            lxc file push --uid 0 --gid 0 --mode 600 \
+              /tmp/99-default-route.yaml \
+              {{ container_name }}/etc/netplan/99-default-route.yaml
+            rm -f /tmp/99-default-route.yaml
+          changed_when: true
+
+        - name: Container | Disable cloud-init network config regeneration
+          ansible.builtin.shell: |
+            cat > /tmp/99-disable-network-config.cfg <<'EOF'
+            network: {config: disabled}
+            EOF
+            lxc file push --uid 0 --gid 0 --mode 644 \
+              /tmp/99-disable-network-config.cfg \
+              {{ container_name }}/etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
+            rm -f /tmp/99-disable-network-config.cfg
+          changed_when: true
+
+        - name: Container | Apply netplan to activate default route
+          ansible.builtin.command: "lxc exec {{ container_name }} -- netplan apply"
+          changed_when: true
 
     # =========================================================================
     # Bootstrap Python3 and SSH
