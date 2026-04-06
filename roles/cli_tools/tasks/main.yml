@@ -335,15 +335,15 @@
               alias duf="dust"
           fi
 
-          # fd replaces find
-          if command -v fd &> /dev/null; then
-              alias find="fd"
-          fi
+          # fd is available as 'fd' — do NOT alias 'find' to it.
+          # fd uses different flag syntax (e.g. -t f instead of -type f),
+          # which breaks scripts that call 'find' with POSIX flags
+          # (notably sdkman-init.sh).
 
-          # ripgrep replaces grep for code search
-          if command -v rg &> /dev/null; then
-              alias grep="rg"
-          fi
+          # ripgrep is available as 'rg' — do NOT alias 'grep' to it.
+          # rg uses different flag syntax than POSIX grep (e.g. -E is default,
+          # -r is implicit, -v works but other flags differ), which breaks
+          # scripts that call 'grep' with POSIX flags.
 
           # difft for better diffs
           if command -v difft &> /dev/null; then
