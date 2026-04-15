@@ -1,0 +1,44 @@
+# Managed by Ansible (claude_code role) — do not edit by hand.
+# Per-account Claude Code aliases using bubblewrap mount overlays.
+# See docs/two-claudes.md for the rationale.
+{% raw %}
+_claude_bwrap() {
+  local acct="$1"; shift
+  bwrap --dev-bind / / \
+    --bind "$HOME/.claude-${acct}/.claude.json" "$HOME/.claude.json" \
+    --bind "$HOME/.claude-${acct}/.credentials.json" "$HOME/.claude/.credentials.json" \
+    "$(command -v claude)" "$@"
+}
+{% endraw %}
+
+{% for acct in claude_code_multi_account.accounts %}
+claude-{{ acct }}() { _claude_bwrap "{{ acct }}" "$@"; }
+{% endfor %}
+
+{% raw %}
+claude() {
+{% endraw %}
+  local accounts=({% for acct in claude_code_multi_account.accounts %}"{{ acct }}" {% endfor %})
+{% raw %}
+  if [[ ${#accounts[@]} -eq 1 ]]; then
+    _claude_bwrap "${accounts[0]}" "$@"
+    return
+  fi
+
+  echo "Select account:"
+  local i=1
+  for acct in "${accounts[@]}"; do
+    echo "  $i) $acct"
+    ((i++))
+  done
+  printf "Choice [1-%d]: " "${#accounts[@]}"
+  read -r choice
+
+  if [[ "$choice" -ge 1 && "$choice" -le "${#accounts[@]}" ]] 2>/dev/null; then
+    _claude_bwrap "${accounts[$((choice-1))]}" "$@"
+  else
+    echo "Invalid choice." >&2
+    return 1
+  fi
+}
+{% endraw %}

@@ -25,7 +25,7 @@ claude_code_gotify_token: ""
 claude_code_ai_prompts:
   enabled: true
   # Remote source to clone from (SSH format: user@host:path)
-  source_remote: "adam@192.168.42.207:/home/adam/tmp/AI"
+  source_remote: "adam@192.168.42.206:/home/adam/tmp/AI"
   # GitHub remote to set as 'origin' for pushing changes
   github_remote: "git@github.com:adamryczkowski/AI-prompts.git"
   # Local destination directory on the target host
@@ -127,3 +127,34 @@ claude_code_deny_permissions:
   - "Read(./.env)"
   - "Read(./.env.*)"
   - "Bash(rm -rf /)"
+
+# Additional settings to include in settings.json (merged as top-level keys)
+# Examples: enabledPlugins, skipDangerousModePermissionPrompt, model, etc.
+claude_code_extra_settings: {}
+
+# Environment variables to inject into the claude-hierarchy MCP server config
+# e.g. {"GOTIFY_URL": "http://host:port", "GOTIFY_APP_TOKEN": "xxx"}
+claude_code_hierarchy_env: {}
+
+# chrome-devtools-mcp: extra arguments and env
+claude_code_chrome_devtools_args:
+  - "--browserUrl"
+  - "http://127.0.0.1:9222"
+claude_code_chrome_devtools_env:
+  PUPPETEER_EXECUTABLE_PATH: "/snap/bin/chromium"
+
+# Optional: enable per-account identity overlays via bubblewrap.
+# When enabled, installs `bubblewrap` and deploys `claude-<name>` shell
+# aliases that bind-mount per-account .claude.json + .credentials.json
+# over the shared ~/.claude/ directory. See docs/two-claudes.md.
+#
+# OAuth login itself is interactive and remains a manual step
+# (instructions are printed by the playbook on completion).
+claude_code_multi_account:
+  enabled: false
+  # List of account "slugs". For each entry, the role:
+  #   - creates ~/.claude-<name>/ (mode 0700, owned by claude_code_username)
+  #   - emits an alias `claude-<name>` in ~/.bashrc.d/22_claude_accounts.sh
+  accounts:
+    - adam
+    - mik

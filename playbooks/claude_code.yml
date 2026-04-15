@@ -52,3 +52,28 @@
           To start HTTP MCP services:
             systemctl --user start svg-mcp imagen-mcp mcp-remove-background
           ============================================================
+
+    - name: Display multi-account setup instructions
+      ansible.builtin.debug:
+        msg: |
+          ============================================================
+          Multi-account mode enabled.
+          Per-account aliases: {% for a in claude_code_multi_account.accounts %}claude-{{ a }}{% if not loop.last %}, {% endif %}{% endfor %}
+
+          First-time setup (interactive, run as {{ target_user }}):
+          {% for a in claude_code_multi_account.accounts %}
+            CLAUDE_CONFIG_DIR=~/.claude-{{ a }} claude   # OAuth login as {{ a }}
+          {% endfor %}
+
+          After OAuth login completes for each account, reload your
+          shell (or `source ~/.bashrc.d/22_claude_accounts.sh`) and run:
+          {% for a in claude_code_multi_account.accounts %}
+            claude-{{ a }}
+          {% endfor %}
+
+          Caveat: MCP server config lives in ~/.claude.json (per-account).
+          Adding an MCP server while running as one account will not be
+          visible to the other — sync the `mcpServers` key manually
+          between the per-account .claude.json files when needed.
+          ============================================================
+      when: claude_code_multi_account.enabled | default(false)

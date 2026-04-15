@@ -1,0 +1,56 @@
+---
+# Multi-account overlays via bubblewrap.
+#
+# Prepares the plumbing for running multiple Anthropic accounts under a
+# single Linux user, sharing ~/.claude/ but overlaying per-account
+# .claude.json and .credentials.json. The interactive OAuth login step
+# remains the operator's responsibility.
+#
+# See docs/two-claudes.md for design rationale.
+
+- name: Claude Code | Multi-account | Install bubblewrap
+  ansible.builtin.apt:
+    name: bubblewrap
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  become: true
+
+- name: Claude Code | Multi-account | Create per-account directories
+  ansible.builtin.file:
+    path: "{{ claude_code_user_home }}/.claude-{{ item }}"
+    state: directory
+    owner: "{{ claude_code_username }}"
+    group: "{{ claude_code_username }}"
+    mode: '0700'
+  loop: "{{ claude_code_multi_account.accounts }}"
+  become: true
+
+- name: Claude Code | Multi-account | Create stub identity files
+  ansible.builtin.copy:
+    content: "{}"
+    dest: "{{ claude_code_user_home }}/.claude-{{ item.0 }}/{{ item.1 }}"
+    owner: "{{ claude_code_username }}"
+    group: "{{ claude_code_username }}"
+    mode: '0600'
+    force: false
+  loop: "{{ claude_code_multi_account.accounts | product(['.claude.json', '.credentials.json']) | list }}"
+  become: true
+
+- name: Claude Code | Multi-account | Ensure ~/.bashrc.d exists
+  ansible.builtin.file:
+    path: "{{ claude_code_user_home }}/.bashrc.d"
+    state: directory
+    owner: "{{ claude_code_username }}"
+    group: "{{ claude_code_username }}"
+    mode: '0755'
+  become: true
+
+- name: Claude Code | Multi-account | Deploy per-account aliases
+  ansible.builtin.template:
+    src: claude_accounts.sh.j2
+    dest: "{{ claude_code_user_home }}/.bashrc.d/22_claude_accounts.sh"
+    owner: "{{ claude_code_username }}"
+    group: "{{ claude_code_username }}"
+    mode: '0644'
+  become: true

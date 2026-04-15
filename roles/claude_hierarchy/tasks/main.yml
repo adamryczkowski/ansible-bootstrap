@@ -93,6 +93,8 @@
 
 - name: Claude Hierarchy | Build and pack from source
   ansible.builtin.shell: |
+    export PATH="$HOME/.local/share/mise/shims:$HOME/.local/bin:$PATH"
+    export MISE_YES=1
     npm ci && npm run build && npm pack
   args:
     executable: /bin/bash

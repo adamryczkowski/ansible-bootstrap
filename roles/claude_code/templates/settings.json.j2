@@ -36,6 +36,13 @@
 {% set _ = ns.servers.append('claude-hierarchy') %}
 {% endif %}
 {
+  "statusLine": {
+    "type": "command",
+    "command": "bash {{ claude_code_user_home }}/.claude/statusline-command.sh"
+  },
+{% for key, value in claude_code_extra_settings.items() %}
+  {{ key | to_json }}: {{ value | to_json }},
+{% endfor %}
   "permissions": {
     "allow": {{ claude_code_mcp_permissions | to_nice_json(indent=6) }},
     "deny": {{ claude_code_deny_permissions | to_nice_json(indent=6) }}
@@ -71,7 +78,10 @@
 {% if 'chrome-devtools-mcp' in ns.servers %}
     "chrome-devtools-mcp": {
       "command": "{{ claude_code_node_bin }}/chrome-devtools-mcp",
-      "args": []
+      "args": {{ claude_code_chrome_devtools_args | to_json }}{{ ',' if claude_code_chrome_devtools_env | default({}) | length > 0 else '' }}
+{% if claude_code_chrome_devtools_env | default({}) | length > 0 %}
+      "env": {{ claude_code_chrome_devtools_env | to_json }}
+{% endif %}
     }{{ ',' if ns.servers[ns.servers.index('chrome-devtools-mcp')+1:] | length > 0 else '' }}
 {% endif %}
 {% if 'browsermcp' in ns.servers %}
@@ -110,7 +120,10 @@
 {% if 'claude-hierarchy' in ns.servers %}
     "claude-hierarchy": {
       "command": "claude-hierarchy",
-      "args": []
+      "args": []{{ ',' if claude_code_hierarchy_env | default({}) | length > 0 else '' }}
+{% if claude_code_hierarchy_env | default({}) | length > 0 %}
+      "env": {{ claude_code_hierarchy_env | to_json }}
+{% endif %}
     }
 {% endif %}
   }

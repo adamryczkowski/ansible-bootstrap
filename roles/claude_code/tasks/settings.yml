@@ -32,6 +32,15 @@
     - claude_code_settings_stat.stat.exists | default(false)
     - claude_code_settings_stat.stat.islnk | default(false)
 
+- name: Claude Code | Deploy statusline script
+  ansible.builtin.template:
+    src: statusline-command.sh.j2
+    dest: "{{ claude_code_user_home }}/.claude/statusline-command.sh"
+    owner: "{{ claude_code_username }}"
+    mode: '0755'
+  become: true
+  become_user: "{{ claude_code_username }}"
+
 - name: Claude Code | Deploy settings.json
   ansible.builtin.template:
     src: settings.json.j2

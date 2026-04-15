@@ -67,7 +67,7 @@
 
 - name: Claude Code | Setup SVG-MCP
   ansible.builtin.shell: |
-    export PATH="{{ claude_code_user_home }}/.local/bin:$PATH"
+    export PATH="{{ claude_code_user_home }}/.local/bin:{{ claude_code_user_home }}/.local/share/mise/shims:$PATH"
     cd {{ claude_code_mcp_dir }}/SVG-MCP
     just setup
   become: true
@@ -78,7 +78,7 @@
 
 - name: Claude Code | Install SVG-MCP systemd service
   ansible.builtin.shell: |
-    export PATH="{{ claude_code_user_home }}/.local/bin:$PATH"
+    export PATH="{{ claude_code_user_home }}/.local/bin:{{ claude_code_user_home }}/.local/share/mise/shims:$PATH"
     cd {{ claude_code_mcp_dir }}/SVG-MCP
     just install-systemd-service
   become: true
@@ -102,7 +102,7 @@
 
 - name: Claude Code | Setup Imagen-MCP
   ansible.builtin.shell: |
-    export PATH="{{ claude_code_user_home }}/.local/bin:$PATH"
+    export PATH="{{ claude_code_user_home }}/.local/bin:{{ claude_code_user_home }}/.local/share/mise/shims:$PATH"
     cd {{ claude_code_mcp_dir }}/Imagen-MCP
     just setup
   become: true
@@ -113,7 +113,7 @@
 
 - name: Claude Code | Install Imagen-MCP systemd service
   ansible.builtin.shell: |
-    export PATH="{{ claude_code_user_home }}/.local/bin:$PATH"
+    export PATH="{{ claude_code_user_home }}/.local/bin:{{ claude_code_user_home }}/.local/share/mise/shims:$PATH"
     cd {{ claude_code_mcp_dir }}/Imagen-MCP
     just install-systemd-service
   become: true
@@ -137,7 +137,7 @@
 
 - name: Claude Code | Setup MCP-remove-background
   ansible.builtin.shell: |
-    export PATH="{{ claude_code_user_home }}/.local/bin:$PATH"
+    export PATH="{{ claude_code_user_home }}/.local/bin:{{ claude_code_user_home }}/.local/share/mise/shims:$PATH"
     cd {{ claude_code_mcp_dir }}/MCP-remove-background
     just setup
   become: true
@@ -148,7 +148,7 @@
 
 - name: Claude Code | Install MCP-remove-background systemd service
   ansible.builtin.shell: |
-    export PATH="{{ claude_code_user_home }}/.local/bin:$PATH"
+    export PATH="{{ claude_code_user_home }}/.local/bin:{{ claude_code_user_home }}/.local/share/mise/shims:$PATH"
     cd {{ claude_code_mcp_dir }}/MCP-remove-background
     just install-systemd-service
   become: true
@@ -162,7 +162,7 @@
 # ============================================================================
 - name: Claude Code | Verify mcp-pdb can be run via uv
   ansible.builtin.shell: |
-    export PATH="{{ claude_code_user_home }}/.local/bin:$PATH"
+    export PATH="{{ claude_code_user_home }}/.local/bin:{{ claude_code_user_home }}/.local/share/mise/shims:$PATH"
     uv run --python 3.13 --with mcp-pdb mcp-pdb --help
   become: true
   become_user: "{{ claude_code_username }}"
@@ -175,7 +175,7 @@
 # ============================================================================
 - name: Claude Code | Verify mcp-hn can be run via uv
   ansible.builtin.shell: |
-    export PATH="{{ claude_code_user_home }}/.local/bin:$PATH"
+    export PATH="{{ claude_code_user_home }}/.local/bin:{{ claude_code_user_home }}/.local/share/mise/shims:$PATH"
     uv run --python 3.13 --with mcp-hn mcp-hn --help
   become: true
   become_user: "{{ claude_code_username }}"
@@ -188,7 +188,7 @@
 # ============================================================================
 - name: Claude Code | Verify paper-search-mcp can be run via uv
   ansible.builtin.shell: |
-    export PATH="{{ claude_code_user_home }}/.local/bin:$PATH"
+    export PATH="{{ claude_code_user_home }}/.local/bin:{{ claude_code_user_home }}/.local/share/mise/shims:$PATH"
     uv run --python 3.13 --with paper-search-mcp paper-search-mcp --help
   become: true
   become_user: "{{ claude_code_username }}"

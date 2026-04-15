@@ -23,7 +23,10 @@
   changed_when: false
   failed_when: false
 
-# mise is installed by cli_tools role, we just need to install Node.js and Python
+# mise is installed by cli_tools role, we just need to install Node.js and Python.
+# `mise install` and `mise use -g` are both idempotent. We always run them so
+# the global default is set even when the tool was previously installed without
+# `use -g` (in which case mise shims error out with "No version is set").
 - name: Claude Code | Install Node.js via mise
   ansible.builtin.shell: |
     export PATH="{{ claude_code_user_home }}/.local/bin:$PATH"
@@ -31,8 +34,8 @@
     mise use -g node@{{ claude_code_node_version }}
   become: true
   become_user: "{{ claude_code_username }}"
-  args:
-    creates: "{{ claude_code_user_home }}/.local/share/mise/installs/node"
+  register: claude_code_mise_node
+  changed_when: "'already installed' not in claude_code_mise_node.stderr | default('')"
 
 - name: Claude Code | Install Python via mise
   ansible.builtin.shell: |
@@ -41,8 +44,8 @@
     mise use -g python@{{ claude_code_python_version }}
   become: true
   become_user: "{{ claude_code_username }}"
-  args:
-    creates: "{{ claude_code_user_home }}/.local/share/mise/installs/python"
+  register: claude_code_mise_python
+  changed_when: "'already installed' not in claude_code_mise_python.stderr | default('')"
 
 - name: Claude Code | Install uv via pipx
   ansible.builtin.command:
@@ -78,4 +81,13 @@
   become_user: "{{ claude_code_username }}"
   environment:
     PATH: "{{ claude_code_user_home }}/.local/bin:{{ ansible_facts.env.PATH }}"
+  changed_when: false
+
+- name: Claude Code | Ensure Poetry creates in-project virtualenvs
+  ansible.builtin.shell: |
+    export PATH="{{ claude_code_user_home }}/.local/bin:$PATH"
+    poetry config virtualenvs.create true
+    poetry config virtualenvs.in-project true
+  become: true
+  become_user: "{{ claude_code_username }}"
   changed_when: false

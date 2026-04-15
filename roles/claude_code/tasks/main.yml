@@ -70,3 +70,7 @@
 
 - name: Claude Code | Register MCP servers with CLI
   ansible.builtin.include_tasks: register_mcp.yml
+
+- name: Claude Code | Configure multi-account overlays
+  ansible.builtin.include_tasks: multi_account.yml
+  when: claude_code_multi_account.enabled | default(false)
