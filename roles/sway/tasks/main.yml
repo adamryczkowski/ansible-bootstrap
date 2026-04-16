@@ -56,6 +56,10 @@
   ansible.builtin.include_tasks: fix_hardcoded_paths.yml
   when: sway_fix_hardcoded_paths | bool
 
+- name: Sway | Include waybar duplication fix
+  ansible.builtin.include_tasks: fix_waybar_duplication.yml
+  when: sway_fix_waybar_duplication | bool
+
 - name: Sway | Include swayidle monitor wake fix
   ansible.builtin.include_tasks: fix_swayidle.yml
   when: sway_fix_swayidle_monitor_wake | bool

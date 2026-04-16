@@ -1,0 +1,23 @@
+---
+# Sway role - Fix waybar duplication on login / sway reload
+#
+# The i3-config repository uses `swaybar_command waybar` inside a `bar {}`
+# block, which hands waybar's lifecycle to sway. On sway reload (including
+# implicit reloads triggered by kanshi / output hotplug at login) sway
+# spawns a new waybar while the previous one does not always terminate
+# cleanly — the user ends up with two stacked bars.
+#
+# Fix: remove the bar block from the cloned i3-config and launch waybar
+# via `exec_always`, with a pkill guard so each reload yields exactly one
+# fresh waybar instance.
+
+- name: Sway | Replace bar block with exec_always waybar
+  ansible.builtin.replace:
+    path: "{{ sway_config_dest }}/sway/config"
+    regexp: 'bar\s*\{[^}]*swaybar_command\s+waybar[^}]*\}'
+    replace: |-
+      # bar{} block replaced by ansible (fix_waybar_duplication.yml) —
+      # sway no longer owns waybar's lifecycle; see exec_always below.
+      exec_always pkill -x waybar; waybar
+  become: true
+  become_user: "{{ sway_username }}"

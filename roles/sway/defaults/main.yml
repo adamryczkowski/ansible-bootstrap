@@ -231,6 +231,13 @@ sway_bright_add_to_video_group: true
 # This replaces /home/adam/ with /home/{{ sway_username }}/ in config files
 sway_fix_hardcoded_paths: true
 
+# Fix waybar duplication on login / sway reload
+# The i3-config repository uses `swaybar_command waybar` which hands waybar's
+# lifecycle to sway; on implicit reload (e.g. kanshi output hotplug at login)
+# a second waybar is spawned while the first does not always terminate.
+# Replaces the bar block with `exec_always pkill -x waybar; waybar`.
+sway_fix_waybar_duplication: true
+
 # greetd display manager configuration (Arch Linux only)
 # greetd is a minimal, agnostic login manager daemon for Wayland compositors
 # On Arch Linux, we use greetd instead of GDM for a lightweight login experience
