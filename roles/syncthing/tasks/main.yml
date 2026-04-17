@@ -1,0 +1,73 @@
+---
+# syncthing role - install Syncthing from the official apt.syncthing.net
+# repo and run it as a system-level `syncthing@USER` service.
+
+- name: Syncthing | Ensure /etc/apt/keyrings exists
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+
+- name: Syncthing | Fetch the release signing key
+  ansible.builtin.get_url:
+    url: "{{ syncthing_release_key_url }}"
+    dest: /etc/apt/keyrings/syncthing-archive-keyring.gpg
+    mode: "0644"
+    force: false
+
+- name: Syncthing | Write apt repository file
+  ansible.builtin.copy:
+    dest: /etc/apt/sources.list.d/syncthing.sources
+    mode: "0644"
+    content: |
+      Types: deb
+      URIs: {{ syncthing_apt_url }}
+      Suites: {{ syncthing_apt_suite }}
+      Components: {{ syncthing_apt_component }}
+      Signed-By: /etc/apt/keyrings/syncthing-archive-keyring.gpg
+  register: syncthing_repo
+
+# Ubuntu Pro / ESM ships syncthing at priority 510, which outranks any
+# third-party repo at the default priority 500. Pin apt.syncthing.net
+# above that so the stable-v2 channel actually wins.
+- name: Syncthing | Pin apt.syncthing.net above Ubuntu ESM
+  ansible.builtin.copy:
+    dest: /etc/apt/preferences.d/syncthing.pref
+    mode: "0644"
+    content: |
+      Package: syncthing syncthing-discosrv syncthing-relaysrv
+      Pin: origin apt.syncthing.net
+      Pin-Priority: 600
+  register: syncthing_pin
+
+- name: Syncthing | Refresh apt cache after repo change
+  ansible.builtin.apt:
+    update_cache: true
+  when: syncthing_repo.changed or syncthing_pin.changed  # noqa: no-handler — cache refresh must run before install
+
+- name: Syncthing | Install package (latest from pinned repo)
+  ansible.builtin.apt:
+    name: syncthing
+    state: latest  # noqa: package-latest — pin ensures we get stable-v2
+
+- name: Syncthing | Ensure systemd drop-in directory exists
+  ansible.builtin.file:
+    path: "/etc/systemd/system/syncthing@{{ syncthing_user }}.service.d"
+    state: directory
+    mode: "0755"
+
+- name: Syncthing | Configure GUI address via drop-in
+  ansible.builtin.copy:
+    dest: "/etc/systemd/system/syncthing@{{ syncthing_user }}.service.d/override.conf"
+    mode: "0644"
+    content: |
+      [Service]
+      Environment=STGUIADDRESS={{ syncthing_gui_address }}
+  notify: Syncthing | Restart service
+
+- name: Syncthing | Enable and start service
+  ansible.builtin.systemd:
+    name: "syncthing@{{ syncthing_user }}.service"
+    enabled: "{{ syncthing_service_enabled }}"
+    state: "{{ syncthing_service_state }}"
+    daemon_reload: true

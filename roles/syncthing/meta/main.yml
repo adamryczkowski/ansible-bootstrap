@@ -1,0 +1,17 @@
+---
+galaxy_info:
+  author: Adam Ryczkowski
+  description: Install Syncthing from apt.syncthing.net and run as a system service
+  license: MIT
+  min_ansible_version: "2.12"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+        - noble
+  galaxy_tags:
+    - syncthing
+    - sync
+    - file-sharing
+
+dependencies: []

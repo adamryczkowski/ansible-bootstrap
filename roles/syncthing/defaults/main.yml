@@ -1,0 +1,22 @@
+---
+# syncthing role defaults
+
+# User whose syncthing@USER.service we manage. Syncthing runs as this user
+# and stores its state under that user's home directory.
+syncthing_user: "{{ target_user | default(ansible_user) | default('adam') }}"
+
+# GUI bind address. Default is loopback; access via SSH tunnel:
+#   ssh -L 8384:localhost:8384 {{ syncthing_user }}@<host>
+# Set to e.g. "0.0.0.0:8384" to expose on the LAN; syncthing will then
+# require basic auth credentials set through the GUI on first login.
+syncthing_gui_address: "127.0.0.1:8384"
+
+# Lifecycle of the systemd unit.
+syncthing_service_enabled: true
+syncthing_service_state: started
+
+# Repo channel. stable-v2 tracks the v2 series; use "stable" for v1.
+syncthing_apt_suite: syncthing
+syncthing_apt_component: stable-v2
+syncthing_apt_url: https://apt.syncthing.net/
+syncthing_release_key_url: https://syncthing.net/release-key.gpg
