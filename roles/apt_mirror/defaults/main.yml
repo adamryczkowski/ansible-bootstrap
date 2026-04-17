@@ -1,0 +1,19 @@
+---
+# apt_mirror role defaults
+
+# URL of the Ubuntu archive mirror to use. Leave empty to skip rewriting
+# (sources.list is left untouched). Must NOT end with a trailing slash.
+# Example: http://ftp.task.gda.pl/ubuntu
+apt_mirror_url: ""
+
+# When true, security.ubuntu.com is also rewritten to apt_mirror_url.
+# Canonical applies the same rate-limit to archive and security backends,
+# and Polish university mirrors (TASK, ICM) serve -security as well,
+# so redirecting security is the sensible default.
+apt_mirror_include_security: true
+
+# Files to rewrite. Covers the legacy one-line format and the DEB822
+# format introduced in Ubuntu 24.04. Missing files are silently skipped.
+apt_mirror_files:
+  - /etc/apt/sources.list
+  - /etc/apt/sources.list.d/ubuntu.sources

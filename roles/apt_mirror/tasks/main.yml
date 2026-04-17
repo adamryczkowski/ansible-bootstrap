@@ -1,0 +1,57 @@
+---
+# apt_mirror role - Rewrite Ubuntu archive mirror URLs in APT sources.
+#
+# Canonical's own mirrors (archive.ubuntu.com, pl.archive.ubuntu.com,
+# us.archive.ubuntu.com, …) are all fronted by the same pool and can
+# rate-limit (HTTP 429) under load, and some backend IPs are occasionally
+# unreachable from a given network path. A well-peered local mirror
+# (e.g. ftp.task.gda.pl for PL) is both faster and immune to that.
+#
+# This role rewrites the archive (and optionally security) URLs in the
+# legacy /etc/apt/sources.list plus the DEB822 /etc/apt/sources.list.d/
+# ubuntu.sources file. Skipped when apt_mirror_url is empty.
+
+- name: APT mirror | Apply rewrite when apt_mirror_url is set
+  when: apt_mirror_url | length > 0
+  block:
+    - name: APT mirror | Stat each configured sources file
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: apt_mirror_stat
+      loop: "{{ apt_mirror_files }}"
+
+    - name: APT mirror | Rewrite archive.ubuntu.com → {{ apt_mirror_url }}
+      ansible.builtin.replace:
+        path: "{{ item.item }}"
+        regexp: 'https?://([a-z]{2,3}\.)?archive\.ubuntu\.com/ubuntu/?'
+        replace: "{{ apt_mirror_url }}/"
+      loop: "{{ apt_mirror_stat.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+      when: item.stat.exists
+      register: apt_mirror_archive_rewrite
+
+    - name: APT mirror | Rewrite security.ubuntu.com → {{ apt_mirror_url }}
+      ansible.builtin.replace:
+        path: "{{ item.item }}"
+        regexp: 'https?://security\.ubuntu\.com/ubuntu/?'
+        replace: "{{ apt_mirror_url }}/"
+      loop: "{{ apt_mirror_stat.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+      when:
+        - item.stat.exists
+        - apt_mirror_include_security | bool
+      register: apt_mirror_security_rewrite
+
+    - name: APT mirror | Refresh apt cache when any source changed
+      ansible.builtin.apt:
+        update_cache: true
+      when: >
+        (apt_mirror_archive_rewrite.results | default([])
+          | selectattr('changed', 'defined')
+          | selectattr('changed', 'equalto', true) | list | length > 0)
+        or
+        (apt_mirror_security_rewrite.results | default([])
+          | selectattr('changed', 'defined')
+          | selectattr('changed', 'equalto', true) | list | length > 0)

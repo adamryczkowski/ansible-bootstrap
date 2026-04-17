@@ -51,6 +51,10 @@
         common_install_reconnect_vpn: true
       tags: [common, base]
 
+    # Rewrite Ubuntu archive mirror BEFORE packages (apt uses it for updates)
+    - role: apt_mirror
+      tags: [apt_mirror, base]
+
     # Package management (APT packages)
     - role: packages
       tags: [packages, base]
