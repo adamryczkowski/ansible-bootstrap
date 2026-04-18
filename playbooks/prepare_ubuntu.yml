@@ -55,6 +55,10 @@
     - role: apt_mirror
       tags: [apt_mirror, base]
 
+    # Stop snaps from auto-upgrading themselves
+    - role: snap_hold
+      tags: [snap_hold, base]
+
     # Package management (APT packages)
     - role: packages
       tags: [packages, base]

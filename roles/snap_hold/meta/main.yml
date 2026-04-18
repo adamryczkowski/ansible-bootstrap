@@ -1,0 +1,17 @@
+---
+galaxy_info:
+  author: Adam Ryczkowski
+  description: Stop snaps from auto-upgrading themselves
+  license: MIT
+  min_ansible_version: "2.12"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+        - noble
+  galaxy_tags:
+    - snap
+    - snapd
+    - upgrade
+
+dependencies: []

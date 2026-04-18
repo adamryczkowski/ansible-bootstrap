@@ -1,0 +1,14 @@
+---
+# snap_hold role defaults
+
+# Hostnames to redirect to 127.0.0.1 via /etc/hosts. api.snapcraft.io is
+# the store endpoint snapd actually uses on modern Ubuntu; api.snapcraft.com
+# is its legacy name. Set to [] to skip the /etc/hosts override.
+# NOTE: blocking these also blocks `snap install/remove` over the network.
+snap_hold_blocked_hosts:
+  - api.snapcraft.com
+  - api.snapcraft.io
+
+# Whether to also invoke `snap refresh --hold` (snapd's officially
+# supported way to pause auto-refresh indefinitely). Requires snapd >= 2.58.
+snap_hold_refresh: true

@@ -1,0 +1,34 @@
+---
+# snap_hold role - stop snaps from automatically refreshing.
+#
+# Two independent measures, either or both controllable via defaults:
+#   1. /etc/hosts entry redirecting the Snap Store API to loopback, so
+#      snapd cannot reach the store at all (blunt but unambiguous).
+#   2. `snap refresh --hold`, snapd's officially supported indefinite
+#      auto-refresh pause (snapd >= 2.58).
+
+- name: Snap hold | Block Snap Store hosts in /etc/hosts
+  ansible.builtin.blockinfile:
+    path: /etc/hosts
+    marker: "# {mark} ANSIBLE MANAGED BLOCK (snap_hold)"
+    block: |-
+      {% for host in snap_hold_blocked_hosts %}
+      127.0.0.1 {{ host }}
+      {% endfor %}
+    create: false
+    state: present
+  when: snap_hold_blocked_hosts | length > 0
+
+- name: Snap hold | Check whether snapd is installed
+  ansible.builtin.stat:
+    path: /usr/bin/snap
+  register: snap_hold_snap
+  when: snap_hold_refresh | bool
+
+- name: Snap hold | Pause auto-refresh indefinitely
+  ansible.builtin.command:
+    cmd: snap refresh --hold
+  when:
+    - snap_hold_refresh | bool
+    - snap_hold_snap.stat.exists | default(false)
+  changed_when: false  # snap refresh --hold is idempotent and emits no reliable change signal
