@@ -5,6 +5,7 @@
 _claude_bwrap() {
   local acct="$1"; shift
   bwrap --dev-bind / / \
+    --setenv CLAUDE_ACCOUNT "${acct}" \
     --bind "$HOME/.claude-${acct}/.claude.json" "$HOME/.claude.json" \
     --bind "$HOME/.claude-${acct}/.credentials.json" "$HOME/.claude/.credentials.json" \
     "$(command -v claude)" "$@"

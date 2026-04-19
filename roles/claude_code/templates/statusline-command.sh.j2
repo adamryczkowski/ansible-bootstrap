@@ -7,6 +7,7 @@ cwd=$(echo "$input" | jq -r '.workspace.current_dir // .cwd // empty')
 used_pct=$(echo "$input" | jq -r '.context_window.used_percentage // empty')
 five_hour_pct=$(echo "$input" | jq -r '.rate_limits.five_hour.used_percentage // empty')
 seven_day_pct=$(echo "$input" | jq -r '.rate_limits.seven_day.used_percentage // empty')
+seven_day_resets_at=$(echo "$input" | jq -r '.rate_limits.seven_day.resets_at // empty')
 # "sonnet" limit: Claude Max tracks a per-model (Sonnet) usage window separately.
 sonnet_pct=$(echo "$input" | jq -r '
   .rate_limits
@@ -14,6 +15,11 @@ sonnet_pct=$(echo "$input" | jq -r '
   | select(.key | test("sonnet"; "i"))
   | .value.used_percentage
   // empty' 2>/dev/null | head -1)
+
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+ORANGE='\033[38;5;208m'
+RESET='\033[0m'
 
 # Fetch account email using the OAuth access token
 creds_file="{{ claude_code_user_home }}/.claude/.credentials.json"
@@ -47,6 +53,17 @@ fi
 # Build status line parts
 parts=()
 
+# 0. Per-account overlay slug (set by bubblewrap wrapper in claude_accounts.sh)
+if [ -n "$CLAUDE_ACCOUNT" ]; then
+    case "$CLAUDE_ACCOUNT" in
+        sofia) acct_color="$GREEN" ;;
+        adam)  acct_color="$RED" ;;
+        mik)   acct_color="$ORANGE" ;;
+        *)     acct_color="$RESET" ;;
+    esac
+    parts+=("$(printf "${acct_color}%s${RESET}" "$CLAUDE_ACCOUNT")")
+fi
+
 # 1. Logged-in account (email/username)
 if [ -n "$account" ]; then
     parts+=("$account")
@@ -74,10 +91,37 @@ if [ -n "$limits" ]; then
     parts+=("$limits")
 fi
 
-# 4. claude-hierarchy MCP server availability
-GREEN='\033[0;32m'
-RED='\033[0;31m'
-RESET='\033[0m'
+# 4. Weekly budget metric vs linear pace
+#    metric = elapsed_fraction_of_week * 100 - seven_day_used_pct
+#    Positive (green): under linear pace (can still spend that much today).
+#    Negative (red): over linear pace.
+if [ -n "$seven_day_pct" ] && [ -n "$seven_day_resets_at" ]; then
+    now=$(date +%s)
+    secs_left=$(( seven_day_resets_at - now ))
+    week_secs=604800
+    metric=$(awk -v used="$seven_day_pct" -v left="$secs_left" -v week="$week_secs" \
+        'BEGIN { m = (week - left)/week*100 - used; printf "%.1f", m }')
+    if [ "$secs_left" -le 0 ]; then
+        time_left="0d"
+    else
+        days_left=$(( secs_left / 86400 ))
+        hours_left=$(( (secs_left % 86400) / 3600 ))
+        if [ "$days_left" -gt 0 ]; then
+            time_left="${days_left}d${hours_left}h"
+        else
+            time_left="${hours_left}h"
+        fi
+    fi
+    is_negative=$(awk -v m="$metric" 'BEGIN { print (m < 0) ? "1" : "0" }')
+    if [ "$is_negative" = "1" ]; then
+        metric_color="$RED"
+    else
+        metric_color="$GREEN"
+    fi
+    parts+=("$(printf "${metric_color}7d: %+.1f%% (ends %s)${RESET}" "$metric" "$time_left")")
+fi
+
+# 5. claude-hierarchy MCP server availability
 if command -v claude-hierarchy >/dev/null 2>&1; then
     # Read version from npm metadata — calling `claude-hierarchy --version`
     # starts the MCP server on stdio instead of printing a version string.
@@ -92,7 +136,7 @@ else
     parts+=("$(printf "${RED}no claude-hierarchy${RESET}")")
 fi
 
-# 5. Current folder
+# 6. Current folder
 if [ -n "$cwd" ]; then
     parts+=("$(basename "$cwd")")
 fi
