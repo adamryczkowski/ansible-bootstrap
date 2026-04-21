@@ -1,0 +1,31 @@
+---
+# Gotify push notification server role metadata
+
+galaxy_info:
+  author: Adam
+  description: >-
+    Deploy the Gotify push notification server inside a new LXD container.
+    Handles container creation, binary installation, configuration, optional
+    SQLite database restore, and hardened systemd service management.
+  company: ""
+  license: MIT
+  min_ansible_version: "2.14"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - noble   # 24.04 LTS (Molecule / container host)
+        - jammy   # 22.04 LTS (LXD container guest)
+
+  galaxy_tags:
+    - gotify
+    - notifications
+    - push
+    - lxd
+    - container
+    - systemd
+    - ubuntu
+
+collections:
+  - community.general
+
+dependencies: []

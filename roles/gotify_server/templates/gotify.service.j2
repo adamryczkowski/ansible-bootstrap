@@ -1,0 +1,35 @@
+# {{ ansible_managed }}
+# Systemd unit for the Gotify push notification server.
+# Deployed by the gotify_server Ansible role.
+#
+# Hardening notes:
+#   - ProtectSystem=strict  : makes /usr, /boot, /etc read-only from service
+#   - ProtectHome=true      : hides /home, /root, /run/user from service
+#   - NoNewPrivileges=true  : prevents privilege escalation via setuid/capabilities
+#   - PrivateTmp=true       : service gets an isolated /tmp namespace
+#   - ReadWritePaths        : explicitly grants write access to data and log dirs
+
+[Unit]
+Description=Gotify Push Notification Server
+Documentation=https://gotify.net/docs/
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User={{ gotify_user }}
+Group={{ gotify_user }}
+WorkingDirectory={{ gotify_install_dir }}
+ExecStart={{ gotify_install_dir }}/gotify-linux-amd64 --config {{ gotify_config_dir }}/config.yml
+Restart=on-failure
+RestartSec=5
+
+# --- Security hardening ---
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths={{ gotify_data_dir }} {{ gotify_log_dir }}
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

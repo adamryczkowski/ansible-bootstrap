@@ -1,0 +1,45 @@
+# {{ ansible_managed }}
+# Gotify server configuration — managed by Ansible; do NOT edit by hand.
+
+server:
+  listenaddr: "{{ gotify_listen_addr }}"
+  port: {{ gotify_port }}
+
+  ssl:
+    enabled: {{ gotify_ssl_enabled | lower }}
+    redirecttohttps: true
+    listenaddr: ""
+    port: 443
+    certfile:
+    certkey:
+    letsencrypt:
+      enabled: false
+      accepttos: false
+      cache: data/certs
+      hosts:
+
+  responseheaders:
+
+  trustedproxies:
+
+  cors:
+    alloworigins:
+    allowmethods:
+    allowheaders:
+
+  stream:
+    pingperiodseconds: 45
+    allowedorigins:
+
+database:
+  dialect: sqlite3
+  connection: data/gotify.db
+
+defaultuser:
+  name: "{{ gotify_default_user }}"
+  pass: "{{ gotify_default_pass }}"
+
+passstrength: 10
+uploadedimagesdir: data/images
+pluginsdir: data/plugins
+registration: {{ gotify_registration | lower }}

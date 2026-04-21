@@ -1,0 +1,71 @@
+---
+# Molecule test configuration for Gotify push notification server role
+#
+# This scenario tests the full Gotify deployment inside an LXD container,
+# verifying that the binary, configuration, user, systemd service, and
+# database are all correctly installed and functional.
+#
+# The test verifies:
+# - Gotify binary is installed with correct permissions
+# - Configuration file is deployed with correct permissions
+# - Gotify system user is created with nologin shell
+# - Systemd service unit is installed
+# - Service is enabled and active
+# - Port 1486 is listening
+# - SQLite database exists and has been initialised
+
+dependency:
+  name: galaxy
+  options:
+    requirements-file: requirements.yml
+
+driver:
+  name: default
+
+platforms:
+  - name: gotify-test-noble
+    groups:
+      - gotify
+
+provisioner:
+  name: ansible
+  env:
+    ANSIBLE_ROLES_PATH: ${MOLECULE_PROJECT_DIRECTORY}/roles
+    ANSIBLE_COLLECTIONS_PATH: ${MOLECULE_PROJECT_DIRECTORY}/collections
+  config_options:
+    defaults:
+      interpreter_python: auto_silent
+      callbacks_enabled: profile_tasks
+    connection:
+      pipelining: true
+  connection_options:
+    ansible_connection: community.general.lxd
+  inventory:
+    host_vars:
+      gotify-test-noble:
+        ansible_user: root
+        gotify_restore_db: false
+        gotify_default_pass: "MoleculeTestPass123!"
+        gotify_host_fix_zfs: false
+  playbooks:
+    create: create.yml
+    destroy: destroy.yml
+    converge: converge.yml
+    verify: verify.yml
+
+verifier:
+  name: ansible
+
+scenario:
+  name: gotify
+  test_sequence:
+    - dependency
+    - cleanup
+    - destroy
+    - syntax
+    - create
+    - converge
+    - idempotence
+    - verify
+    - cleanup
+    - destroy

@@ -1,0 +1,26 @@
+---
+# Gotify Server Role — Prerequisites Tasks
+#
+# Purpose:
+#   Installs the OS-level packages required by the Gotify deployment:
+#     - unzip   : extract the Gotify binary zip archive
+#     - curl    : used for health-check and download fallback
+#     - sqlite3 : inspect / verify the SQLite database from the CLI
+#
+# Variables:  none (packages are hard-coded as role prerequisites)
+# Tags:       gotify_prerequisites (applied on include_tasks in main.yml)
+
+# =============================================================================
+# Package Installation
+# =============================================================================
+
+- name: Gotify Prerequisites | Install required apt packages
+  ansible.builtin.apt:
+    name:
+      - unzip
+      - curl
+      - sqlite3
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  become: true

@@ -1,0 +1,26 @@
+---
+# Gotify Server Role — Configuration Tasks
+#
+# Purpose:
+#   Renders the Gotify config.yml from a Jinja2 template into the config
+#   directory. The task uses no_log: true because the template contains the
+#   default admin password. A change in the rendered file notifies the
+#   restart handler so the service picks up the new configuration.
+#
+# Prerequisites (must have run before this file is included):
+#   - user.yml  — creates the gotify system user and {{ gotify_config_dir }}
+
+# =============================================================================
+# Render configuration file from template
+# =============================================================================
+
+- name: Gotify Configure | Deploy config.yml from template
+  ansible.builtin.template:
+    src: config.yml.j2
+    dest: "{{ gotify_config_dir }}/config.yml"
+    owner: gotify
+    group: gotify
+    mode: "0640"
+  become: true
+  no_log: true
+  notify: "Gotify | Restart gotify"

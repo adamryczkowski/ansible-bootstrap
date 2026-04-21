@@ -1,0 +1,77 @@
+---
+# Gotify Server Role — User and Directory Tasks
+#
+# Purpose:
+#   Creates the dedicated `gotify` system user (no login shell) and the
+#   required directory tree with ownership and modes as specified in the
+#   security requirements:
+#
+#   Path                  Owner         Mode  Rationale
+#   ──────────────────    ────────────  ────  ─────────────────────────────────
+#   /opt/gotify/          gotify:gotify 0755  Working dir for systemd service
+#   /opt/gotify/data/     gotify:gotify 0700  Contains plaintext API tokens
+#   /etc/gotify/          root:gotify   0750  Config dir, group-readable by gotify
+#   /var/log/gotify/      gotify:adm    0750  Logs (may contain sensitive data)
+#
+# Variables (all defined in defaults/main.yml):
+#   gotify_user        : service account name (default: gotify)
+#   gotify_install_dir : /opt/gotify
+#   gotify_data_dir    : /opt/gotify/data
+#   gotify_config_dir  : /etc/gotify
+#   gotify_log_dir     : /var/log/gotify
+#
+# Tags:  gotify_user (applied on include_tasks in main.yml)
+
+# =============================================================================
+# System User
+# =============================================================================
+
+- name: Gotify User | Create dedicated gotify system user
+  ansible.builtin.user:
+    name: "{{ gotify_user }}"
+    system: true
+    shell: /usr/sbin/nologin
+    home: "{{ gotify_install_dir }}"
+    create_home: false
+    comment: Gotify push notification server
+  become: true
+
+# =============================================================================
+# Directory Tree
+# =============================================================================
+
+- name: Gotify User | Create install directory /opt/gotify
+  ansible.builtin.file:
+    path: "{{ gotify_install_dir }}"
+    state: directory
+    owner: "{{ gotify_user }}"
+    group: "{{ gotify_user }}"
+    mode: "0755"
+  become: true
+
+- name: Gotify User | Create data directory /opt/gotify/data
+  ansible.builtin.file:
+    path: "{{ gotify_data_dir }}"
+    state: directory
+    owner: "{{ gotify_user }}"
+    group: "{{ gotify_user }}"
+    mode: "0700"
+  become: true
+
+- name: Gotify User | Create config directory /etc/gotify
+  ansible.builtin.file:
+    path: "{{ gotify_config_dir }}"
+    state: directory
+    owner: root
+    group: "{{ gotify_user }}"
+    mode: "0750"
+  become: true
+
+- name: Gotify User | Create log directory /var/log/gotify
+  ansible.builtin.file:
+    path: "{{ gotify_log_dir }}"
+    state: directory
+    owner: "{{ gotify_user }}"
+    group: adm
+    mode: "0750"
+  become: true

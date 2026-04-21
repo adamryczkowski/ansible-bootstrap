@@ -1,0 +1,30 @@
+---
+# Gotify server role handlers
+#
+# All handlers use the listen: directive so that task files notify via a
+# stable string rather than the handler name, making refactoring safe.
+#
+# Handler firing order (Ansible processes handlers in declaration order):
+#   1. Reload systemd       — must run before (re)starting the service
+#   2. Restart gotify       — restarts the running service unit
+#   3. Restart LXD          — host-level; only fires when ZFS setting changes
+
+- name: Gotify | Reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: true
+  become: true
+  listen: "Gotify | Reload systemd"
+
+- name: Gotify | Restart gotify service
+  ansible.builtin.systemd:
+    name: gotify
+    state: restarted
+  become: true
+  listen: "Gotify | Restart gotify"
+
+- name: Gotify Host | Restart LXD snap service
+  ansible.builtin.command:
+    cmd: snap restart lxd
+  become: true
+  changed_when: true
+  listen: "Gotify Host | Restart LXD"

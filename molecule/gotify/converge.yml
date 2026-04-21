@@ -1,0 +1,60 @@
+---
+# Molecule converge playbook for Gotify push notification server test
+#
+# Runs the full gotify_server role with test-appropriate defaults.
+# Database restore is disabled so Gotify initialises a fresh SQLite DB.
+
+- name: Converge - Gotify push notification server setup
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    # Disable database restore — Gotify will create a fresh DB on first start
+    gotify_restore_db: false
+
+    # Use a safe test password (override in production via vault)
+    gotify_default_pass: "MoleculeTestPass123!"
+
+    # Skip the LXD host ZFS fix — not applicable inside a container
+    gotify_host_fix_zfs: false
+
+    # Test with default port
+    gotify_port: 1486
+
+    # Enable service so we can test it is active and listening
+    # (service.yml enables and starts gotify by default)
+
+  pre_tasks:
+    - name: Display test configuration
+      ansible.builtin.debug:
+        msg: |
+          Gotify Server Molecule Test
+          - Install dir: {{ gotify_install_dir | default('/opt/gotify') }}
+          - Config dir:  {{ gotify_config_dir | default('/etc/gotify') }}
+          - Port:        {{ gotify_port | default(1486) }}
+          - OS:          {{ ansible_distribution }} {{ ansible_distribution_version }}
+
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+  tasks:
+    - name: Include gotify_server role
+      ansible.builtin.include_role:
+        name: gotify_server
+
+  post_tasks:
+    - name: Display converge completion
+      ansible.builtin.debug:
+        msg: |
+          Molecule Converge Complete!
+
+          Deployed components:
+          - Gotify binary       (/opt/gotify/gotify-linux-amd64)
+          - Configuration file  (/etc/gotify/config.yml)
+          - System user         (gotify, nologin shell)
+          - Systemd unit        (/etc/systemd/system/gotify.service)
+          - Service state       (enabled and started)
+          - SQLite database     (/opt/gotify/data/gotify.db)

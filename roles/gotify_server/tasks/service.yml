@@ -1,0 +1,44 @@
+---
+# Gotify Server Role — Systemd Service Tasks
+#
+# Purpose:
+#   Deploys the hardened systemd unit file for the Gotify service,
+#   triggers a daemon-reload when the unit changes, then ensures
+#   the service is enabled and started.
+#
+# Handler dependencies (defined in handlers/main.yml):
+#   - "Gotify | Reload systemd"   — runs daemon_reload before the service
+#                                    starts/restarts on unit file changes
+#   - "Gotify | Restart gotify"   — restarts the live service when config
+#                                    or binary changes (notified elsewhere)
+#
+# Security context:
+#   The unit file itself is owned root:root 0644.  Hardening directives
+#   (NoNewPrivileges, ProtectSystem=strict, ProtectHome, PrivateTmp, and
+#   ReadWritePaths) are baked into gotify.service.j2.
+
+# =============================================================================
+# Deploy Systemd Unit File
+# =============================================================================
+
+- name: Gotify Service | Deploy systemd unit file from template
+  ansible.builtin.template:
+    src: gotify.service.j2
+    dest: /etc/systemd/system/gotify.service
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  notify: "Gotify | Reload systemd"
+
+# =============================================================================
+# Enable and Start the Service
+# =============================================================================
+
+- name: Gotify Service | Enable and start gotify service
+  ansible.builtin.systemd:
+    name: gotify
+    enabled: true
+    state: started
+    daemon_reload: false  # daemon_reload handled by the notified handler
+  become: true

@@ -1,0 +1,107 @@
+---
+# Default variables for Gotify push notification server role
+#
+# This role deploys Gotify inside a new LXD container on the host,
+# configuring it as a systemd service with hardened permissions and
+# optional SQLite database restore from a backup.
+#
+# References:
+#   - https://gotify.net/docs/
+#   - https://github.com/gotify/server
+
+# =============================================================================
+# Version and Download
+# =============================================================================
+
+# Gotify release version to install (pin in production via group_vars)
+gotify_version: "2.9.1"
+
+# SHA256 checksum of the downloaded zip archive (e.g. "sha256:abcdef...")
+# MUST be overridden in production to enable binary integrity verification.
+# Leave empty to skip checksum verification (not recommended for production).
+gotify_checksum: ""  # Override in group_vars or vault for production
+
+# =============================================================================
+# Network Configuration
+# =============================================================================
+
+# TCP port Gotify listens on inside the container
+gotify_port: 1486  # Matches legacy deployment port
+
+# Listen address inside the container (empty = all interfaces)
+gotify_listen_addr: ""  # Empty string binds to 0.0.0.0 inside the container
+
+# =============================================================================
+# Directory Paths
+# =============================================================================
+
+# Base installation directory (binary and data)
+gotify_install_dir: /opt/gotify  # Working directory for the systemd service
+
+# Directory for Gotify configuration file
+gotify_config_dir: /etc/gotify  # Separate config dir; owned root:gotify mode 0750
+
+# Data directory containing the SQLite database and uploads
+gotify_data_dir: "{{ gotify_install_dir }}/data"  # Contains plaintext API tokens — mode 0700
+
+# Directory for Gotify log files
+gotify_log_dir: /var/log/gotify  # Owned gotify:adm, mode 0750
+
+# =============================================================================
+# Service User
+# =============================================================================
+
+# Dedicated system user that runs the Gotify process
+gotify_user: gotify  # No login shell — created with /usr/sbin/nologin
+
+# =============================================================================
+# Initial Admin Credentials (first-run only)
+# =============================================================================
+
+# Default admin username created by Gotify on fresh database initialisation
+gotify_default_user: admin  # Only applied when Gotify starts with a new empty DB
+
+# Default admin password — MUST be overridden via Ansible Vault in production
+# Example: gotify_default_pass: !vault | <encrypted-value>
+gotify_default_pass: "CHANGE_ME_IN_VAULT"  # Vault-encrypt before production use
+
+# =============================================================================
+# Application Settings
+# =============================================================================
+
+# Allow new users to self-register (false = invite-only / admin-managed)
+gotify_registration: false  # Disabled for security; enable only if self-signup is desired
+
+# Enable TLS/SSL termination inside Gotify (false = delegate to reverse proxy / LXD proxy)
+gotify_ssl_enabled: false  # TLS is handled by the LXD proxy device at the host layer
+
+# =============================================================================
+# Database Restore
+# =============================================================================
+
+# Enable SQLite database restore from a backup file on the Ansible controller
+# Set to true only when you want to copy an existing database into the container.
+# WARNING: restore.yml MUST be included BEFORE service.yml in tasks/main.yml.
+# If Gotify starts first it creates a fresh DB; the stat guard then skips restore.
+gotify_restore_db: false  # Enable for production migration; disabled by default and in molecule
+
+# Absolute path on the Ansible controller to the gotify.db backup file
+gotify_restore_db_src: ""  # Required when gotify_restore_db is true
+
+# Overwrite an existing database (DANGEROUS — destroys current data)
+# This is a secondary safety switch; the stat guard in restore.yml also protects.
+gotify_restore_force: false  # Never set true unless you intentionally want to overwrite
+
+# =============================================================================
+# LXD Host Configuration
+# =============================================================================
+
+# Apply the ZFS external tools fix to the LXD host before container creation
+# (snap set lxd zfs.external=true). Only fires if the value is not already set.
+gotify_host_fix_zfs: true  # Required on hosts using ZFS storage pool with LXD snap
+
+# Name of the LXD container to create on the host
+gotify_container_name: gotify  # Used for lxc create, proxy device, and inventory
+
+# Ubuntu image version for the new LXD container
+gotify_container_image: "22.04"  # Ubuntu 22.04 LTS (Jammy) inside the container

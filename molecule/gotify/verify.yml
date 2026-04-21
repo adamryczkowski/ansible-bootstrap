@@ -1,0 +1,243 @@
+---
+# Molecule verify playbook for Gotify push notification server test
+#
+# Performs 10 assertion blocks to confirm the role deployed every component
+# correctly:
+#   1.  Binary exists with mode 0755
+#   2.  Config file exists with mode 0640
+#   3.  Config file contains port 1486
+#   4.  gotify system user exists with nologin shell
+#   5.  Systemd unit file exists
+#   6.  Service is enabled
+#   7.  Service is active (running)
+#   8.  Port 1486 is listening
+#   9.  SQLite database exists and size > 0
+#  10.  SQLite user table is non-empty (DB has been initialised)
+
+- name: Verify - Gotify push notification server
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    gotify_install_dir: /opt/gotify
+    gotify_config_dir: /etc/gotify
+    gotify_data_dir: /opt/gotify/data
+    gotify_user: gotify
+    gotify_port: 1486
+
+  tasks:
+
+    # =========================================================================
+    # 1. Binary exists with mode 0755
+    # =========================================================================
+
+    - name: Verify | Stat Gotify binary
+      ansible.builtin.stat:
+        path: "{{ gotify_install_dir }}/gotify-linux-amd64"
+      register: verify_binary
+
+    - name: Verify | Assert binary exists with mode 0755
+      ansible.builtin.assert:
+        that:
+          - verify_binary.stat.exists
+          - verify_binary.stat.mode == '0755'
+        fail_msg: >-
+          Gotify binary not found at {{ gotify_install_dir }}/gotify-linux-amd64
+          or mode is not 0755 (got {{ verify_binary.stat.mode | default('missing') }})
+        success_msg: "Gotify binary exists at {{ gotify_install_dir }}/gotify-linux-amd64 with mode 0755"
+
+    # =========================================================================
+    # 2. Config file exists with mode 0640
+    # =========================================================================
+
+    - name: Verify | Stat Gotify config file
+      ansible.builtin.stat:
+        path: "{{ gotify_config_dir }}/config.yml"
+      register: verify_config
+
+    - name: Verify | Assert config file exists with mode 0640
+      ansible.builtin.assert:
+        that:
+          - verify_config.stat.exists
+          - verify_config.stat.mode == '0640'
+        fail_msg: >-
+          Gotify config not found at {{ gotify_config_dir }}/config.yml
+          or mode is not 0640 (got {{ verify_config.stat.mode | default('missing') }})
+        success_msg: "Gotify config exists at {{ gotify_config_dir }}/config.yml with mode 0640"
+
+    # =========================================================================
+    # 3. Config file contains port 1486
+    # =========================================================================
+
+    - name: Verify | Slurp Gotify config file contents
+      ansible.builtin.slurp:
+        src: "{{ gotify_config_dir }}/config.yml"
+      register: verify_config_content
+
+    - name: Verify | Assert config contains port 1486
+      ansible.builtin.assert:
+        that:
+          - "'1486' in (verify_config_content.content | b64decode)"
+        fail_msg: "Gotify config does not contain port 1486"
+        success_msg: "Gotify config contains port 1486"
+
+    # =========================================================================
+    # 4. gotify user exists with nologin shell
+    # =========================================================================
+
+    - name: Verify | Look up gotify user in passwd database
+      ansible.builtin.getent:
+        database: passwd
+        key: "{{ gotify_user }}"
+      register: verify_user
+
+    - name: Verify | Assert gotify user exists with nologin shell
+      ansible.builtin.assert:
+        that:
+          - verify_user is not failed
+          - "'/nologin' in getent_passwd[gotify_user][5]"
+        fail_msg: >-
+          User '{{ gotify_user }}' not found or does not have a nologin shell
+          (shell: {{ getent_passwd[gotify_user][5] | default('unknown') }})
+        success_msg: "User '{{ gotify_user }}' exists with nologin shell"
+
+    # =========================================================================
+    # 5. Systemd unit file exists
+    # =========================================================================
+
+    - name: Verify | Stat Gotify systemd unit file
+      ansible.builtin.stat:
+        path: /etc/systemd/system/gotify.service
+      register: verify_unit
+
+    - name: Verify | Assert systemd unit file exists
+      ansible.builtin.assert:
+        that:
+          - verify_unit.stat.exists
+        fail_msg: "Gotify systemd unit file not found at /etc/systemd/system/gotify.service"
+        success_msg: "Gotify systemd unit file exists at /etc/systemd/system/gotify.service"
+
+    # =========================================================================
+    # 6. Service is enabled
+    # =========================================================================
+
+    - name: Verify | Check if gotify service is enabled
+      ansible.builtin.command: systemctl is-enabled gotify
+      register: verify_service_enabled
+      changed_when: false
+      failed_when: false
+
+    - name: Verify | Assert gotify service is enabled
+      ansible.builtin.assert:
+        that:
+          - verify_service_enabled.rc == 0
+          - verify_service_enabled.stdout == 'enabled'
+        fail_msg: >-
+          Gotify service is not enabled
+          (systemctl is-enabled returned: {{ verify_service_enabled.stdout | default('') }})
+        success_msg: "Gotify service is enabled"
+
+    # =========================================================================
+    # 7. Service is active (running)
+    # =========================================================================
+
+    - name: Verify | Check if gotify service is active
+      ansible.builtin.command: systemctl is-active gotify
+      register: verify_service_active
+      changed_when: false
+      failed_when: false
+
+    - name: Verify | Assert gotify service is active
+      ansible.builtin.assert:
+        that:
+          - verify_service_active.rc == 0
+          - verify_service_active.stdout == 'active'
+        fail_msg: >-
+          Gotify service is not active
+          (systemctl is-active returned: {{ verify_service_active.stdout | default('') }})
+        success_msg: "Gotify service is active (running)"
+
+    # =========================================================================
+    # 8. Port 1486 is listening
+    # =========================================================================
+
+    - name: Verify | Check port 1486 is listening
+      ansible.builtin.command: ss -tlnp sport = :{{ gotify_port }}
+      register: verify_port
+      changed_when: false
+
+    - name: Verify | Assert port 1486 is listening
+      ansible.builtin.assert:
+        that:
+          - "':' ~ gotify_port | string in verify_port.stdout"
+        fail_msg: "Port {{ gotify_port }} is not listening (ss output: {{ verify_port.stdout }})"
+        success_msg: "Port {{ gotify_port }} is listening"
+
+    # =========================================================================
+    # 9. SQLite database exists with size > 0
+    # =========================================================================
+
+    - name: Verify | Stat Gotify SQLite database
+      ansible.builtin.stat:
+        path: "{{ gotify_data_dir }}/gotify.db"
+      register: verify_db
+
+    - name: Verify | Assert SQLite database exists with size > 0
+      ansible.builtin.assert:
+        that:
+          - verify_db.stat.exists
+          - verify_db.stat.size > 0
+        fail_msg: >-
+          Gotify database not found at {{ gotify_data_dir }}/gotify.db
+          or has zero size (size: {{ verify_db.stat.size | default(0) }} bytes)
+        success_msg: >-
+          Gotify database exists at {{ gotify_data_dir }}/gotify.db
+          (size: {{ verify_db.stat.size }} bytes)
+
+    # =========================================================================
+    # 10. SQLite user table is non-empty (DB has been initialised)
+    # =========================================================================
+
+    - name: Verify | Query user count from Gotify SQLite database
+      ansible.builtin.command: >-
+        sqlite3 {{ gotify_data_dir }}/gotify.db "SELECT COUNT(*) FROM user;"
+      register: verify_db_users
+      changed_when: false
+
+    - name: Verify | Assert SQLite user table is non-empty
+      ansible.builtin.assert:
+        that:
+          - verify_db_users.rc == 0
+          - verify_db_users.stdout | int > 0
+        fail_msg: >-
+          Gotify database user table is empty or could not be queried
+          (sqlite3 returned: {{ verify_db_users.stdout | default('') }}, rc={{ verify_db_users.rc }})
+        success_msg: >-
+          Gotify database user table contains {{ verify_db_users.stdout }} user(s) — DB is initialised
+
+    # =========================================================================
+    # Summary
+    # =========================================================================
+
+    - name: Verify | Display verification summary
+      ansible.builtin.debug:
+        msg: |
+          ============================================================
+          Molecule Verification Complete!
+          ============================================================
+
+          All checks passed:
+          1/10  Binary /opt/gotify/gotify-linux-amd64 exists, mode 0755
+          2/10  Config /etc/gotify/config.yml exists, mode 0640
+          3/10  Config contains port 1486
+          4/10  User 'gotify' exists with nologin shell
+          5/10  Systemd unit /etc/systemd/system/gotify.service exists
+          6/10  Service gotify is enabled
+          7/10  Service gotify is active
+          8/10  Port 1486 is listening
+          9/10  Database /opt/gotify/data/gotify.db exists, size > 0
+          10/10 Database user table is non-empty (DB initialised)
+
+          The gotify_server role is correctly configured.
+          ============================================================

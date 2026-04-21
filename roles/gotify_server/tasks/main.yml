@@ -1,0 +1,83 @@
+---
+# Gotify Server Role — Task Entry Point
+#
+# Purpose:
+#   Deploys the Gotify push notification server inside a dedicated LXD
+#   container on the target host. The host.yml play handles container
+#   lifecycle; the remaining task files run inside the container.
+#
+# Inclusion order is CRITICAL — do NOT reorder:
+#   1. prerequisites.yml  — apt packages (unzip, curl, sqlite3)
+#   2. user.yml           — gotify system user + directory tree
+#   3. install.yml        — download binary, stat-guard, set permissions
+#   4. configure.yml      — render config.yml from template (no_log: true)
+#   5. restore.yml        — copy SQLite DB BEFORE service start (stat + force guard)
+#   6. service.yml        — systemd unit file, enable and start
+#
+# The host.yml tasks are intentionally NOT included here; they run in a
+# separate play targeting the LXD host (see playbooks/gotify.yml).
+#
+# Key Variables (see defaults/main.yml for full list):
+#   - gotify_version       : Release version to install
+#   - gotify_port          : TCP listen port (default 1486)
+#   - gotify_restore_db    : Set true to copy a backup database
+#   - gotify_default_pass  : Initial admin password (Vault-encrypt in production)
+#
+# Tags (apply to include_tasks only, per project convention):
+#   gotify_prerequisites, gotify_user, gotify_install,
+#   gotify_configure, gotify_restore, gotify_service
+
+# =============================================================================
+# Prerequisites
+# =============================================================================
+
+- name: Gotify Prerequisites | Include prerequisites tasks
+  ansible.builtin.include_tasks: prerequisites.yml
+  tags:
+    - gotify_prerequisites
+
+# =============================================================================
+# User and Directory Setup
+# =============================================================================
+
+- name: Gotify User | Include user setup tasks
+  ansible.builtin.include_tasks: user.yml
+  tags:
+    - gotify_user
+
+# =============================================================================
+# Binary Installation
+# =============================================================================
+
+- name: Gotify Install | Include binary installation tasks
+  ansible.builtin.include_tasks: install.yml
+  tags:
+    - gotify_install
+
+# =============================================================================
+# Configuration
+# =============================================================================
+
+- name: Gotify Configure | Include configuration tasks
+  ansible.builtin.include_tasks: configure.yml
+  tags:
+    - gotify_configure
+
+# =============================================================================
+# Database Restore (MUST precede service.yml)
+# Gotify creates an empty DB on first start; restore must happen beforehand.
+# =============================================================================
+
+- name: Gotify Restore | Include database restore tasks
+  ansible.builtin.include_tasks: restore.yml
+  tags:
+    - gotify_restore
+
+# =============================================================================
+# Systemd Service
+# =============================================================================
+
+- name: Gotify Service | Include systemd service tasks
+  ansible.builtin.include_tasks: service.yml
+  tags:
+    - gotify_service
