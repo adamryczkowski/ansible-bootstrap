@@ -1,12 +1,20 @@
 ---
 # ai_config role — entry point
 
-- name: AI Config | Install git
+- name: AI Config | Install git (Debian/Ubuntu)
   ansible.builtin.apt:
     name: git
     state: present
     update_cache: false
   become: true
+  when: ansible_os_family == "Debian"
+
+- name: AI Config | Install git (Arch)
+  community.general.pacman:
+    name: git
+    state: present
+  become: true
+  when: ansible_os_family == "Archlinux"
 
 - name: AI Config | Look up user home directory
   ansible.builtin.getent:

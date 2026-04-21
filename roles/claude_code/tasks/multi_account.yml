@@ -8,13 +8,21 @@
 #
 # See docs/two-claudes.md for design rationale.
 
-- name: Claude Code | Multi-account | Install bubblewrap
+- name: Claude Code | Multi-account | Install bubblewrap (Debian/Ubuntu)
   ansible.builtin.apt:
     name: bubblewrap
     state: present
     update_cache: true
     cache_valid_time: 3600
   become: true
+  when: ansible_os_family == "Debian"
+
+- name: Claude Code | Multi-account | Install bubblewrap (Arch)
+  community.general.pacman:
+    name: bubblewrap
+    state: present
+  become: true
+  when: ansible_os_family == "Archlinux"
 
 - name: Claude Code | Multi-account | Create per-account directories
   ansible.builtin.file:

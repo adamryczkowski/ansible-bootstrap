@@ -58,6 +58,44 @@ cli_tools_apt: >-
   }}
 
 # =============================================================================
+# Pacman Packages Configuration (Arch Linux)
+# =============================================================================
+
+# Base pacman packages (installed for both profiles).
+# Names differ from Debian: build-essential -> base-devel; python3-* -> python-*.
+cli_tools_pacman_base:
+  - jq
+  - htop
+  - tree
+  - tmux
+  - curl
+  - wget
+  - unzip
+  - zip
+  - git
+  - git-lfs
+  - make
+  - base-devel
+
+# Additional pacman packages for 'full' profile.
+# liquidprompt and prettyping live in AUR only; skip here, install via AUR or rust tools.
+cli_tools_pacman_full:
+  - btop
+  - ncdu
+  - byobu
+  - mc
+  - entr
+  - neovim
+  - magic-wormhole
+
+# Combined pacman packages based on profile
+cli_tools_pacman: >-
+  {{
+    cli_tools_pacman_base +
+    (cli_tools_pacman_full if cli_tools_profile == 'full' else [])
+  }}
+
+# =============================================================================
 # Tool Installation Flags
 # =============================================================================
 

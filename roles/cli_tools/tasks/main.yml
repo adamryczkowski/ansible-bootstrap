@@ -39,12 +39,23 @@
 # APT Package Installation
 # =============================================================================
 
-- name: CLI Tools | Install APT-based CLI tools
+- name: CLI Tools | Install APT-based CLI tools (Debian/Ubuntu)
   ansible.builtin.apt:
     name: "{{ cli_tools_apt }}"
     state: present
   become: true
-  when: cli_tools_apt | length > 0
+  when:
+    - ansible_os_family == "Debian"
+    - cli_tools_apt | length > 0
+
+- name: CLI Tools | Install pacman-based CLI tools (Arch)
+  community.general.pacman:
+    name: "{{ cli_tools_pacman }}"
+    state: present
+  become: true
+  when:
+    - ansible_os_family == "Archlinux"
+    - cli_tools_pacman | length > 0
 
 # =============================================================================
 # Nerd Fonts Installation (full profile)
@@ -53,11 +64,19 @@
 - name: CLI Tools | Install Nerd Fonts
   when: cli_tools_install_nerd_fonts | bool
   block:
-    - name: CLI Tools | Ensure fontconfig is installed
+    - name: CLI Tools | Ensure fontconfig is installed (Debian/Ubuntu)
       ansible.builtin.apt:
         name: fontconfig
         state: present
       become: true
+      when: ansible_os_family == "Debian"
+
+    - name: CLI Tools | Ensure fontconfig is installed (Arch)
+      community.general.pacman:
+        name: fontconfig
+        state: present
+      become: true
+      when: ansible_os_family == "Archlinux"
 
     - name: CLI Tools | Check if Nerd Font is installed
       ansible.builtin.shell: fc-list | grep -q "{{ cli_tools_nerd_font_name }} Nerd Font"

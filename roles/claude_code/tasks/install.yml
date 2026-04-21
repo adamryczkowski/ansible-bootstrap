@@ -1,10 +1,24 @@
 ---
 # Install Claude Code CLI
 
-- name: Claude Code | Check if claude is already installed
-  ansible.builtin.stat:
-    path: "{{ claude_code_user_home }}/.local/bin/claude"
-  register: claude_code_binary
+- name: Claude Code | Locate claude binary (respects npm's configured prefix)
+  ansible.builtin.shell: |
+    export PATH="{{ claude_code_user_home }}/.local/bin:{{ claude_code_user_home }}/.local/share/mise/shims:$PATH"
+    eval "$(mise activate bash 2>/dev/null)" || true
+    prefix="$(npm config get prefix 2>/dev/null)"
+    if [ -n "$prefix" ] && [ -x "$prefix/bin/claude" ]; then
+      echo "$prefix/bin/claude"
+    elif [ -x "{{ claude_code_user_home }}/.local/bin/claude" ]; then
+      echo "{{ claude_code_user_home }}/.local/bin/claude"
+    else
+      echo ""
+    fi
+  args:
+    executable: /bin/bash
+  become: true
+  become_user: "{{ claude_code_username }}"
+  register: claude_code_locate
+  changed_when: false
 
 - name: Claude Code | Install Claude Code via npm
   ansible.builtin.shell: |
@@ -15,7 +29,7 @@
     executable: /bin/bash
   become: true
   become_user: "{{ claude_code_username }}"
-  when: not claude_code_binary.stat.exists
+  when: claude_code_locate.stdout | length == 0
   register: claude_code_npm_install
   changed_when: "'added' in claude_code_npm_install.stdout | default('')"
 
@@ -23,6 +37,8 @@
   ansible.builtin.shell: |
     export PATH="{{ claude_code_user_home }}/.local/bin:{{ claude_code_user_home }}/.local/share/mise/shims:$PATH"
     eval "$(mise activate bash 2>/dev/null)" || true
+    npm_bin="$(npm config get prefix 2>/dev/null)/bin"
+    export PATH="$npm_bin:$PATH"
     claude --version
   args:
     executable: /bin/bash
