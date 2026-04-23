@@ -108,24 +108,28 @@ if [ -n "$five_hour_pct" ]; then
     fi
 
     # --- Color logic ---
-    # Both limits share the same consumption (burning at 100%/hr of 5h
-    # budget consumes the same absolute amount from either pool).
-    # Constraints after consuming C% of 5h budget:
-    #     5h:     fh + C <= 100
-    #     weekly: 7*wk + C <= 700    (weekly total = 7 × 5h, in 5h-units)
-    # Both hold iff  max(fh, 7*wk - 600) + C <= 100.
-    # So:
-    #   Green:  effective + 60 <= 100  (≥36 min of runway at 100%/hr)
-    #   Yellow: effective + 20 <= 100  (≥12 min of runway at 100%/hr)
-    #   Red:    otherwise
+    # Burning C% of the 5h budget at 100%/hr takes C/100 hours. If the 5h
+    # window resets mid-burn (in tr_h hours), only 100*tr_h is charged to
+    # the current bucket; the rest lands in a fresh bucket.
+    # Constraints after consuming C%:
+    #     5h:     fh + min(C, 100*tr_h) <= 100
+    #     weekly: 7*wk + C <= 700    (weekly = 7 × 5h, short burn ≪ 7d)
+    # Green at C=60, yellow at C=20. If reset time unknown, assume no
+    # imminent reset (large tr_h → min collapses to C, strict 5h cap).
     five_color=$(awk \
         -v fp="$five_hour_pct" \
         -v sp="${seven_day_pct:-0}" \
+        -v tr="${five_secs_left:-86400}" \
         'BEGIN {
-            w_eff = 7*sp - 600
-            eff = (fp > w_eff) ? fp : w_eff
-            if (eff + 60 <= 100) { print "green" }
-            else if (eff + 20 <= 100) { print "yellow" }
+            tr_h = tr / 3600
+            c = 60
+            h5 = (c < 100*tr_h) ? c : 100*tr_h
+            green_ok = (fp + h5 <= 100) && (7*sp + c <= 700)
+            c = 20
+            h5 = (c < 100*tr_h) ? c : 100*tr_h
+            yellow_ok = (fp + h5 <= 100) && (7*sp + c <= 700)
+            if (green_ok) { print "green" }
+            else if (yellow_ok) { print "yellow" }
             else { print "red" }
         }')
     case "$five_color" in
