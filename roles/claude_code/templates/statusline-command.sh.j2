@@ -194,15 +194,18 @@ if [ -n "$seven_day_pct" ] && [ -n "$seven_day_resets_at" ]; then
     metric=$(awk -v ae="$active_elapsed" -v at="$active_total" -v used="$seven_day_pct" \
         'BEGIN { printf "%.1f", (ae/at)*100 - used }')
     if [ "$secs_left" -le 0 ]; then
-        time_left="0d"
-    else
+        time_left="0m"
+    elif [ "$secs_left" -ge 86400 ]; then
         days_left=$(( secs_left / 86400 ))
         hours_left=$(( (secs_left % 86400) / 3600 ))
-        if [ "$days_left" -gt 0 ]; then
-            time_left="${days_left}d${hours_left}h"
-        else
-            time_left="${hours_left}h"
-        fi
+        time_left="${days_left}d${hours_left}h"
+    elif [ "$secs_left" -ge 3600 ]; then
+        hours_left=$(( secs_left / 3600 ))
+        mins_left=$(( (secs_left % 3600) / 60 ))
+        time_left="${hours_left}h${mins_left}m"
+    else
+        mins_left=$(( secs_left / 60 ))
+        time_left="${mins_left}m"
     fi
     is_negative=$(awk -v m="$metric" 'BEGIN { print (m < 0) ? "1" : "0" }')
     if [ "$is_negative" = "1" ]; then
