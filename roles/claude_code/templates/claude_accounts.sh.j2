@@ -2,8 +2,58 @@
 # Per-account Claude Code aliases using bubblewrap mount overlays.
 # See docs/two-claudes.md for the rationale.
 {% raw %}
+# Heuristic: does the account have a usable credentials file?
+# The Ansible task seeds stub "{}" files, and login flows inside the bwrap
+# sandbox cannot persist credentials due to the file-bind + rename kernel
+# bug — so "file exists" is not enough. Require a JSON object with ≥1 key.
+_claude_creds_ok() {
+  local acct="$1"
+  local f="$HOME/.claude-${acct}/.credentials.json"
+  [ -s "$f" ] || return 1
+  if command -v jq >/dev/null 2>&1; then
+    jq -e 'type == "object" and (keys | length) > 0' "$f" >/dev/null 2>&1 || return 1
+  else
+    # Fallback when jq is unavailable: the seeded stub is 3 bytes ("{}").
+    [ "$(wc -c < "$f" 2>/dev/null || echo 0)" -gt 16 ] || return 1
+  fi
+  return 0
+}
+
+# Log in outside any bwrap sandbox, then stash the resulting credentials
+# as the given account's bind source. `command claude` bypasses the
+# claude() shell function below so the real binary runs on the host —
+# avoiding the bwrap file-bind + rename bug that prevents /login from
+# persisting when invoked inside a wrapper.
+claude_login_reseed() {
+  local acct="$1"
+  if [ -z "$acct" ]; then
+    echo "usage: claude_login_reseed <account>" >&2
+    return 2
+  fi
+  local dir="$HOME/.claude-${acct}"
+  local target="$dir/.credentials.json"
+  if [ ! -d "$dir" ]; then
+    echo "claude_login_reseed: no such account directory: $dir" >&2
+    return 1
+  fi
+  echo "claude_login_reseed: signing in for '${acct}' — complete OAuth in the browser using the matching Anthropic account." >&2
+  rm -f "$HOME/.claude/.credentials.json"
+  command claude /login || return 1
+  if [ ! -s "$HOME/.claude/.credentials.json" ]; then
+    echo "claude_login_reseed: /login did not produce ~/.claude/.credentials.json" >&2
+    return 1
+  fi
+  mv -f "$HOME/.claude/.credentials.json" "$target"
+  chmod 0600 "$target"
+  echo "claude_login_reseed: seeded ${target}" >&2
+}
+
 _claude_bwrap() {
   local acct="$1"; shift
+  if ! _claude_creds_ok "$acct"; then
+    echo "claude-${acct}: no usable credentials — running one-time claude_login_reseed..." >&2
+    claude_login_reseed "$acct" || return 1
+  fi
   bwrap --dev-bind / / \
     --setenv CLAUDE_ACCOUNT "${acct}" \
     --bind "$HOME/.claude-${acct}/.claude.json" "$HOME/.claude.json" \

@@ -95,3 +95,42 @@
   changed_when: "'CHANGED' in claude_code_mcp_sync.stdout"
   become: true
   become_user: "{{ claude_code_username }}"
+
+# Drift tripwire: the multi-account design assumes the bubblewrap wrapper is
+# the *only* mechanism that overlays per-account identity files onto the
+# shared ~/.claude/ paths. If a stray host-level bind mount exists (e.g.
+# someone ran `mount --bind ~/.claude-adam/.credentials.json
+# ~/.claude/.credentials.json` manually), then `claude-<acct>` for one account
+# silently writes into another account's file, masking bugs and making
+# /login-in-wrapper appear to work for one winning account while quietly
+# failing for the others. Fail the play if we detect any such mount.
+- name: Claude Code | Multi-account | Assert no stray host-level bind mounts on claude files
+  ansible.builtin.shell:
+    cmd: |
+      set -eu
+      found=""
+      check() {
+        local p="$1"
+        if [ -e "$p" ] && findmnt --mountpoint "$p" >/dev/null 2>&1; then
+          found="${found}  $p$(printf '\n')  $(findmnt --noheadings --output SOURCE,FSTYPE --target "$p")$(printf '\n')"
+        fi
+      }
+      check '{{ claude_code_user_home }}/.claude.json'
+      check '{{ claude_code_user_home }}/.claude/.credentials.json'
+      {% for acct in claude_code_multi_account.accounts %}
+      check '{{ claude_code_user_home }}/.claude-{{ acct }}/.claude.json'
+      check '{{ claude_code_user_home }}/.claude-{{ acct }}/.credentials.json'
+      {% endfor %}
+      if [ -n "$found" ]; then
+        echo "DRIFT: host-level bind mount(s) detected on claude identity files."
+        echo "The multi-account design does not expect any such mounts — remove them"
+        echo "with \`sudo umount <path>\` and re-run the playbook."
+        echo
+        printf '%s\n' "$found"
+        exit 1
+      fi
+      echo "OK: no stray host-level bind mounts."
+    executable: /bin/bash
+  changed_when: false
+  become: true
+  become_user: "{{ claude_code_username }}"
