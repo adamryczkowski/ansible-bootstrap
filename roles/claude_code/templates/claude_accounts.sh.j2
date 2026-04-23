@@ -48,12 +48,38 @@ claude_login_reseed() {
   echo "claude_login_reseed: seeded ${target}" >&2
 }
 
+# Sync mcpServers from the shared ~/.claude.json into the per-account file.
+# The Ansible role also does this, but that write races with live claude
+# sessions (the CLI keeps .claude.json in memory and flushes it back,
+# stomping the sync). Doing it here — at launch, before bwrap — runs
+# when no CLI is holding the file, so the result sticks. Preserves all
+# keys other than .mcpServers.
+_claude_sync_mcp() {
+  local acct="$1"
+  local shared="$HOME/.claude.json"
+  local target="$HOME/.claude-${acct}/.claude.json"
+  [ -f "$shared" ] && [ -f "$target" ] || return 0
+  command -v jq >/dev/null 2>&1 || return 0
+  local desired current tmp
+  desired=$(jq -c '.mcpServers // {}' "$shared" 2>/dev/null) || return 0
+  current=$(jq -c '.mcpServers // {}' "$target" 2>/dev/null || echo '{}')
+  [ "$desired" = "$current" ] && return 0
+  tmp=$(mktemp --tmpdir="$(dirname "$target")" .claude.json.XXXXXX) || return 0
+  if jq --argjson m "$desired" '.mcpServers = $m' "$target" > "$tmp" 2>/dev/null; then
+    chmod 0600 "$tmp"
+    mv -f "$tmp" "$target"
+  else
+    rm -f "$tmp"
+  fi
+}
+
 _claude_bwrap() {
   local acct="$1"; shift
   if ! _claude_creds_ok "$acct"; then
     echo "claude-${acct}: no usable credentials — running one-time claude_login_reseed..." >&2
     claude_login_reseed "$acct" || return 1
   fi
+  _claude_sync_mcp "$acct"
   bwrap --dev-bind / / \
     --setenv CLAUDE_ACCOUNT "${acct}" \
     --bind "$HOME/.claude-${acct}/.claude.json" "$HOME/.claude.json" \

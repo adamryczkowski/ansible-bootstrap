@@ -63,38 +63,18 @@
     mode: '0644'
   become: true
 
-# `register_mcp.yml` (run earlier in main.yml) registers MCP servers
-# only in the shared ~/.claude.json. Because the bubblewrap aliases bind
-# each ~/.claude-<acct>/.claude.json over the shared file, a session
-# launched as `claude-<acct>` would otherwise see zero MCP servers.
-# This step propagates the shared mcpServers key into every per-account
-# .claude.json, while preserving anything else already in the per-account
-# file (OAuth identity, projects, tipsHistory, …).
-- name: Claude Code | Multi-account | Sync mcpServers from shared into per-account .claude.json
-  ansible.builtin.shell:
-    cmd: |
-      set -euo pipefail
-      shared='{{ claude_code_user_home }}/.claude.json'
-      target='{{ claude_code_user_home }}/.claude-{{ item }}/.claude.json'
-      desired=$(jq -c '.mcpServers // {}' "$shared")
-      current=$(jq -c '.mcpServers // {}' "$target" 2>/dev/null || echo '{}')
-      if [ "$desired" = "$current" ]; then
-        echo UNCHANGED
-        exit 0
-      fi
-      tmp=$(mktemp --tmpdir=$(dirname "$target") .claude.json.XXXXXX)
-      jq --argjson m "$desired" '.mcpServers = $m' "$target" > "$tmp"
-      chmod 0600 "$tmp"
-      mv "$tmp" "$target"
-      echo CHANGED
-    executable: /bin/bash
-  loop: "{{ claude_code_multi_account.accounts }}"
-  loop_control:
-    label: "{{ item }}"
-  register: claude_code_mcp_sync
-  changed_when: "'CHANGED' in claude_code_mcp_sync.stdout"
-  become: true
-  become_user: "{{ claude_code_username }}"
+# MCP-server sync into per-account .claude.json is intentionally NOT done
+# here. Doing it in the playbook races with any live `claude-<acct>`
+# session: the CLI holds .claude.json in memory and periodically flushes
+# it back, so a playbook write can be stomped seconds later. That race
+# was the root cause of both "/mcp shows no servers after clean playbook
+# run" and apparent auth-reset symptoms (the CLI's stale flush also
+# discarded freshly-updated identity state).
+#
+# The sync now lives in _claude_sync_mcp inside 22_claude_accounts.sh.
+# It runs at launch time, before bwrap binds the file, so no CLI is
+# holding it. First launch merges the shared mcpServers into the stub
+# "{}" file; subsequent launches update only when the shared set changes.
 
 # Drift tripwire: the multi-account design assumes the bubblewrap wrapper is
 # the *only* mechanism that overlays per-account identity files onto the
