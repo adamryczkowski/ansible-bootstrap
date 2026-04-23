@@ -152,16 +152,47 @@ if [ -n "$limits" ]; then
     parts+=("$limits")
 fi
 
-# 4. Weekly window: usage% + surplus/deficit vs linear pace.
-#    metric = elapsed_fraction_of_week * 100 - seven_day_used_pct
-#    Positive (green): under linear pace — that much budget "spare" right now.
-#    Negative (red): over linear pace — in deficit.
+# 4. Weekly window: usage% + surplus/deficit vs working-hours pace.
+#    Expected usage accumulates only during 08:00-21:00 local time.
+#    Nights (21:00-08:00) are dead: "spare" stays flat if you don't work.
+#    A full 7-day span always contains exactly 7*13 = 91 active hours.
+#    metric = expected_pct - seven_day_used_pct
+#    Positive (green): under pace — that much budget "spare" right now.
+#    Negative (red): over pace — in deficit.
 if [ -n "$seven_day_pct" ] && [ -n "$seven_day_resets_at" ]; then
     now=$(date +%s)
     secs_left=$(( seven_day_resets_at - now ))
     week_secs=604800
-    metric=$(awk -v used="$seven_day_pct" -v left="$secs_left" -v week="$week_secs" \
-        'BEGIN { m = (week - left)/week*100 - used; printf "%.1f", m }')
+    w_start=$(( seven_day_resets_at - week_secs ))
+    active_total=$(( 7 * 13 * 3600 ))
+    # Clamp now into [w_start, resets_at] to tolerate stale/future data.
+    eff_now="$now"
+    [ "$eff_now" -gt "$seven_day_resets_at" ] && eff_now="$seven_day_resets_at"
+    [ "$eff_now" -lt "$w_start" ] && eff_now="$w_start"
+    # Walk calendar days in [w_start, eff_now], summing overlap of each
+    # day's [08:00, 21:00) slice with the clamped window.
+    active_elapsed=0
+    d=$(date -d "@$w_start" +%Y-%m-%d 2>/dev/null)
+    end_d=$(date -d "@$eff_now" +%Y-%m-%d 2>/dev/null)
+    if [ -n "$d" ] && [ -n "$end_d" ]; then
+        while :; do
+            day_8=$(date -d "$d 08:00" +%s 2>/dev/null)
+            day_21=$(date -d "$d 21:00" +%s 2>/dev/null)
+            if [ -z "$day_8" ] || [ -z "$day_21" ]; then
+                break
+            fi
+            lo=$(( day_8 > w_start ? day_8 : w_start ))
+            hi=$(( day_21 < eff_now ? day_21 : eff_now ))
+            if [ "$hi" -gt "$lo" ]; then
+                active_elapsed=$(( active_elapsed + hi - lo ))
+            fi
+            [ "$d" = "$end_d" ] && break
+            d=$(date -d "$d + 1 day" +%Y-%m-%d 2>/dev/null)
+            [ -z "$d" ] && break
+        done
+    fi
+    metric=$(awk -v ae="$active_elapsed" -v at="$active_total" -v used="$seven_day_pct" \
+        'BEGIN { printf "%.1f", (ae/at)*100 - used }')
     if [ "$secs_left" -le 0 ]; then
         time_left="0d"
     else
