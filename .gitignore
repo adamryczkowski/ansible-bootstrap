@@ -53,3 +53,8 @@ remote-work-log.md
 ref/
 
 roles/globalprotect/files/*.tgz
+
+# Tool runtime state (not source material)
+.claude-flow/
+.roo/
+state/
