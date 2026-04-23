@@ -47,6 +47,19 @@
     "allow": {{ claude_code_mcp_permissions | to_nice_json(indent=6) }},
     "deny": {{ claude_code_deny_permissions | to_nice_json(indent=6) }}
   },
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "notify-send -a 'Claude Code' -i dialog-information 'Claude is idle' \"${CLAUDE_ACCOUNT:-claude} · $(basename \"${PWD:-~}\")\""
+          }
+        ]
+      }
+    ]
+  },
   "mcpServers": {
 {% if 'mcp-pdb' in ns.servers %}
     "mcp-pdb": {
