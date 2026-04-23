@@ -6,6 +6,7 @@ input=$(cat)
 cwd=$(echo "$input" | jq -r '.workspace.current_dir // .cwd // empty')
 used_pct=$(echo "$input" | jq -r '.context_window.used_percentage // empty')
 five_hour_pct=$(echo "$input" | jq -r '.rate_limits.five_hour.used_percentage // empty')
+five_hour_resets_at=$(echo "$input" | jq -r '.rate_limits.five_hour.resets_at // empty')
 seven_day_pct=$(echo "$input" | jq -r '.rate_limits.seven_day.used_percentage // empty')
 seven_day_resets_at=$(echo "$input" | jq -r '.rate_limits.seven_day.resets_at // empty')
 # "sonnet" limit: Claude Max tracks a per-model (Sonnet) usage window separately.
@@ -17,6 +18,7 @@ sonnet_pct=$(echo "$input" | jq -r '
   // empty' 2>/dev/null | head -1)
 
 GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
 RED='\033[0;31m'
 ORANGE='\033[38;5;208m'
 RESET='\033[0m'
@@ -69,19 +71,74 @@ if [ -n "$account" ]; then
     parts+=("$account")
 fi
 
-# 2. Context window usage
+# 2. Context window usage (green <20%, red >88%, orange otherwise)
 if [ -n "$used_pct" ]; then
-    parts+=("ctx:$(printf '%.0f' "$used_pct")%")
+    ctx_band=$(awk -v p="$used_pct" 'BEGIN {
+        if (p < 20) print "green"
+        else if (p > 88) print "red"
+        else print "orange"
+    }')
+    case "$ctx_band" in
+        green) _cc="$GREEN" ;;
+        red)   _cc="$RED" ;;
+        *)     _cc="$ORANGE" ;;
+    esac
+    parts+=("$(printf "${_cc}ctx:%.0f%%${RESET}" "$used_pct")")
 fi
 
 # 3. Claude Max allowances: 5h, 7d, and Sonnet model limits
 limits=""
 if [ -n "$five_hour_pct" ]; then
-    limits="5h:$(printf '%.0f' "$five_hour_pct")%"
-fi
-if [ -n "$seven_day_pct" ]; then
-    [ -n "$limits" ] && limits="$limits " || true
-    limits="${limits}7d:$(printf '%.0f' "$seven_day_pct")%"
+    # --- "ends ..." time remaining in the 5h window ---
+    five_time_str=""
+    if [ -n "$five_hour_resets_at" ]; then
+        now=$(date +%s)
+        five_secs_left=$(( five_hour_resets_at - now ))
+        if [ "$five_secs_left" -le 0 ]; then
+            five_time_str="0m"
+        else
+            five_h_left=$(( five_secs_left / 3600 ))
+            five_m_left=$(( (five_secs_left % 3600) / 60 ))
+            if [ "$five_h_left" -gt 0 ]; then
+                five_time_str="${five_h_left}h${five_m_left}m"
+            else
+                five_time_str="${five_m_left}m"
+            fi
+        fi
+    fi
+
+    # --- Color logic ---
+    # Both limits share the same consumption (burning at 100%/hr of 5h
+    # budget consumes the same absolute amount from either pool).
+    # Constraints after consuming C% of 5h budget:
+    #     5h:     fh + C <= 100
+    #     weekly: 7*wk + C <= 700    (weekly total = 7 × 5h, in 5h-units)
+    # Both hold iff  max(fh, 7*wk - 600) + C <= 100.
+    # So:
+    #   Green:  effective + 60 <= 100  (≥36 min of runway at 100%/hr)
+    #   Yellow: effective + 20 <= 100  (≥12 min of runway at 100%/hr)
+    #   Red:    otherwise
+    five_color=$(awk \
+        -v fp="$five_hour_pct" \
+        -v sp="${seven_day_pct:-0}" \
+        'BEGIN {
+            w_eff = 7*sp - 600
+            eff = (fp > w_eff) ? fp : w_eff
+            if (eff + 60 <= 100) { print "green" }
+            else if (eff + 20 <= 100) { print "yellow" }
+            else { print "red" }
+        }')
+    case "$five_color" in
+        green)  _fc="$GREEN" ;;
+        yellow) _fc="$YELLOW" ;;
+        *)      _fc="$RED" ;;
+    esac
+
+    if [ -n "$five_time_str" ]; then
+        limits="$(printf "${_fc}5h:$(printf '%.0f' "$five_hour_pct")%% (ends %s)${RESET}" "$five_time_str")"
+    else
+        limits="$(printf "${_fc}5h:$(printf '%.0f' "$five_hour_pct")%%${RESET}")"
+    fi
 fi
 if [ -n "$sonnet_pct" ]; then
     [ -n "$limits" ] && limits="$limits " || true
@@ -91,10 +148,10 @@ if [ -n "$limits" ]; then
     parts+=("$limits")
 fi
 
-# 4. Weekly budget metric vs linear pace
+# 4. Weekly window: usage% + surplus/deficit vs linear pace.
 #    metric = elapsed_fraction_of_week * 100 - seven_day_used_pct
-#    Positive (green): under linear pace (can still spend that much today).
-#    Negative (red): over linear pace.
+#    Positive (green): under linear pace — that much budget "spare" right now.
+#    Negative (red): over linear pace — in deficit.
 if [ -n "$seven_day_pct" ] && [ -n "$seven_day_resets_at" ]; then
     now=$(date +%s)
     secs_left=$(( seven_day_resets_at - now ))
@@ -118,7 +175,21 @@ if [ -n "$seven_day_pct" ] && [ -n "$seven_day_resets_at" ]; then
     else
         metric_color="$GREEN"
     fi
-    parts+=("$(printf "${metric_color}7d: %+.1f%% (ends %s)${RESET}" "$metric" "$time_left")")
+    # Window-reset proximity: red if reset lands today, yellow tomorrow, green later.
+    reset_date=$(date -d "@$seven_day_resets_at" +%Y-%m-%d 2>/dev/null)
+    today_date=$(date +%Y-%m-%d)
+    tomorrow_date=$(date -d "tomorrow" +%Y-%m-%d 2>/dev/null)
+    if [ -n "$reset_date" ] && [ "$reset_date" = "$today_date" ]; then
+        reset_color="$RED"
+    elif [ -n "$reset_date" ] && [ "$reset_date" = "$tomorrow_date" ]; then
+        reset_color="$YELLOW"
+    else
+        reset_color="$GREEN"
+    fi
+    parts+=("$(printf "${reset_color}7d:%.0f%% (ends %s)${RESET}" "$seven_day_pct" "$time_left")")
+    parts+=("$(printf "${metric_color}spare %+.1f%%${RESET}" "$metric")")
+elif [ -n "$seven_day_pct" ]; then
+    parts+=("7d:$(printf '%.0f' "$seven_day_pct")%")
 fi
 
 # 5. claude-hierarchy MCP server availability
@@ -136,9 +207,15 @@ else
     parts+=("$(printf "${RED}no claude-hierarchy${RESET}")")
 fi
 
-# 6. Current folder
+# 6. Current folder (home-relative path, e.g. ~/tmp/ansible-bootstrap)
 if [ -n "$cwd" ]; then
-    parts+=("$(basename "$cwd")")
+    if [ -n "$HOME" ] && [ "$cwd" = "$HOME" ]; then
+        parts+=("~")
+    elif [ -n "$HOME" ] && [ "${cwd#$HOME/}" != "$cwd" ]; then
+        parts+=("~/${cwd#$HOME/}")
+    else
+        parts+=("$cwd")
+    fi
 fi
 
 # Join with separator
