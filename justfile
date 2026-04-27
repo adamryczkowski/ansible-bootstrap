@@ -146,6 +146,11 @@ run playbook inventory="inventory/production/hosts.yml":
 check playbook inventory="inventory/production/hosts.yml":
 	ansible-playbook playbooks/{{playbook}}.yml -i {{inventory}} --check --diff
 
+# Run the claude_code playbook against a single host (multi-account enabled)
+play-claude-code hostname:
+	ansible-playbook playbooks/claude_code.yml --limit {{hostname}} \
+		-e '{"claude_code_multi_account": {"enabled": true, "accounts": ["adam", "mik", "sofia"]}}'
+
 # Show Ansible configuration
 config:
 	ansible-config dump --only-changed
