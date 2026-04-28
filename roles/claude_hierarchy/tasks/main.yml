@@ -56,7 +56,9 @@
 - name: Claude Hierarchy | Set installed version fact
   ansible.builtin.set_fact:
     claude_hierarchy_inst_ver: "{{ claude_hierarchy_installed_version.stdout | trim }}"
-    claude_hierarchy_needs_install: "{{ claude_hierarchy_installed_version.stdout | trim != claude_hierarchy_src_version.stdout | trim }}"
+    claude_hierarchy_needs_install: >-
+      {{ claude_hierarchy_force_reinstall | bool
+      or claude_hierarchy_installed_version.stdout | trim != claude_hierarchy_src_version.stdout | trim }}
 
 - name: Claude Hierarchy | Skip install if version matches
   ansible.builtin.debug:

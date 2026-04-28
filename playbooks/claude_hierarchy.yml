@@ -1,0 +1,26 @@
+---
+# claude-hierarchy playbook — Build claude-hierarchy on the controller
+# and (re)install it on the target as a global npm package.
+#
+# Usage:
+#   ansible-playbook playbooks/claude_hierarchy.yml --limit potwor
+#   just upgrade-claude-hierarchy potwor   # forces reinstall via force flag
+#
+# Prerequisites:
+#   - controller has the claude-hierarchy git repo at the path given by
+#     claude_hierarchy_source_dir (defaults to ~/tmp/claude-hierarchy)
+
+- name: Upgrade claude-hierarchy
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    target_user: "{{ ansible_user | default('adam') }}"
+
+  roles:
+    - role: claude_hierarchy
+      vars:
+        claude_hierarchy_username: "{{ target_user }}"
+        claude_hierarchy_run_validate: false
+      tags: [claude_hierarchy]

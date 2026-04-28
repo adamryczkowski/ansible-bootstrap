@@ -3,3 +3,6 @@ claude_hierarchy_username: "{{ ansible_user | default('adam') }}"
 claude_hierarchy_node_version: "22"
 claude_hierarchy_source_dir: "~/tmp/claude-hierarchy"   # controller-side path
 claude_hierarchy_run_validate: true
+# Force a rebuild + reinstall even when the installed version already
+# matches the source. Useful for `just upgrade-claude-hierarchy`.
+claude_hierarchy_force_reinstall: false

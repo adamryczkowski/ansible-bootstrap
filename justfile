@@ -151,6 +151,11 @@ play-claude-code hostname:
 	ansible-playbook playbooks/claude_code.yml --limit {{hostname}} \
 		-e '{"claude_code_multi_account": {"enabled": true, "accounts": ["adam", "mik", "sofia"]}}'
 
+# Rebuild claude-hierarchy on the controller and force-reinstall on a single host
+upgrade-claude-hierarchy hostname:
+	ansible-playbook playbooks/claude_hierarchy.yml --limit {{hostname}} \
+		-e '{"claude_hierarchy_force_reinstall": true}'
+
 # Show Ansible configuration
 config:
 	ansible-config dump --only-changed
