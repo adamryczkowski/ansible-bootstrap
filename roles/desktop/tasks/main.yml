@@ -40,7 +40,11 @@
   when: desktop_tweak_nemo | bool
 
 - name: Desktop | Include SMB shares
-  ansible.builtin.include_tasks: smb.yml
+  ansible.builtin.include_tasks:
+    file: smb.yml
+    apply:
+      tags: [smb]
+  tags: [smb]
   when: desktop_tweak_smb | bool
 
 - name: Desktop | Include laptop tweaks

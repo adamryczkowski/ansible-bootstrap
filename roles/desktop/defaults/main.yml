@@ -23,13 +23,32 @@ desktop_base_packages:
 desktop_num_workspaces: 9
 # desktop_keyboard_layouts: "[('xkb', 'us'), ('xkb', 'pl')]"
 
-# SMB shares configuration
+# ── SMB shares ────────────────────────────────────────────────────────────────
+# Where to install the credentials file and how it's owned. Default is a
+# per-user file in the home directory; hosts that share the credentials
+# file across services can point this at /etc/samba/user (or similar).
+desktop_smb_credentials_path: "/home/{{ desktop_username }}/.smbcredentials"
+desktop_smb_credentials_mode: "0600"
+desktop_smb_credentials_owner: "{{ desktop_username }}"
+desktop_smb_credentials_group: "{{ desktop_username }}"
+
+# Default opts applied to every share that doesn't set its own `opts:` field.
+# Override per-host (e.g. add `noauto,users` for on-demand non-root mounts).
+desktop_smb_default_opts: >-
+  credentials={{ desktop_smb_credentials_path }},uid={{ desktop_username }},gid={{ desktop_username }},iocharset=utf8,nofail,_netdev
+
+# Per-share configuration. Each entry:
+#   server:       NetBIOS name or IP/hostname
+#   share:        share name on the server
+#   mount_point:  local mount point
+#   opts:         (optional) override of desktop_smb_default_opts for this share
 desktop_smb_shares: []
 # Example:
 # desktop_smb_shares:
 #   - server: "192.168.1.100"
 #     share: "media"
 #     mount_point: "/mnt/media"
+#     # opts: "users,credentials=/etc/samba/user,noexec,noauto"   # optional
 # desktop_smb_username: ""
 # desktop_smb_password: ""
 

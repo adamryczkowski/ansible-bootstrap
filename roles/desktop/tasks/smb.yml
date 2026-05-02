@@ -2,7 +2,7 @@
 # Desktop SMB shares tasks
 
 - name: Desktop SMB | Install SMB client packages
-  ansible.builtin.apt:
+  ansible.builtin.package:
     name:
       - cifs-utils
       - smbclient
@@ -20,13 +20,21 @@
   loop: "{{ desktop_smb_shares }}"
   when: desktop_smb_shares | length > 0
 
+- name: Desktop SMB | Ensure credentials file parent directory exists
+  ansible.builtin.file:
+    path: "{{ desktop_smb_credentials_path | dirname }}"
+    state: directory
+    mode: "0755"
+  become: true
+  when: desktop_smb_username is defined and desktop_smb_password is defined
+
 - name: Desktop SMB | Create credentials file
   ansible.builtin.template:
     src: smb_credentials.j2
-    dest: "/home/{{ desktop_username }}/.smbcredentials"
-    mode: "0600"
-    owner: "{{ desktop_username }}"
-    group: "{{ desktop_username }}"
+    dest: "{{ desktop_smb_credentials_path }}"
+    mode: "{{ desktop_smb_credentials_mode }}"
+    owner: "{{ desktop_smb_credentials_owner }}"
+    group: "{{ desktop_smb_credentials_group }}"
   become: true
   when: desktop_smb_username is defined and desktop_smb_password is defined
   no_log: true
@@ -36,7 +44,7 @@
     path: "{{ item.mount_point }}"
     src: "//{{ item.server }}/{{ item.share }}"
     fstype: cifs
-    opts: "credentials=/home/{{ desktop_username }}/.smbcredentials,uid={{ desktop_username }},gid={{ desktop_username }},iocharset=utf8,nofail,_netdev"
+    opts: "{{ item.opts | default(desktop_smb_default_opts) }}"
     state: present
   become: true
   loop: "{{ desktop_smb_shares }}"
