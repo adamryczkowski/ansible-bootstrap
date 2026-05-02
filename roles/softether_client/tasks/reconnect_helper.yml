@@ -33,7 +33,7 @@
       softether_reconnect_helper.enabled is true
 
 - name: SoftEther | Reconnect | Install sshfs (when sshfs_mount is configured)
-  ansible.builtin.apt:
+  ansible.builtin.package:
     name: sshfs
     state: present
   become: true
