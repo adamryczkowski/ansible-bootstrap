@@ -30,6 +30,22 @@
 #     - softether_connection_name: Connection name (default: username)
 #     - softether_nicname: Virtual NIC name (default: vpn)
 #     - softether_ip: Static IP or 'dhcp' (default: dhcp)
+#
+#     - softether_reconnect_helper: Opt-in host-level reconnect orchestrator
+#       (default: {enabled: false}). When enabled, deploys
+#       /usr/local/bin/reconnect_vpn plus a systemd unit and two triggers
+#       (NM dispatcher hook + systemd-sleep post-resume hook) so the VPN
+#       and home-network route are re-established on every link-up / resume.
+#       Required sub-keys: connection_name, nicname, home_check_ip,
+#       tunnel_check_ip, home_subnet, tunnel_gateway. Optional:
+#       internet_probe, sshfs_mount.{remote,local,user}.
+#       Example:
+#         -e '{"softether_reconnect_helper":{"enabled":true,
+#              "connection_name":"dom","nicname":"dom",
+#              "home_check_ip":"192.168.10.10",
+#              "tunnel_check_ip":"192.168.42.1",
+#              "home_subnet":"192.168.10.0/24",
+#              "tunnel_gateway":"192.168.42.10"}}'
 
 - name: Install and configure SoftEther VPN Client
   hosts: all

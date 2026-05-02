@@ -1,7 +1,32 @@
 #!/bin/sh
-# SoftEther VPN start script for {{ softether_connection_name }} (static IP mode)
-sudo /usr/local/bin/vpncmd localhost /CLIENT /CMD accountconnect {{ softether_connection_name }}
-sudo ifconfig vpn_{{ softether_nicname }} {{ softether_ip }}
-if service --status-all | grep -Fq 'isc-dhcp-server'; then
-  sudo systemctl restart isc-dhcp-server.service
+# Started by softether_{{ softether_connection_name }}_client.service as root. No sudo needed.
+# Bounded calls so a broken VPN tunnel does not pin the unit in `activating`.
+
+/usr/bin/timeout 5 /usr/local/bin/vpncmd localhost /CLIENT /CMD accountconnect {{ softether_connection_name }} \
+    >/dev/null 2>&1 || true
+
+established=0
+for _ in $(seq 1 20); do
+    status=$(/usr/bin/timeout 3 /usr/local/bin/vpncmd localhost /CLIENT /CMD AccountStatusGet {{ softether_connection_name }} 2>/dev/null \
+      | awk -F'|' '/Session Status/ {print $2}' | xargs)
+    case "$status" in
+        *"Session Established"*|*"Connection Completed"*|*"Established"*)
+            established=1
+            break
+            ;;
+    esac
+    sleep 1
+done
+
+if [ "$established" -ne 1 ]; then
+    echo "start_{{ softether_connection_name }}_vpn.sh: SoftEther session did not establish (last status: ${status:-unknown})" >&2
+    exit 1
+fi
+
+# Tunnel is up — apply the static IP.
+/usr/bin/ip address add {{ softether_ip }} dev vpn_{{ softether_nicname }}
+/usr/bin/ip link set vpn_{{ softether_nicname }} up
+
+if /usr/sbin/service --status-all 2>/dev/null | grep -Fq 'isc-dhcp-server'; then
+    /usr/bin/systemctl restart isc-dhcp-server.service
 fi

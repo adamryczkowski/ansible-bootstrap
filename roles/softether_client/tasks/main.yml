@@ -211,3 +211,7 @@
     state: started
     daemon_reload: true
   become: true
+
+- name: SoftEther | Configure reconnect-vpn orchestrator
+  ansible.builtin.include_tasks: reconnect_helper.yml
+  when: softether_reconnect_helper.enabled | default(false)

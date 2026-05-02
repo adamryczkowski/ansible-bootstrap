@@ -1,4 +1,41 @@
 #!/bin/sh
-# SoftEther VPN start script for {{ softether_connection_name }} (DHCP mode)
-sudo /usr/local/bin/vpncmd localhost /CLIENT /CMD accountconnect {{ softether_connection_name }}
-sudo dhclient vpn_{{ softether_nicname }}
+# Started by softether_{{ softether_connection_name }}_client.service as root. No sudo needed.
+# Bounded calls so a broken VPN tunnel does not pin the unit in `activating`.
+#
+# Design notes:
+# - softether_client.service owns the vpnclient daemon; the `{{ softether_connection_name }}`
+#   account is usually already set to auto-connect, so `accountconnect` often
+#   returns error 35 ("setting is currently connected/connecting"), which is
+#   not an error for us — we just want the session established.
+# - We check session state directly via AccountStatusGet in a bounded loop
+#   and only call dhclient once the tunnel is actually up.
+# - No `set -e`: exit codes are driven by explicit checks so a noisy vpncmd
+#   call cannot fail the whole unit.
+
+# Nudge the account into connecting. Any failure here is informational; real
+# state is determined by AccountStatusGet below.
+/usr/bin/timeout 5 /usr/local/bin/vpncmd localhost /CLIENT /CMD accountconnect {{ softether_connection_name }} \
+    >/dev/null 2>&1 || true
+
+# Wait up to 20s for the SoftEther session to actually come up.
+established=0
+for _ in $(seq 1 20); do
+    status=$(/usr/bin/timeout 3 /usr/local/bin/vpncmd localhost /CLIENT /CMD AccountStatusGet {{ softether_connection_name }} 2>/dev/null \
+      | awk -F'|' '/Session Status/ {print $2}' | xargs)
+    case "$status" in
+        *"Session Established"*|*"Connection Completed"*|*"Established"*)
+            established=1
+            break
+            ;;
+    esac
+    sleep 1
+done
+
+if [ "$established" -ne 1 ]; then
+    echo "start_{{ softether_connection_name }}_vpn.sh: SoftEther session did not establish (last status: ${status:-unknown})" >&2
+    exit 1
+fi
+
+# Tunnel is up — now ask for a DHCP lease on vpn_{{ softether_nicname }} (bounded).
+# -1 = one-shot mode; timeout bounds the DISCOVER wait.
+exec /usr/bin/timeout 15 /usr/sbin/dhclient -1 vpn_{{ softether_nicname }}

@@ -1,0 +1,14 @@
+[Unit]
+Description=Reconnect to home VPN and (optionally) mount remote share
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/reconnect_vpn
+TimeoutStartSec=120
+# Don't fail the boot if the network is not where we expect it.
+SuccessExitStatus=1
+
+[Install]
+WantedBy=multi-user.target

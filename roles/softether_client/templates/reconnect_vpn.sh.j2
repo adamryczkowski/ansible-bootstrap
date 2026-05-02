@@ -1,0 +1,87 @@
+#!/bin/env bash
+set -euo pipefail
+# Managed by Ansible (softether_client role) — do not edit by hand.
+#
+# Triggered by:
+#   - reconnect-vpn.service           (boot / manual)
+#   - NetworkManager dispatcher       (any non-VPN iface comes up)
+#   - systemd-sleep post-resume hook  (laptop wakes from suspend)
+#
+# Logic:
+# 1. No internet?                                     exit
+# 2. Home gateway already reachable?                  exit (already there)
+# 3. SoftEther {{ softether_reconnect_helper.connection_name }} session not established?  restart tunnel
+# 4. No DHCP lease on vpn_{{ softether_reconnect_helper.nicname }}?            run dhclient
+# 5. Add static route to home subnet via tunnel.
+# 6. Verify by pinging home gateway.
+{% if softether_reconnect_helper.sshfs_mount is defined %}
+# 7. Mount {{ softether_reconnect_helper.sshfs_mount.remote }} at {{ softether_reconnect_helper.sshfs_mount.local }} via sshfs.
+{% endif %}
+
+CONN="{{ softether_reconnect_helper.connection_name }}"
+NIC="vpn_{{ softether_reconnect_helper.nicname }}"
+HOME_CHECK_IP="{{ softether_reconnect_helper.home_check_ip }}"
+TUNNEL_CHECK_IP="{{ softether_reconnect_helper.tunnel_check_ip }}"
+HOME_SUBNET="{{ softether_reconnect_helper.home_subnet }}"
+TUNNEL_GATEWAY="{{ softether_reconnect_helper.tunnel_gateway }}"
+INTERNET_PROBE="{{ softether_reconnect_helper.internet_probe | default('8.8.8.8') }}"
+
+if ! ping -c 1 "$INTERNET_PROBE" &>/dev/null; then
+    echo "No internet connection. Exiting."
+    exit 1
+fi
+
+if ! ping -c 1 -W 0.5 "$HOME_CHECK_IP" &>/dev/null; then
+
+    if ! vpncmd localhost /CLIENT /CMD AccountStatusGet "$CONN" \
+        | grep "Session Status" | grep -q "Session Established"; then
+        echo "VPN is not connected. Restarting VPN..."
+        systemctl stop "softether_${CONN}_client.service"
+        systemctl stop softether_client.service
+        systemctl start softether_client.service
+        systemctl start "softether_${CONN}_client.service"
+
+        if ! vpncmd localhost /CLIENT /CMD AccountStatusGet "$CONN" \
+            | grep "Session Status" | grep -q "Session Established"; then
+            echo "VPN connection failed. Exiting."
+            exit 1
+        fi
+    fi
+
+    if ! ping -c 1 -W 0.5 "$TUNNEL_CHECK_IP" &>/dev/null; then
+        dhclient "$NIC"
+    fi
+
+    echo "VPN is connected. Adding route to home network..."
+    ip route add "$HOME_SUBNET" via "$TUNNEL_GATEWAY" 2>/dev/null || true
+    if ! ping -c 1 -W 0.5 "$HOME_CHECK_IP" &>/dev/null; then
+        echo "ERROR! No connection to the home network. Is the VPN server running?"
+        exit 0
+    fi
+else
+    echo "Already connected to the home network"
+fi
+
+{% if softether_reconnect_helper.sshfs_mount is defined %}
+# ── Optional sshfs mount ──────────────────────────────────────────────────────
+SSHFS_REMOTE="{{ softether_reconnect_helper.sshfs_mount.remote }}"
+SSHFS_LOCAL="{{ softether_reconnect_helper.sshfs_mount.local }}"
+SSHFS_USER="{{ softether_reconnect_helper.sshfs_mount.user }}"
+
+# Use findmnt as the source of truth: a stale FUSE handle from an interrupted
+# suspend can fool `mountpoint`/`stat` while still blocking new sshfs mounts.
+if findmnt -n "$SSHFS_LOCAL" >/dev/null && sudo -u "$SSHFS_USER" test -r "$SSHFS_LOCAL"; then
+    echo "$SSHFS_LOCAL is already mounted"
+else
+    # Drop any stale FUSE handle before mounting.
+    umount -lf "$SSHFS_LOCAL" 2>/dev/null || true
+    echo "Mounting $SSHFS_LOCAL using sshfs..."
+    sudo -u "$SSHFS_USER" sshfs \
+        -o reconnect,ServerAliveInterval=15,ServerAliveCountMax=3 \
+        "$SSHFS_REMOTE" "$SSHFS_LOCAL"
+    if ! findmnt -n "$SSHFS_LOCAL" >/dev/null; then
+        echo "Failed to mount $SSHFS_LOCAL"
+        exit 1
+    fi
+fi
+{% endif %}

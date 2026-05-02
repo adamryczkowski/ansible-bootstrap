@@ -39,3 +39,21 @@ softether_install_dir: "/usr/local/lib/SoftEtherVPN"
 
 # Build configuration
 softether_build_jobs: 4
+
+# Reconnect-VPN orchestrator (host-level helper).
+# When enabled, deploys /usr/local/bin/reconnect_vpn plus a systemd unit and
+# two trigger hooks (NetworkManager dispatcher + systemd-sleep post-resume).
+# See tasks/reconnect_helper.yml for the full list of required keys.
+softether_reconnect_helper:
+  enabled: false
+  # connection_name: "dom"
+  # nicname: "dom"                  # interface becomes vpn_dom
+  # home_check_ip: 192.168.10.10
+  # tunnel_check_ip: 192.168.42.1
+  # home_subnet: 192.168.10.0/24
+  # tunnel_gateway: 192.168.42.10
+  # internet_probe: 8.8.8.8         # optional
+  # sshfs_mount:                    # optional
+  #   remote: 192.168.10.7:/pool88GB
+  #   local: /home/adam/mnt
+  #   user: adam

@@ -1,0 +1,18 @@
+#!/bin/sh
+# Managed by Ansible (softether_client role) — do not edit by hand.
+# NM dispatcher: trigger reconnect-vpn when a physical interface comes up.
+# Skip the VPN tunnels themselves and loopback to avoid feedback loops.
+# Only react to the "up" action — "connectivity-change" also fires during
+# pre-suspend network teardown and would race against systemd-sleep.
+IFACE="$1"
+ACTION="$2"
+
+case "$IFACE" in
+    vpn_*|lo|p2p-*) exit 0 ;;
+esac
+
+case "$ACTION" in
+    up)
+        systemctl start --no-block reconnect-vpn.service
+        ;;
+esac

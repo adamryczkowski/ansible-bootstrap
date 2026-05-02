@@ -1,15 +1,27 @@
 [Unit]
 Description=SoftEther {{ softether_connection_name }} Client
-After=softether_client.service
+After=softether_client.service network-online.target
 Requires=softether_client.service
+Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStartPre=/bin/sh -c 'until ping -c1 {{ softether_server_address }}; do sleep 1; done;'
-ExecStart=/bin/bash /usr/local/lib/softether/start_{{ softether_connection_name }}_vpn.sh
-ExecStop=/usr/local/bin/vpncmd localhost /CLIENT /CMD accountdisconnect {{ softether_connection_name }}
-ExecStop=/bin/bash -c "ifconfig vpn_{{ softether_nicname }} down"
 RemainAfterExit=yes
+TimeoutStartSec=30
+KillMode=mixed
+
+# Single bounded connectivity check; let Restart= handle retries instead of
+# an unbounded `until ping` loop that pins the unit in `activating` forever.
+ExecStartPre=/bin/sh -c '/usr/bin/ping -c1 -W 5 {{ softether_server_address }} >/dev/null'
+
+# start_<conn>_vpn.sh runs as root (no sudo) and bounds its dhclient call.
+ExecStart=/bin/bash /usr/local/lib/softether/start_{{ softether_connection_name }}_vpn.sh
+
+ExecStop=/usr/bin/timeout 5 /usr/local/bin/vpncmd localhost /CLIENT /CMD accountdisconnect {{ softether_connection_name }}
+ExecStop=/usr/bin/ip link set vpn_{{ softether_nicname }} down
+
+Restart=on-failure
+RestartSec=10s
 
 [Install]
 WantedBy=multi-user.target

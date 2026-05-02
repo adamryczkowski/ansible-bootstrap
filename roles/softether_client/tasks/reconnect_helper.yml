@@ -1,0 +1,85 @@
+---
+# softether_client role — opt-in reconnect-vpn orchestrator
+#
+# Deploys a host-level helper that re-establishes the SoftEther tunnel and
+# (optionally) re-mounts a remote share. Triggered on:
+#   - boot / explicit `systemctl start reconnect-vpn`
+#   - any non-VPN physical interface coming up (via NetworkManager dispatcher)
+#   - resume from suspend / hibernate (via systemd-sleep hook)
+#
+# Required when softether_reconnect_helper.enabled is true:
+#   - softether_reconnect_helper.connection_name  (e.g. "dom")
+#   - softether_reconnect_helper.nicname          (e.g. "dom" → vpn_dom)
+#   - softether_reconnect_helper.home_check_ip    (e.g. 192.168.10.10)
+#   - softether_reconnect_helper.tunnel_check_ip  (e.g. 192.168.42.1)
+#   - softether_reconnect_helper.home_subnet      (e.g. 192.168.10.0/24)
+#   - softether_reconnect_helper.tunnel_gateway   (e.g. 192.168.42.10)
+# Optional:
+#   - softether_reconnect_helper.internet_probe   (default 8.8.8.8)
+#   - softether_reconnect_helper.sshfs_mount.remote / .local / .user
+
+- name: SoftEther | Reconnect | Validate required helper variables
+  ansible.builtin.assert:
+    that:
+      - softether_reconnect_helper.connection_name | default('') | length > 0
+      - softether_reconnect_helper.nicname | default('') | length > 0
+      - softether_reconnect_helper.home_check_ip | default('') | length > 0
+      - softether_reconnect_helper.tunnel_check_ip | default('') | length > 0
+      - softether_reconnect_helper.home_subnet | default('') | length > 0
+      - softether_reconnect_helper.tunnel_gateway | default('') | length > 0
+    fail_msg: >-
+      softether_reconnect_helper.{connection_name,nicname,home_check_ip,
+      tunnel_check_ip,home_subnet,tunnel_gateway} must all be set when
+      softether_reconnect_helper.enabled is true
+
+- name: SoftEther | Reconnect | Install sshfs (when sshfs_mount is configured)
+  ansible.builtin.apt:
+    name: sshfs
+    state: present
+  become: true
+  when: softether_reconnect_helper.sshfs_mount is defined
+
+- name: SoftEther | Reconnect | Deploy /usr/local/bin/reconnect_vpn
+  ansible.builtin.template:
+    src: reconnect_vpn.sh.j2
+    dest: /usr/local/bin/reconnect_vpn
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+
+- name: SoftEther | Reconnect | Deploy reconnect-vpn.service
+  ansible.builtin.template:
+    src: reconnect-vpn.service.j2
+    dest: /etc/systemd/system/reconnect-vpn.service
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  notify:
+    - Reload systemd
+
+- name: SoftEther | Reconnect | Enable reconnect-vpn.service
+  ansible.builtin.systemd:
+    name: reconnect-vpn.service
+    enabled: true
+    daemon_reload: true
+  become: true
+
+- name: SoftEther | Reconnect | Deploy NetworkManager dispatcher hook
+  ansible.builtin.template:
+    src: nm-dispatcher-90-reconnect-vpn.j2
+    dest: /etc/NetworkManager/dispatcher.d/90-reconnect-vpn
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+
+- name: SoftEther | Reconnect | Deploy systemd-sleep post-resume hook
+  ansible.builtin.template:
+    src: systemd-sleep-reconnect-vpn.j2
+    dest: /lib/systemd/system-sleep/reconnect-vpn
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
