@@ -1,0 +1,52 @@
+---
+# Host-specific overrides for mikolaj-framework.
+
+# ── Desktop role: SMB shares ─────────────────────────────────────────────────
+desktop_tweak_smb: true
+
+# Per-user credentials file (default location). Define the password via
+# ansible-vault or `-e desktop_smb_password=...` to actually write the file;
+# without it the credentials task is skipped and any pre-existing
+# /home/mikolaj/.smbcredentials is left intact.
+desktop_smb_username: mikolaj
+# desktop_smb_password: "{{ vault_smb_password }}"
+
+# Mount on demand by any logged-in user, no exec.
+desktop_smb_default_opts: "users,credentials=/home/mikolaj/.smbcredentials,noexec,noauto"
+
+desktop_smb_shares:
+  - { server: wielodysk, share: niezbednik, mount_point: /media/szesciodysk/niezbednik }
+  - { server: wielodysk, share: filmy, mount_point: /media/szesciodysk/filmy }
+  - { server: wielodysk, share: zdjecia, mount_point: /media/szesciodysk/zdjecia }
+  # Mikolaj's personal share. NOTE: this requires the server-side Samba
+  # config on `wielodysk` to expose a share named `mikolaj` backed by
+  # /pool88GB/mikolaj on the NAS. If it does not exist yet, create it on the
+  # NAS first, otherwise the mount will fail with NT_STATUS_BAD_NETWORK_NAME.
+  - { server: wielodysk, share: mikolaj, mount_point: /media/szesciodysk/mikolaj }
+
+# ── SoftEther client ─────────────────────────────────────────────────────────
+# Server / hub matches legion9's `dom` account. Password is in
+# group_vars/all/vault.yml as `softether_password`.
+softether_server_address: n2n.statystyka.net
+softether_port: 992
+softether_vpn_hub: VPN
+softether_vpn_username: framework-mikolaj
+# Local label for the connection (drives the systemd unit name and the
+# helper script filename).
+softether_connection_name: dom
+# Virtual NIC name → kernel interface becomes vpn_dom_vpn.
+softether_nicname: dom_vpn
+
+# ── SoftEther reconnect-vpn orchestrator ─────────────────────────────────────
+# Mirrors legion9: on boot, NetworkManager dispatcher events, and resume from
+# suspend, run /usr/local/bin/reconnect_vpn to (re-)establish the tunnel and
+# add the static route to the home subnet.
+softether_reconnect_helper:
+  enabled: true
+  connection_name: dom            # softether_connection_name above
+  nicname: dom_vpn                # softether_nicname above (interface vpn_dom_vpn)
+  home_check_ip: 192.168.10.10    # home gateway — reachable means we're already home
+  tunnel_check_ip: 192.168.42.1   # VPN gateway — reachable means tunnel is up
+  home_subnet: 192.168.10.0/24    # network to route through the tunnel
+  tunnel_gateway: 192.168.42.10   # next-hop on the VPN side
+  internet_probe: 8.8.8.8
