@@ -13,7 +13,7 @@
     state: present
     update_cache: true
     cache_valid_time: 3600
-  when: ansible_os_family == "Debian"
+  when: ansible_facts['os_family'] == "Debian"
 
 - name: Sway | Install font packages from pacman (Arch Linux)
   become: true
@@ -24,7 +24,7 @@
       - otf-font-awesome
       - ttf-fira-code
     state: present
-  when: ansible_os_family == "Archlinux"
+  when: ansible_facts['os_family'] == "Archlinux"
 
 - name: Sway | Ensure user fonts directory exists
   ansible.builtin.file:

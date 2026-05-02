@@ -7,7 +7,7 @@ sway_username: "{{ target_user | default(ansible_user) | default('adam') }}"
 # Installation method: 'nix' for Ubuntu (latest version), 'native' for Arch
 # On Arch Linux, Sway is installed directly from pacman (latest version available)
 # On Ubuntu/Debian, Nix is used to get Sway 1.11+ (Ubuntu 24.04 only has 1.9)
-sway_install_method: "{{ 'native' if ansible_os_family == 'Archlinux' else 'nix' }}"
+sway_install_method: "{{ 'native' if ansible_facts['os_family'] == 'Archlinux' else 'nix' }}"
 
 # Nix packages to install (when sway_install_method is 'nix')
 # These provide the core Sway experience with latest versions
@@ -242,7 +242,7 @@ sway_fix_waybar_duplication: true
 # greetd is a minimal, agnostic login manager daemon for Wayland compositors
 # On Arch Linux, we use greetd instead of GDM for a lightweight login experience
 # Reference: https://wiki.archlinux.org/title/Greetd
-sway_install_greetd: "{{ ansible_os_family == 'Archlinux' }}"
+sway_install_greetd: "{{ ansible_facts['os_family'] == 'Archlinux' }}"
 
 # greetd packages to install
 sway_greetd_packages:

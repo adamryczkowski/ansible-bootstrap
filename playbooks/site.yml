@@ -19,11 +19,11 @@
 
     - role: apt_mirror
       tags: [apt_mirror, base]
-      when: ansible_os_family == "Debian"
+      when: ansible_facts['os_family'] == "Debian"
 
     - role: snap_hold
       tags: [snap_hold, base]
-      when: ansible_os_family == "Debian"
+      when: ansible_facts['os_family'] == "Debian"
 
     - role: packages
       tags: [packages, base]

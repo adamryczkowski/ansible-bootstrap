@@ -37,7 +37,7 @@
           Prepare Ubuntu Configuration:
           - Target user: {{ target_user }}
           - CLI profile: {{ cli_tools_profile }}
-          - OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          - OS: {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}
 
     - name: Update apt cache
       ansible.builtin.apt:

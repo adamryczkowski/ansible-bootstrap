@@ -125,8 +125,8 @@
     - name: Display target system info
       ansible.builtin.debug:
         msg: |
-          Target system: {{ ansible_hostname }}
-          OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          Target system: {{ ansible_facts['hostname'] }}
+          OS: {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}
           User: {{ target_user }}
           MCP directory: {{ roo_code_mcp_base_dir }}
 

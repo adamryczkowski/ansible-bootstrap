@@ -25,7 +25,7 @@
   roles:
     - role: apt_mirror
       tags: [apt_mirror, base]
-      when: ansible_os_family == "Debian"
+      when: ansible_facts['os_family'] == "Debian"
 
     - role: syncthing
       tags: [syncthing]

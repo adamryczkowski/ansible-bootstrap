@@ -7,14 +7,14 @@
     state: present
     update_cache: true
   become: true
-  when: ansible_os_family == "Debian"
+  when: ansible_facts['os_family'] == "Debian"
 
 - name: Sway | Install Fusuma dependencies (Arch Linux)
   community.general.pacman:
     name: "{{ sway_fusuma_packages_arch }}"
     state: present
   become: true
-  when: ansible_os_family == "Archlinux"
+  when: ansible_facts['os_family'] == "Archlinux"
 
 - name: Sway | Check if Fusuma is installed
   ansible.builtin.command:
@@ -71,4 +71,4 @@
     name: libinput-gestures
     state: absent
   become: true
-  when: ansible_os_family == "Debian"
+  when: ansible_facts['os_family'] == "Debian"

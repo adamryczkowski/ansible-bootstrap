@@ -27,7 +27,7 @@
           - Install dir: {{ conduwuit_install_dir | default('/opt/conduwuit') }}
           - Config dir:  {{ conduwuit_config_dir | default('/etc/conduwuit') }}
           - Port:        {{ conduwuit_port | default(6167) }}
-          - OS:          {{ ansible_distribution }} {{ ansible_distribution_version }}
+          - OS:          {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}
 
     - name: Update apt cache
       ansible.builtin.apt:

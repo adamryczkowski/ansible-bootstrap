@@ -18,7 +18,7 @@
     state: present
     update_cache: true
   become: true
-  when: ansible_os_family == "Debian"
+  when: ansible_facts['os_family'] == "Debian"
 
 - name: Fingerprint swaylock | Clone swaylock-fprintd repository
   ansible.builtin.git:
@@ -28,13 +28,13 @@
     depth: 1
     force: true
   become: true
-  when: ansible_os_family == "Debian"
+  when: ansible_facts['os_family'] == "Debian"
 
 - name: Fingerprint swaylock | Check if swaylock-fprintd is already built
   ansible.builtin.stat:
     path: "{{ sway_swaylock_fprintd_dest }}/build/swaylock"
   register: sway_swaylock_fprintd_built
-  when: ansible_os_family == "Debian"
+  when: ansible_facts['os_family'] == "Debian"
 
 - name: Fingerprint swaylock | Configure build with meson (Debian/Ubuntu)
   ansible.builtin.command:
@@ -43,7 +43,7 @@
     creates: "{{ sway_swaylock_fprintd_dest }}/build/build.ninja"
   become: true
   when:
-    - ansible_os_family == "Debian"
+    - ansible_facts['os_family'] == "Debian"
     - not (sway_swaylock_fprintd_built.stat.exists | default(false))
 
 - name: Fingerprint swaylock | Build with ninja (Debian/Ubuntu)
@@ -54,7 +54,7 @@
   register: sway_swaylock_ninja_build
   changed_when: sway_swaylock_ninja_build.rc == 0
   when:
-    - ansible_os_family == "Debian"
+    - ansible_facts['os_family'] == "Debian"
     - not (sway_swaylock_fprintd_built.stat.exists | default(false))
 
 - name: Fingerprint swaylock | Install swaylock-fprintd binary (Debian/Ubuntu)
@@ -66,7 +66,7 @@
     group: root
     remote_src: true
   become: true
-  when: ansible_os_family == "Debian"
+  when: ansible_facts['os_family'] == "Debian"
 
 # === Arch Linux: Try AUR first, fall back to source ===
 
@@ -76,7 +76,7 @@
   register: sway_aur_helper_check
   changed_when: false
   failed_when: false
-  when: ansible_os_family == "Archlinux"
+  when: ansible_facts['os_family'] == "Archlinux"
 
 - name: Fingerprint swaylock | Install from AUR using yay (Arch Linux)
   ansible.builtin.command:
@@ -86,7 +86,7 @@
   register: sway_aur_install
   changed_when: "'installing' in sway_aur_install.stdout or 'upgraded' in sway_aur_install.stdout"
   when:
-    - ansible_os_family == "Archlinux"
+    - ansible_facts['os_family'] == "Archlinux"
     - sway_aur_helper_check.rc == 0
 
 - name: Fingerprint swaylock | Check if AUR package installed swaylock
@@ -94,7 +94,7 @@
     path: /usr/bin/swaylock
   register: sway_aur_swaylock_installed
   when:
-    - ansible_os_family == "Archlinux"
+    - ansible_facts['os_family'] == "Archlinux"
     - sway_aur_helper_check.rc == 0
 
 - name: Fingerprint swaylock | Move AUR swaylock to swaylock-fprintd-bin (Arch Linux)
@@ -103,7 +103,7 @@
     creates: /usr/local/bin/swaylock-fprintd-bin
   become: true
   when:
-    - ansible_os_family == "Archlinux"
+    - ansible_facts['os_family'] == "Archlinux"
     - sway_aur_helper_check.rc == 0
     - sway_aur_swaylock_installed.stat.exists | default(false)
 
@@ -114,7 +114,7 @@
     state: present
   become: true
   when:
-    - ansible_os_family == "Archlinux"
+    - ansible_facts['os_family'] == "Archlinux"
     - sway_aur_helper_check.rc != 0
 
 - name: Fingerprint swaylock | Clone swaylock-fprintd repository (Arch Linux - no AUR)
@@ -126,7 +126,7 @@
     force: true
   become: true
   when:
-    - ansible_os_family == "Archlinux"
+    - ansible_facts['os_family'] == "Archlinux"
     - sway_aur_helper_check.rc != 0
 
 - name: Fingerprint swaylock | Configure build with meson (Arch Linux - no AUR)
@@ -136,7 +136,7 @@
     creates: "{{ sway_swaylock_fprintd_dest }}/build/build.ninja"
   become: true
   when:
-    - ansible_os_family == "Archlinux"
+    - ansible_facts['os_family'] == "Archlinux"
     - sway_aur_helper_check.rc != 0
 
 - name: Fingerprint swaylock | Build with ninja (Arch Linux - no AUR)
@@ -147,7 +147,7 @@
   register: sway_swaylock_ninja_build_arch
   changed_when: sway_swaylock_ninja_build_arch.rc == 0
   when:
-    - ansible_os_family == "Archlinux"
+    - ansible_facts['os_family'] == "Archlinux"
     - sway_aur_helper_check.rc != 0
 
 - name: Fingerprint swaylock | Install swaylock-fprintd binary (Arch Linux - no AUR)
@@ -160,7 +160,7 @@
     remote_src: true
   become: true
   when:
-    - ansible_os_family == "Archlinux"
+    - ansible_facts['os_family'] == "Archlinux"
     - sway_aur_helper_check.rc != 0
 
 # === Common: Deploy wrapper and config ===

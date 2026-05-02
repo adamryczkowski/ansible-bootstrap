@@ -26,7 +26,7 @@ virtualbox_apt_key_path: "/usr/share/keyrings/oracle-virtualbox-2016.gpg"
 virtualbox_repository_base: "https://download.virtualbox.org/virtualbox/debian"
 virtualbox_repository: >-
   deb [arch=amd64 signed-by={{ virtualbox_apt_key_path }}]
-  {{ virtualbox_repository_base }} {{ ansible_distribution_release }} contrib
+  {{ virtualbox_repository_base }} {{ ansible_facts['distribution_release'] }} contrib
 
 # Dependencies required for VirtualBox kernel module compilation
 virtualbox_dependencies:

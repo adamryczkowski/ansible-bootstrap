@@ -83,7 +83,7 @@
   ansible.builtin.set_fact:
     virtualbox_target_users: >-
       {{ virtualbox_users if virtualbox_users | length > 0
-      else [target_user | default(ansible_user_id)] }}
+      else [target_user | default(ansible_facts['user_id'])] }}
   when: virtualbox_enable_usb_passthrough | bool
 
 - name: VirtualBox | Add users to vboxusers group

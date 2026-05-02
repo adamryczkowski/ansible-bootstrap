@@ -12,14 +12,14 @@
     name: nethogs
     state: present
   become: true
-  when: ansible_os_family == "Debian"
+  when: ansible_facts['os_family'] == "Debian"
 
 - name: Sway | Install nethogs package (Arch Linux)
   community.general.pacman:
     name: nethogs
     state: present
   become: true
-  when: ansible_os_family == "Archlinux"
+  when: ansible_facts['os_family'] == "Archlinux"
 
 - name: Sway | Get full path to nethogs binary
   ansible.builtin.command:

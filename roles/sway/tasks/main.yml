@@ -22,11 +22,11 @@
 # Package installation - distro-specific
 - name: Sway | Include apt packages installation (Debian/Ubuntu)
   ansible.builtin.include_tasks: apt_packages.yml
-  when: ansible_os_family == "Debian"
+  when: ansible_facts['os_family'] == "Debian"
 
 - name: Sway | Include pacman packages installation (Arch Linux)
   ansible.builtin.include_tasks: pacman_packages.yml
-  when: ansible_os_family == "Archlinux"
+  when: ansible_facts['os_family'] == "Archlinux"
 
 - name: Sway | Include fonts installation
   ansible.builtin.include_tasks: fonts.yml
@@ -39,7 +39,7 @@
   ansible.builtin.include_tasks: nix.yml
   when:
     - sway_install_method == 'nix'
-    - ansible_os_family == "Debian"
+    - ansible_facts['os_family'] == "Debian"
 
 # Foot terminal from source - only needed on Debian/Ubuntu
 # On Arch, foot is already installed via pacman with latest version
@@ -47,7 +47,7 @@
   ansible.builtin.include_tasks: foot.yml
   when:
     - sway_install_foot_from_source | bool
-    - ansible_os_family == "Debian"
+    - ansible_facts['os_family'] == "Debian"
 
 - name: Sway | Include configuration setup
   ansible.builtin.include_tasks: config.yml
@@ -100,7 +100,7 @@
   ansible.builtin.include_tasks: greetd.yml
   when:
     - sway_install_greetd | bool
-    - ansible_os_family == "Archlinux"
+    - ansible_facts['os_family'] == "Archlinux"
 
 - name: Sway | Include Slack Wayland compatibility
   ansible.builtin.include_tasks: slack.yml

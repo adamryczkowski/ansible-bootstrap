@@ -15,14 +15,14 @@
     name: pipx
     state: present
   become: true
-  when: ansible_os_family == "Debian"
+  when: ansible_facts['os_family'] == "Debian"
 
 - name: Sway | Ensure pipx is installed (Arch Linux)
   community.general.pacman:
     name: python-pipx
     state: present
   become: true
-  when: ansible_os_family == "Archlinux"
+  when: ansible_facts['os_family'] == "Archlinux"
 
 - name: Sway | Ensure pipx path is configured for user
   ansible.builtin.command:

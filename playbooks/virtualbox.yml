@@ -14,7 +14,7 @@
 
   vars:
     # Override target_user for localhost runs
-    target_user: "{{ ansible_user_id }}"
+    target_user: "{{ ansible_facts['user_id'] }}"
 
   roles:
     - role: virtualbox

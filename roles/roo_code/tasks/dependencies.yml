@@ -77,5 +77,5 @@
   become: true
   become_user: "{{ roo_code_username }}"
   environment:
-    PATH: "{{ roo_code_user_home }}/.local/bin:{{ ansible_env.PATH }}"
+    PATH: "{{ roo_code_user_home }}/.local/bin:{{ ansible_facts['env'].PATH }}"
   changed_when: false

@@ -32,10 +32,10 @@
       ansible.builtin.raw: |
         dpkg -s python3-cffi >/dev/null 2>&1 || apt-get update && apt-get install -y python3-cffi
       changed_when: false
-      when: ansible_os_family == "Debian"
+      when: ansible_facts['os_family'] == "Debian"
 
     - name: Update apt cache with broken repository handling
-      when: ansible_os_family == "Debian"
+      when: ansible_facts['os_family'] == "Debian"
       block:
         - name: Update apt cache
           ansible.builtin.apt:
@@ -106,13 +106,13 @@
           - ca-certificates
           - gnupg
         state: present
-      when: ansible_os_family == "Debian"
+      when: ansible_facts['os_family'] == "Debian"
 
     # Arch Linux specific pre-tasks
     - name: Update pacman cache (Arch Linux)
       community.general.pacman:
         update_cache: true
-      when: ansible_os_family == "Archlinux"
+      when: ansible_facts['os_family'] == "Archlinux"
 
     - name: Install essential packages (Arch Linux)
       community.general.pacman:
@@ -124,7 +124,7 @@
           - ca-certificates
           - gnupg
         state: present
-      when: ansible_os_family == "Archlinux"
+      when: ansible_facts['os_family'] == "Archlinux"
 
   roles:
     - role: sway
@@ -132,7 +132,7 @@
         sway_username: "{{ target_user }}"
         # Install method is auto-detected based on OS family in defaults
         # sway_install_method: determined automatically (nix for Debian, native for Arch)
-        sway_install_foot_from_source: "{{ ansible_os_family == 'Debian' }}"
+        sway_install_foot_from_source: "{{ ansible_facts['os_family'] == 'Debian' }}"
         sway_install_fusuma: true
         sway_create_desktop_entry: true
       tags: [sway]
@@ -154,7 +154,7 @@
           - Foot config: ~/.config/foot/foot.ini
 
           Note: You may need to log out and log back in for group changes to take effect.
-      when: ansible_os_family == "Debian"
+      when: ansible_facts['os_family'] == "Debian"
 
     - name: Display completion message (Arch Linux)
       ansible.builtin.debug:
@@ -172,4 +172,4 @@
           - Foot config: ~/.config/foot/foot.ini
 
           Note: You may need to log out and log back in for group changes to take effect.
-      when: ansible_os_family == "Archlinux"
+      when: ansible_facts['os_family'] == "Archlinux"

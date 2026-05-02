@@ -57,4 +57,4 @@
   become: true
   listen: Run pam-auth-update
   # Only runs on Debian/Ubuntu systems
-  when: ansible_os_family == "Debian"
+  when: ansible_facts['os_family'] == "Debian"

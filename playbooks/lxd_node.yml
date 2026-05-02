@@ -92,7 +92,7 @@
           LXD Container Configuration:
           - Target user: {{ target_user }}
           - CLI profile: {{ cli_tools_profile }}
-          - OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          - OS: {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}
 
   roles:
     # Base system configuration

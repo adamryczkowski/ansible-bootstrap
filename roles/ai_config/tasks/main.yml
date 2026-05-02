@@ -7,14 +7,14 @@
     state: present
     update_cache: false
   become: true
-  when: ansible_os_family == "Debian"
+  when: ansible_facts['os_family'] == "Debian"
 
 - name: AI Config | Install git (Arch)
   community.general.pacman:
     name: git
     state: present
   become: true
-  when: ansible_os_family == "Archlinux"
+  when: ansible_facts['os_family'] == "Archlinux"
 
 - name: AI Config | Look up user home directory
   ansible.builtin.getent:

@@ -15,7 +15,7 @@
         msg: |
           Claude Code Test Configuration:
           - Target user: {{ target_user }}
-          - OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          - OS: {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}
 
     - name: Update apt cache
       ansible.builtin.apt:

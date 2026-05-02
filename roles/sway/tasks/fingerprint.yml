@@ -30,7 +30,7 @@
   become: true
   when:
     - sway_fingerprint_reader_detected | bool
-    - ansible_os_family == "Debian"
+    - ansible_facts['os_family'] == "Debian"
 
 - name: Fingerprint | Install fingerprint packages (Arch Linux)
   community.general.pacman:
@@ -39,7 +39,7 @@
   become: true
   when:
     - sway_fingerprint_reader_detected | bool
-    - ansible_os_family == "Archlinux"
+    - ansible_facts['os_family'] == "Archlinux"
 
 # === Phase 3: PAM Configuration ===
 
@@ -54,7 +54,7 @@
   notify: Run pam-auth-update
   when:
     - sway_fingerprint_reader_detected | bool
-    - ansible_os_family == "Debian"
+    - ansible_facts['os_family'] == "Debian"
 
 # Arch Linux: Modify PAM files directly
 - name: Fingerprint | Check if pam_fprintd.so is already configured (Arch Linux)
@@ -65,7 +65,7 @@
   failed_when: false
   when:
     - sway_fingerprint_reader_detected | bool
-    - ansible_os_family == "Archlinux"
+    - ansible_facts['os_family'] == "Archlinux"
 
 - name: Fingerprint | Add pam_fprintd.so to system-auth (Arch Linux)
   ansible.builtin.lineinfile:
@@ -76,7 +76,7 @@
   become: true
   when:
     - sway_fingerprint_reader_detected | bool
-    - ansible_os_family == "Archlinux"
+    - ansible_facts['os_family'] == "Archlinux"
     - sway_pam_fprintd_check.rc != 0
 
 # === Phase 4: User Configuration ===

@@ -12,7 +12,7 @@
     state: present
     update_cache: true
     cache_valid_time: 3600
-  when: ansible_os_family == "Debian"
+  when: ansible_facts['os_family'] == "Debian"
 
 - name: Install XDG Desktop Portal packages (Arch Linux)
   become: true
@@ -22,7 +22,7 @@
       - xdg-desktop-portal-gtk
       - xdg-desktop-portal-wlr
     state: present
-  when: ansible_os_family == "Archlinux"
+  when: ansible_facts['os_family'] == "Archlinux"
 
 - name: Deploy Sway portal configuration
   become: true

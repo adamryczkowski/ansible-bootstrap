@@ -9,7 +9,7 @@
 
 - name: Roo-Code | Set user home directory
   ansible.builtin.set_fact:
-    roo_code_user_home: "{{ ansible_env.HOME if ansible_user == roo_code_username else '/home/' + roo_code_username }}"
+    roo_code_user_home: "{{ ansible_facts['env'].HOME if ansible_user == roo_code_username else '/home/' + roo_code_username }}"
 
 - name: Roo-Code | Expand MCP base directory
   ansible.builtin.set_fact:

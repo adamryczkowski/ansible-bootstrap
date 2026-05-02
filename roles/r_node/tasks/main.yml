@@ -10,7 +10,7 @@
 
 - name: R Node | Add CRAN repository
   ansible.builtin.apt_repository:
-    repo: "deb https://cloud.r-project.org/bin/linux/ubuntu {{ ansible_distribution_release }}-cran40/"
+    repo: "deb https://cloud.r-project.org/bin/linux/ubuntu {{ ansible_facts['distribution_release'] }}-cran40/"
     filename: r-cran
     state: present
   become: true
@@ -50,7 +50,7 @@
 
     - name: R Node | Download RStudio
       ansible.builtin.get_url:
-        url: "https://download1.rstudio.org/electron/{{ ansible_distribution_release }}/amd64/rstudio-{{ r_node_rstudio_version }}-amd64.deb"
+        url: "https://download1.rstudio.org/electron/{{ ansible_facts['distribution_release'] }}/amd64/rstudio-{{ r_node_rstudio_version }}-amd64.deb"
         dest: "/tmp/rstudio-{{ r_node_rstudio_version }}-amd64.deb"
         mode: "0644"
       when: r_node_rstudio_check.rc != 0
@@ -85,7 +85,7 @@
 
     - name: R Node | Download RStudio Server
       ansible.builtin.get_url:
-        url: "https://download2.rstudio.org/server/{{ ansible_distribution_release }}/amd64/rstudio-server-{{ r_node_rstudio_server_version }}-amd64.deb"
+        url: "https://download2.rstudio.org/server/{{ ansible_facts['distribution_release'] }}/amd64/rstudio-server-{{ r_node_rstudio_server_version }}-amd64.deb"
         dest: "/tmp/rstudio-server-{{ r_node_rstudio_server_version }}-amd64.deb"
         mode: "0644"
       when: r_node_rstudio_server_check.rc != 0
@@ -106,7 +106,7 @@
 
 - name: R Node | Create R user library directory
   ansible.builtin.file:
-    path: "/home/{{ r_node_username }}/R/{{ ansible_architecture }}-pc-linux-gnu-library/{{ r_node_r_version }}"
+    path: "/home/{{ r_node_username }}/R/{{ ansible_facts['architecture'] }}-pc-linux-gnu-library/{{ r_node_r_version }}"
     state: directory
     mode: "0755"
     owner: "{{ r_node_username }}"

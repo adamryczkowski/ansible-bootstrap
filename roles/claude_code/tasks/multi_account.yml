@@ -15,14 +15,14 @@
     update_cache: true
     cache_valid_time: 3600
   become: true
-  when: ansible_os_family == "Debian"
+  when: ansible_facts['os_family'] == "Debian"
 
 - name: Claude Code | Multi-account | Install bubblewrap (Arch)
   community.general.pacman:
     name: bubblewrap
     state: present
   become: true
-  when: ansible_os_family == "Archlinux"
+  when: ansible_facts['os_family'] == "Archlinux"
 
 - name: Claude Code | Multi-account | Create per-account directories
   ansible.builtin.file:

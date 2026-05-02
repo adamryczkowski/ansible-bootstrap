@@ -33,7 +33,7 @@
           - Install dir: {{ gotify_install_dir | default('/opt/gotify') }}
           - Config dir:  {{ gotify_config_dir | default('/etc/gotify') }}
           - Port:        {{ gotify_port | default(1486) }}
-          - OS:          {{ ansible_distribution }} {{ ansible_distribution_version }}
+          - OS:          {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}
 
     - name: Update apt cache
       ansible.builtin.apt:

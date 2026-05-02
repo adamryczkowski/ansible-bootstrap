@@ -54,22 +54,22 @@
     - name: Check if running Ubuntu
       ansible.builtin.assert:
         that:
-          - ansible_distribution == "Ubuntu"
+          - ansible_facts['distribution'] == "Ubuntu"
         fail_msg: "This playbook is designed for Ubuntu systems only"
-        success_msg: "Running on Ubuntu {{ ansible_distribution_version }}"
+        success_msg: "Running on Ubuntu {{ ansible_facts['distribution_version'] }}"
 
     - name: Check Ubuntu version
       ansible.builtin.assert:
         that:
-          - ansible_distribution_version is version('22.04', '>=')
+          - ansible_facts['distribution_version'] is version('22.04', '>=')
         fail_msg: "Ubuntu 22.04 LTS or newer is required"
-        success_msg: "Ubuntu {{ ansible_distribution_version }} is supported"
+        success_msg: "Ubuntu {{ ansible_facts['distribution_version'] }} is supported"
 
     - name: Check available memory
       ansible.builtin.debug:
         msg: >-
-          Available memory: {{ ansible_memtotal_mb }}MB.
-          {% if ansible_memtotal_mb < 8000 %}
+          Available memory: {{ ansible_facts['memtotal_mb'] }}MB.
+          {% if ansible_facts['memtotal_mb'] < 8000 %}
           WARNING: Less than 8GB RAM detected. The server may experience performance issues.
           Recommended: 8GB minimum, 12GB+ for larger servers.
           {% else %}

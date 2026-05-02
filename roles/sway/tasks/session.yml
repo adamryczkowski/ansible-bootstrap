@@ -12,7 +12,7 @@
   become: true
   when:
     - sway_enable_wayland_in_gdm | default(true) | bool
-    - ansible_os_family == "Debian"
+    - ansible_facts['os_family'] == "Debian"
   failed_when: false  # GDM may not be installed
 
 - name: Sway | Enable Wayland in GDM configuration (Arch Linux)
@@ -25,7 +25,7 @@
   become: true
   when:
     - sway_enable_wayland_in_gdm | default(true) | bool
-    - ansible_os_family == "Archlinux"
+    - ansible_facts['os_family'] == "Archlinux"
   failed_when: false  # GDM may not be installed
 
 - name: Sway | Ensure wayland-sessions directory exists

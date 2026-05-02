@@ -14,14 +14,14 @@
     name: iotop-c
     state: present
   become: true
-  when: ansible_os_family == "Debian"
+  when: ansible_facts['os_family'] == "Debian"
 
 - name: Sway | Install iotop package (Arch Linux)
   community.general.pacman:
     name: iotop
     state: present
   become: true
-  when: ansible_os_family == "Archlinux"
+  when: ansible_facts['os_family'] == "Archlinux"
 
 - name: Sway | Get full path to iotop binary (resolve symlinks)
   ansible.builtin.command:

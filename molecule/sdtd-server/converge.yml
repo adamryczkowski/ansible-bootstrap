@@ -25,7 +25,7 @@
           7 Days to Die Server Molecule Test
           - Target user: {{ sdtd_server_username }}
           - Server name: {{ sdtd_server_name }}
-          - OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          - OS: {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}
 
     - name: Update apt cache
       ansible.builtin.apt:

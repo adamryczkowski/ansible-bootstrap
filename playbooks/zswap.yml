@@ -42,16 +42,16 @@
     - name: Check if running Ubuntu
       ansible.builtin.assert:
         that:
-          - ansible_distribution == "Ubuntu"
+          - ansible_facts['distribution'] == "Ubuntu"
         fail_msg: "This playbook is designed for Ubuntu systems only"
-        success_msg: "Running on Ubuntu {{ ansible_distribution_version }}"
+        success_msg: "Running on Ubuntu {{ ansible_facts['distribution_version'] }}"
 
     - name: Check Ubuntu version
       ansible.builtin.debug:
         msg: >-
-          Running on Ubuntu {{ ansible_distribution_version }}
-          ({{ ansible_distribution_release }}).
-          {% if ansible_distribution_version is version('24.04', '<') %}
+          Running on Ubuntu {{ ansible_facts['distribution_version'] }}
+          ({{ ansible_facts['distribution_release'] }}).
+          {% if ansible_facts['distribution_version'] is version('24.04', '<') %}
           WARNING: This playbook is optimized for Ubuntu 24.04 LTS.
           Some features may not work on older versions.
           {% endif %}

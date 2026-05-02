@@ -14,7 +14,7 @@
 
 - name: OpenWRT Conduwuit Preflight | Register architecture fact
   ansible.builtin.set_fact:
-    openwrt_conduwuit_arch: "{{ ansible_architecture }}"
+    openwrt_conduwuit_arch: "{{ ansible_facts['architecture'] }}"
   tags:
     - openwrt_conduwuit_preflight
 
@@ -29,7 +29,7 @@
 
 - name: OpenWRT Conduwuit Preflight | Get total RAM in MB
   ansible.builtin.set_fact:
-    openwrt_conduwuit_ram_mb: "{{ (ansible_memtotal_mb | int) }}"
+    openwrt_conduwuit_ram_mb: "{{ (ansible_facts['memtotal_mb'] | int) }}"
   tags:
     - openwrt_conduwuit_preflight
 
