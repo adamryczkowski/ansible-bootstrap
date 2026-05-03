@@ -1,7 +1,7 @@
 ---
 # Desktop laptop-specific tasks
 
-- name: Desktop Laptop | Install laptop-specific packages
+- name: Desktop Laptop | Install laptop-specific packages (Debian/Ubuntu)
   ansible.builtin.apt:
     name:
       - tlp
@@ -10,6 +10,18 @@
       - acpi
     state: present
   become: true
+  when: ansible_facts['os_family'] == "Debian"
+
+- name: Desktop Laptop | Install laptop-specific packages (Arch)
+  community.general.pacman:
+    name:
+      - tlp
+      - tlp-rdw
+      - powertop
+      - acpi
+    state: present
+  become: true
+  when: ansible_facts['os_family'] == "Archlinux"
 
 - name: Desktop Laptop | Enable TLP service
   ansible.builtin.systemd:
@@ -18,7 +30,7 @@
     state: started
   become: true
 
-- name: Desktop Laptop | Configure power settings
+- name: Desktop Laptop | Configure GNOME power settings
   community.general.dconf:
     key: "{{ item.key }}"
     value: "{{ item.value }}"
@@ -32,13 +44,27 @@
       value: "'suspend'"
     - key: "/org/gnome/settings-daemon/plugins/power/sleep-inactive-battery-timeout"
       value: "1800"
+  # dconf requires a running dbus session and the dconf binary; on a sway-only
+  # Arch host these power keys belong to a desktop the user isn't running.
+  when: desktop_tweak_gnome | bool
 
-- name: Desktop Laptop | Install redshift for screen color temperature
+- name: Desktop Laptop | Install redshift for screen color temperature (Debian/Ubuntu)
   ansible.builtin.apt:
     name: redshift-gtk
     state: present
   become: true
-  when: desktop_install_redshift | bool
+  when:
+    - desktop_install_redshift | bool
+    - ansible_facts['os_family'] == "Debian"
+
+- name: Desktop Laptop | Install redshift for screen color temperature (Arch)
+  community.general.pacman:
+    name: redshift
+    state: present
+  become: true
+  when:
+    - desktop_install_redshift | bool
+    - ansible_facts['os_family'] == "Archlinux"
 
 - name: Desktop Laptop | Create redshift configuration directory
   ansible.builtin.file:

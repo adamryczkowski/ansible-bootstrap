@@ -11,10 +11,18 @@
   become: true
 
 - name: Desktop Base | Install base desktop packages
-  ansible.builtin.apt:
+  ansible.builtin.package:
     name: "{{ desktop_base_packages }}"
     state: present
   become: true
+
+# gdebi-core lives only on Debian-family — used to install local .deb files.
+- name: Desktop Base | Install gdebi-core (Debian/Ubuntu)
+  ansible.builtin.apt:
+    name: gdebi-core
+    state: present
+  become: true
+  when: ansible_facts['os_family'] == "Debian"
 
 - name: Desktop Base | Copy discover_session_bus_address script
   ansible.builtin.copy:

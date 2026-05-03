@@ -18,3 +18,10 @@ vscode_sources_file: "/etc/apt/sources.list.d/vscode.sources"
 
 # Architecture (amd64 for x86_64)
 vscode_architecture: "amd64"
+
+# Pacman package name on Arch. The official `code` package is the
+# open-source build of VS Code from the Microsoft repository (no
+# proprietary binaries / extension marketplace branding). The
+# Microsoft-branded `visual-studio-code-bin` is in AUR — install it
+# manually if you specifically need that build.
+vscode_pacman_package: "code"

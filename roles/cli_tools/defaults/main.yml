@@ -62,7 +62,12 @@ cli_tools_apt: >-
 # =============================================================================
 
 # Base pacman packages (installed for both profiles).
-# Names differ from Debian: build-essential -> base-devel; python3-* -> python-*.
+# Names differ from Debian:
+#   build-essential -> base-devel
+#   python3-*       -> python-*
+# inetutils provides /usr/bin/hostname which scripts (incl. third-party ones
+# the AI prompts repo ships) commonly assume; Debian has it via the base
+# `hostname` package, Arch's base install omits it entirely.
 cli_tools_pacman_base:
   - jq
   - htop
@@ -76,13 +81,15 @@ cli_tools_pacman_base:
   - git-lfs
   - make
   - base-devel
+  - inetutils
 
 # Additional pacman packages for 'full' profile.
-# liquidprompt and prettyping live in AUR only; skip here, install via AUR or rust tools.
+# liquidprompt, prettyping, byobu, dtrx live in AUR only or have no Arch
+# counterpart; skip here. Install via AUR (yay/paru) if specifically needed.
+# aptitude is Debian-specific (apt frontend) and intentionally omitted.
 cli_tools_pacman_full:
   - btop
   - ncdu
-  - byobu
   - mc
   - entr
   - neovim
@@ -105,8 +112,10 @@ cli_tools_install_mise: true
 # fzf (fuzzy finder) - both profiles
 cli_tools_install_fzf: true
 
-# liquidprompt - full profile only (replaces starship)
-cli_tools_install_liquidprompt: "{{ cli_tools_profile == 'full' }}"
+# liquidprompt - full profile only, Debian/Ubuntu only.
+# Liquidprompt isn't in Arch's official repos (AUR only) and the activation
+# script `liquidprompt_activate` is provided by the Debian package.
+cli_tools_install_liquidprompt: "{{ cli_tools_profile == 'full' and ansible_facts['os_family'] == 'Debian' }}"
 
 # zoxide (smarter cd) - full profile only (requires rust role)
 cli_tools_install_zoxide: "{{ cli_tools_profile == 'full' }}"

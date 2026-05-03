@@ -7,9 +7,8 @@ user_setup_username: "{{ target_user | default(ansible_user) | default('adam') }
 # User shell
 user_setup_shell: /bin/bash
 
-# Groups to add user to
-user_setup_groups:
-  - sudo
+# Groups to add user to. Arch uses `wheel` for sudoers; Debian/Ubuntu uses `sudo`.
+user_setup_groups: "{{ ['wheel'] if ansible_facts['os_family'] == 'Archlinux' else ['sudo'] }}"
 
 # Whether to generate SSH key
 user_setup_generate_ssh_key: true

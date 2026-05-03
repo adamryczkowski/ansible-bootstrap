@@ -7,13 +7,14 @@
   become: true
   when: common_hostname is defined and common_hostname | length > 0
 
-- name: Common | Configure locale
+- name: Common | Configure locale (Debian/Ubuntu)
   ansible.builtin.locale_gen:
     name: "{{ common_locale }}"
     state: present
   become: true
+  when: ansible_facts['os_family'] == "Debian"
 
-- name: Common | Set default locale
+- name: Common | Set default locale (Debian/Ubuntu)
   ansible.builtin.copy:
     content: |
       LANG={{ common_locale }}
@@ -23,6 +24,40 @@
     group: root
     mode: "0644"
   become: true
+  when: ansible_facts['os_family'] == "Debian"
+
+# Arch: glibc ships /etc/locale.gen with most lines commented; uncomment the
+# requested locale and run locale-gen, then write /etc/locale.conf.
+- name: Common | Uncomment locale in /etc/locale.gen (Arch)
+  ansible.builtin.lineinfile:
+    path: /etc/locale.gen
+    regexp: '^[#\s]*({{ common_locale }}\s+UTF-8)\s*$'
+    line: '\1'
+    backrefs: true
+    state: present
+  become: true
+  when: ansible_facts['os_family'] == "Archlinux"
+  register: common_arch_locale_gen
+
+- name: Common | Run locale-gen (Arch)
+  ansible.builtin.command:
+    cmd: locale-gen
+  become: true
+  when:
+    - ansible_facts['os_family'] == "Archlinux"
+    - common_arch_locale_gen.changed
+  changed_when: true
+
+- name: Common | Set system locale via /etc/locale.conf (Arch)
+  ansible.builtin.copy:
+    content: |
+      LANG={{ common_locale }}
+    dest: /etc/locale.conf
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  when: ansible_facts['os_family'] == "Archlinux"
 
 - name: Common | Set timezone
   community.general.timezone:
@@ -40,7 +75,7 @@
   become: true
   when: common_sudoers_nopasswd | length > 0
 
-- name: Common | Ensure /etc/apt/keyrings directory exists
+- name: Common | Ensure /etc/apt/keyrings directory exists (Debian/Ubuntu)
   ansible.builtin.file:
     path: /etc/apt/keyrings
     state: directory
@@ -48,6 +83,7 @@
     group: root
     mode: "0755"
   become: true
+  when: ansible_facts['os_family'] == "Debian"
 
 - name: Common | Configure sysctl settings
   ansible.posix.sysctl:

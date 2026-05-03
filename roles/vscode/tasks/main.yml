@@ -1,12 +1,17 @@
 ---
-# VS Code role - Install Visual Studio Code from Microsoft's official repository
+# VS Code role - Install Visual Studio Code
 #
-# This role installs VS Code on Debian/Ubuntu systems using Microsoft's
-# official APT repository with DEB822 format (Ubuntu 24.04+).
+# Debian/Ubuntu: Microsoft's official APT repository (DEB822 format).
+# Arch:          official `code` package (open-source build) from extra repo.
+#                For the Microsoft-branded binary, install
+#                `visual-studio-code-bin` from AUR manually — we don't pull
+#                AUR helpers from this role.
 #
 # Reference: https://code.visualstudio.com/docs/setup/linux
 
-- name: VS Code | Install prerequisites
+# ─── Debian/Ubuntu ───────────────────────────────────────────────────────────
+
+- name: VS Code | Install prerequisites (Debian/Ubuntu)
   ansible.builtin.apt:
     name:
       - apt-transport-https
@@ -16,27 +21,31 @@
     state: present
     update_cache: true
   become: true
+  when: ansible_facts['os_family'] == "Debian"
 
-- name: VS Code | Download Microsoft GPG key
+- name: VS Code | Download Microsoft GPG key (Debian/Ubuntu)
   ansible.builtin.get_url:
     url: "{{ vscode_gpg_key_url }}"
     dest: /tmp/microsoft.asc
     mode: '0644'
   become: true
+  when: ansible_facts['os_family'] == "Debian"
 
-- name: VS Code | Convert GPG key to binary format
+- name: VS Code | Convert GPG key to binary format (Debian/Ubuntu)
   ansible.builtin.command:
     cmd: gpg --dearmor -o {{ vscode_gpg_keyring_path }} /tmp/microsoft.asc
     creates: "{{ vscode_gpg_keyring_path }}"
   become: true
+  when: ansible_facts['os_family'] == "Debian"
 
-- name: VS Code | Set GPG keyring permissions
+- name: VS Code | Set GPG keyring permissions (Debian/Ubuntu)
   ansible.builtin.file:
     path: "{{ vscode_gpg_keyring_path }}"
     mode: '0644'
     owner: root
     group: root
   become: true
+  when: ansible_facts['os_family'] == "Debian"
 
 - name: VS Code | Add Microsoft APT repository (DEB822 format)
   ansible.builtin.copy:
@@ -55,21 +64,35 @@
     group: root
   become: true
   register: vscode_repo_added
+  when: ansible_facts['os_family'] == "Debian"
 
 - name: VS Code | Update APT cache after adding repository
   ansible.builtin.apt:
     update_cache: true
   become: true
-  when: vscode_repo_added.changed
+  when:
+    - ansible_facts['os_family'] == "Debian"
+    - vscode_repo_added.changed | default(false)
 
-- name: VS Code | Install VS Code
+- name: VS Code | Install VS Code (Debian/Ubuntu)
   ansible.builtin.apt:
     name: "{{ vscode_package_name }}"
     state: present
   become: true
+  when: ansible_facts['os_family'] == "Debian"
 
-- name: VS Code | Clean up temporary GPG key
+- name: VS Code | Clean up temporary GPG key (Debian/Ubuntu)
   ansible.builtin.file:
     path: /tmp/microsoft.asc
     state: absent
   become: true
+  when: ansible_facts['os_family'] == "Debian"
+
+# ─── Arch Linux ──────────────────────────────────────────────────────────────
+
+- name: VS Code | Install code from official repos (Arch)
+  community.general.pacman:
+    name: "{{ vscode_pacman_package }}"
+    state: present
+  become: true
+  when: ansible_facts['os_family'] == "Archlinux"

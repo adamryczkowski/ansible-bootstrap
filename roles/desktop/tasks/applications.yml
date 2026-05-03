@@ -2,19 +2,30 @@
 # Desktop applications tasks
 
 - name: Desktop Apps | Install common desktop applications
-  ansible.builtin.apt:
+  ansible.builtin.package:
     name: "{{ desktop_applications }}"
     state: present
   become: true
 
-- name: Desktop Apps | Install Flatpak
+- name: Desktop Apps | Install Flatpak (Debian/Ubuntu)
   ansible.builtin.apt:
     name:
       - flatpak
       - gnome-software-plugin-flatpak
     state: present
   become: true
-  when: desktop_install_flatpak | bool
+  when:
+    - desktop_install_flatpak | bool
+    - ansible_facts['os_family'] == "Debian"
+
+- name: Desktop Apps | Install Flatpak (Arch)
+  community.general.pacman:
+    name: flatpak
+    state: present
+  become: true
+  when:
+    - desktop_install_flatpak | bool
+    - ansible_facts['os_family'] == "Archlinux"
 
 - name: Desktop Apps | Add Flathub repository
   community.general.flatpak_remote:
@@ -32,11 +43,15 @@
   loop: "{{ desktop_flatpak_apps }}"
   when: desktop_install_flatpak | bool and desktop_flatpak_apps | length > 0
 
-- name: Desktop Apps | Install Snap applications
+# Snap is Debian/Ubuntu-only by default. On Arch snapd lives in AUR; we
+# don't auto-install it here.
+- name: Desktop Apps | Install Snap applications (Debian/Ubuntu only)
   community.general.snap:
     name: "{{ item.name }}"
     classic: "{{ item.classic | default(false) }}"
     state: present
   become: true
   loop: "{{ desktop_snap_apps }}"
-  when: desktop_snap_apps | length > 0
+  when:
+    - desktop_snap_apps | length > 0
+    - ansible_facts['os_family'] == "Debian"

@@ -60,20 +60,13 @@
   when: bashrc_custom_snippets | length > 0
 
 - name: Bashrc | Download bash-preexec if enabled
-  ansible.builtin.command:
-    cmd: >-
-      wget -q -O /home/{{ bashrc_username }}/.bash-preexec.sh
-      https://raw.githubusercontent.com/rcaloras/bash-preexec/master/bash-preexec.sh
-    creates: "/home/{{ bashrc_username }}/.bash-preexec.sh"
-  become: true
-  when: bashrc_install_preexec | bool
-
-- name: Bashrc | Set bash-preexec permissions
-  ansible.builtin.file:
-    path: "/home/{{ bashrc_username }}/.bash-preexec.sh"
+  ansible.builtin.get_url:
+    url: https://raw.githubusercontent.com/rcaloras/bash-preexec/master/bash-preexec.sh
+    dest: "/home/{{ bashrc_username }}/.bash-preexec.sh"
     mode: "0644"
     owner: "{{ bashrc_username }}"
     group: "{{ bashrc_username }}"
+    force: false
   become: true
   when: bashrc_install_preexec | bool
 

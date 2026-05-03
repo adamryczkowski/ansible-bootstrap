@@ -49,10 +49,13 @@
   register: ai_config_ai_prompts_set_remote_result
   changed_when: "'changed' in ai_config_ai_prompts_set_remote_result.stdout"
 
+# Use the gathered fact instead of shelling out to `hostname`. The
+# `hostname` binary lives in `inetutils` on Arch and isn't part of the
+# base install, so the previous shell-out failed there.
 - name: AI Config | Get target hostname
-  ansible.builtin.command: hostname
-  register: ai_config_ai_prompts_target_hostname
-  changed_when: false
+  ansible.builtin.set_fact:
+    ai_config_ai_prompts_target_hostname:
+      stdout: "{{ ansible_facts['hostname'] }}"
 
 - name: AI Config | Get target IP address
   ansible.builtin.set_fact:

@@ -12,10 +12,9 @@ desktop_tweak_smb: false
 desktop_tweak_laptop: false
 desktop_tweak_applications: true
 
-# Base packages
+# Base packages. gdebi-core is Debian-only and added in tasks/base.yml.
 desktop_base_packages:
   - git
-  - gdebi-core
   - curl
   - wget
 
@@ -59,11 +58,24 @@ desktop_redshift_temp_night: 4500
 desktop_redshift_latitude: 52.2297
 desktop_redshift_longitude: 21.0122
 
-# Applications
-desktop_applications:
+# Applications. Defaults differ slightly between Debian/Ubuntu (chromium-browser
+# package, gnome-software-plugin-flatpak available) and Arch (chromium package
+# name, no Flatpak GNOME software plugin). Override per host as needed.
+desktop_applications: "{{ desktop_applications_arch if ansible_facts['os_family'] == 'Archlinux' else desktop_applications_debian }}"
+
+desktop_applications_debian:
   - meld
   - gparted
   - chromium-browser
+  - vlc
+  - gimp
+  - inkscape
+  - keepassxc
+
+desktop_applications_arch:
+  - meld
+  - gparted
+  - chromium
   - vlc
   - gimp
   - inkscape

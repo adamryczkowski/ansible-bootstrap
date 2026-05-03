@@ -17,6 +17,27 @@
     state: present
   become: true
 
+# greetd's session worker does not register a logind seat the way GDM/SDDM
+# do, so wlroots can't open a seat via the logind backend and falls back
+# to seatd. Without `seatd` running, sway exits with:
+#   "Backend 'seatd' failed to open seat" / "Backend 'logind' failed to open seat"
+#   "No backend was able to open a seat"
+# The fix: enable seatd (which exposes /run/seatd.sock owned by group `seat`)
+# and add the target user to the `seat` group.
+- name: Sway | Enable seatd service (Arch greetd seat backend)
+  ansible.builtin.systemd:
+    name: seatd
+    enabled: true
+    state: started
+  become: true
+
+- name: Sway | Add user to seat group for libseat access
+  ansible.builtin.user:
+    name: "{{ sway_username }}"
+    groups: seat
+    append: true
+  become: true
+
 - name: Sway | Ensure greetd configuration directory exists
   ansible.builtin.file:
     path: /etc/greetd

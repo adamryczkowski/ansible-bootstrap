@@ -22,7 +22,7 @@
 #         - zoxide
 #         - starship
 
-- name: Rust | Install system dependencies
+- name: Rust | Install system dependencies (Debian/Ubuntu)
   ansible.builtin.apt:
     name:
       - pkgconf
@@ -32,6 +32,17 @@
     update_cache: true
     cache_valid_time: 3600
   become: true
+  when: ansible_facts['os_family'] == "Debian"
+
+- name: Rust | Install system dependencies (Arch)
+  community.general.pacman:
+    name:
+      - pkgconf
+      - openssl
+      - zlib
+    state: present
+  become: true
+  when: ansible_facts['os_family'] == "Archlinux"
 
 - name: Rust | Check if rustup is installed
   ansible.builtin.stat:
@@ -105,23 +116,53 @@
     CARGO_HOME: "/home/{{ rust_username }}/.cargo"
   changed_when: true
 
-- name: Rust | Install Rust packages via binstall
+# `cargo install --list` produces a header line per crate of the form
+# `<crate> v<version> (<source>):` followed by indented binary names. We use
+# that to skip crates that are already present, which avoids a ~10-30s
+# crates.io round-trip per crate per playbook run.
+- name: Rust | List installed cargo packages
+  ansible.builtin.command:
+    cmd: /home/{{ rust_username }}/.cargo/bin/cargo install --list
+  register: rust_installed_list
+  become: true
+  become_user: "{{ rust_username }}"
+  environment:
+    HOME: "/home/{{ rust_username }}"
+  changed_when: false
+  when: rust_packages | length > 0
+
+- name: Rust | Compute set of installed crate names
+  ansible.builtin.set_fact:
+    rust_installed_crates: >-
+      {{
+        rust_installed_list.stdout_lines
+        | default([])
+        | select('match', '^[^ ].* v.*:$')
+        | map('regex_replace', '^([^ ]+) v.*$', '\1')
+        | list
+      }}
+  when: rust_packages | length > 0
+
+- name: Rust | Install Rust packages via binstall (skip already installed)
   ansible.builtin.command: >
     /home/{{ rust_username }}/.cargo/bin/cargo binstall --no-confirm {{ item }}
   loop: "{{ rust_packages }}"
   become: true
   become_user: "{{ rust_username }}"
   register: rust_binstall_result
-  changed_when: "'Installed' in rust_binstall_result.stdout"
+  changed_when: rust_binstall_result.rc == 0
   failed_when:
     - rust_binstall_result.rc != 0
     - "'already installed' not in rust_binstall_result.stderr"
   environment:
     HOME: "/home/{{ rust_username }}"
     PATH: "/home/{{ rust_username }}/.cargo/bin:{{ ansible_facts['env']['PATH'] }}"
-  when: rust_packages | length > 0 and rust_install_binstall | bool
+  when:
+    - rust_packages | length > 0
+    - rust_install_binstall | bool
+    - item not in rust_installed_crates
 
-- name: Rust | Install Rust packages via cargo install (fallback)
+- name: Rust | Install Rust packages via cargo install (fallback, skip already installed)
   ansible.builtin.command: >
     /home/{{ rust_username }}/.cargo/bin/cargo install {{ item }}
   loop: "{{ rust_packages }}"
@@ -133,4 +174,7 @@
   environment:
     HOME: "/home/{{ rust_username }}"
     PATH: "/home/{{ rust_username }}/.cargo/bin:{{ ansible_facts['env']['PATH'] }}"
-  when: rust_packages | length > 0 and not rust_install_binstall | bool
+  when:
+    - rust_packages | length > 0
+    - not rust_install_binstall | bool
+    - item not in rust_installed_crates
