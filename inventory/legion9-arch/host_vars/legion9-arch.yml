@@ -1,0 +1,13 @@
+---
+# Host-specific overrides for legion9-arch.
+
+# ── Claude Code AI prompts source ───────────────────────────────────────────
+# The role's default source_remote points at adam@192.168.42.206:~/tmp/AI,
+# but on this controller the working copy with the .claude/ subtree lives
+# at ~/.local/share/AI_prompts. Point legion9-arch at the working copy so
+# the .claude/agents symlinks created by ai_config land on real content.
+claude_code_ai_prompts:
+  enabled: true
+  source_remote: "adam@192.168.42.206:/home/adam/.local/share/AI_prompts"
+  github_remote: "git@github.com:adamryczkowski/AI-prompts.git"
+  dest_dir: "~/.local/share/AI_prompts"

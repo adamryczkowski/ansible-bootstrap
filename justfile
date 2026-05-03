@@ -156,6 +156,18 @@ upgrade-claude-hierarchy hostname:
 	ansible-playbook playbooks/claude_hierarchy.yml --limit {{hostname}} \
 		-e '{"claude_hierarchy_force_reinstall": true}'
 
+# Bootstrap an Arch host: locale, user, bashrc, full CLI tools (rust + cli_tools).
+# Pass the inventory containing the target host. Asks for sudo password.
+prepare-arch inventory profile="full":
+	ansible-playbook playbooks/prepare_arch.yml -i {{inventory}} \
+		-e cli_tools_profile={{profile}} -K
+
+# Deploy the full Sway desktop on the Lenovo Legion 9 (Arch).
+# Includes desktop, sway, vscode roles. Asks for sudo password.
+legion9-arch-setup:
+	ansible-playbook playbooks/legion9-arch-setup.yml \
+		-i inventory/legion9-arch/hosts.yml -K
+
 # Show Ansible configuration
 config:
 	ansible-config dump --only-changed

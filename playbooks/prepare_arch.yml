@@ -1,0 +1,105 @@
+---
+# Prepare Arch playbook - Base system configuration for Arch Linux.
+#
+# Counterpart of prepare_ubuntu.yml. Skips Ubuntu-only roles (apt_mirror,
+# snap_hold, packages — pacman handles all of those concerns natively) and
+# refreshes the pacman cache instead of apt.
+#
+# This playbook supports two CLI profiles:
+#   - minimal: Basic CLI tools for a functional command-line experience
+#   - full:    Enhanced CLI experience equivalent to --cli-improved flag
+#
+# Usage examples:
+#   ansible-playbook playbooks/prepare_arch.yml -i inventory/legion9-arch/hosts.yml
+#   ansible-playbook playbooks/prepare_arch.yml -i inventory/legion9-arch/hosts.yml -e cli_tools_profile=full
+#   ansible-playbook playbooks/prepare_arch.yml -i inventory/legion9-arch/hosts.yml -e target_user=adam -e cli_tools_profile=full -K
+
+- name: Prepare Arch system
+  hosts: all
+  become: true
+  # Defer fact gathering until python is guaranteed to exist on the host.
+  gather_facts: false
+
+  vars:
+    target_user: "{{ ansible_user | default('adam') }}"
+    # CLI profile: 'minimal' or 'full'
+    cli_tools_profile: minimal
+
+  pre_tasks:
+    # Fresh Arch installs often have no python at all, which means Ansible
+    # cannot run any module other than `raw`. Bootstrap python first.
+    - name: Bootstrap | Ensure python is installed (raw)
+      ansible.builtin.raw: |
+        if ! command -v python3 >/dev/null 2>&1 && ! command -v python >/dev/null 2>&1; then
+          pacman -Sy --noconfirm python python-cffi
+        fi
+      changed_when: false
+
+    - name: Bootstrap | Gather facts now that python exists
+      ansible.builtin.setup:
+
+    - name: Display configuration
+      ansible.builtin.debug:
+        msg: |
+          Prepare Arch Configuration:
+          - Target user: {{ target_user }}
+          - CLI profile: {{ cli_tools_profile }}
+          - OS: {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] | default('rolling') }}
+
+    - name: Refresh pacman package database
+      community.general.pacman:
+        update_cache: true
+      when: ansible_facts['os_family'] == "Archlinux"
+
+  roles:
+    # Base system configuration (locale, timezone, sysctl, VPN reconnect script)
+    - role: common
+      vars:
+        common_install_reconnect_vpn: true
+      tags: [common, base]
+
+    # User setup (create user, SSH keys, etc.). Default group is `wheel` on Arch.
+    - role: user_setup
+      vars:
+        user_setup_username: "{{ target_user }}"
+      tags: [user, base]
+
+    # Shell configuration (bashrc.d setup)
+    - role: bashrc
+      vars:
+        bashrc_username: "{{ target_user }}"
+      tags: [bashrc, base]
+
+    # Rust toolchain (required for full profile)
+    - role: rust
+      vars:
+        rust_username: "{{ target_user }}"
+        rust_packages: "{{ cli_tools_rust_packages | default([]) }}"
+      when: cli_tools_profile == 'full'
+      tags: [rust, cli]
+
+    # CLI tools (mise, fzf, and profile-specific tools)
+    - role: cli_tools
+      vars:
+        cli_tools_username: "{{ target_user }}"
+      tags: [cli_tools, cli]
+
+  post_tasks:
+    - name: Display completion message
+      ansible.builtin.debug:
+        msg: |
+          Arch system preparation complete!
+          - User: {{ target_user }}
+          - CLI profile: {{ cli_tools_profile }}
+          {% if cli_tools_profile == 'full' %}
+          Full profile includes:
+          - Rust toolchain with cargo-binstall
+          - Modern CLI tools: bat, eza, fd, ripgrep, zoxide, atuin, etc.
+          - Improved aliases: cat=bat, ls=eza, find=fd, grep=rg, etc.
+          - Nerd Fonts for terminal icons
+          {% else %}
+          Minimal profile includes:
+          - Basic CLI tools: htop, tmux, jq, git, etc.
+          - mise (polyglot runtime manager)
+          - fzf (fuzzy finder)
+          {% endif %}

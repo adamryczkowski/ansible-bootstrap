@@ -1,0 +1,126 @@
+---
+# Legion 9 (Arch) Sway desktop setup.
+#
+# Counterpart of thinkpad-sway-setup.yml for the Lenovo Legion 9 running
+# Arch Linux. Reuses the same desktop+sway+vscode roles. Differences from
+# the ThinkPad setup:
+#   - No Nix; Sway and ecosystem come from pacman directly.
+#   - GNOME and Nemo tweaks are off (no GNOME on this host).
+#   - Default privileged group is `wheel`, not `sudo`.
+#   - Fingerprint reader detection still runs but the Synaptics USB IDs
+#     in the role are ThinkPad-specific; the role no-ops cleanly when no
+#     supported reader is found.
+#
+# Usage:
+#   ansible-playbook -i inventory/legion9-arch/hosts.yml \
+#       playbooks/legion9-arch-setup.yml -K
+#
+# After this playbook, optionally run waybartool2 deployment:
+#   ansible-playbook -i inventory/legion9-arch/hosts.yml \
+#       playbooks/waybartool2.yml -K
+#
+# Manual follow-ups:
+#   1. Log out and select Sway from greetd
+#   2. (If applicable) sudo fprintd-enroll {{ target_user }}
+
+- name: Set up Sway, fingerprint, and VS Code on Lenovo Legion 9 (Arch)
+  hosts: legion9-arch
+  become: false
+  # Defer fact gathering until python is guaranteed to exist on the host.
+  gather_facts: false
+
+  vars:
+    sway_username: "{{ target_user }}"
+    # 'native' on Arch — Sway and ecosystem come from pacman.
+    sway_install_method: native
+    sway_install_foot_from_source: false
+    sway_enable_fingerprint_auth: true
+    sway_install_fusuma: true
+    sway_configure_gtk_theme: true
+    sway_install_bright: true
+    sway_fix_hardcoded_paths: true
+    sway_configure_lock_before_sleep: true
+    sway_configure_nethogs_sudoers: true
+    sway_configure_iotop: true
+    sway_configure_usbmon: true
+    sway_create_desktop_entry: true
+    # Arch has no GDM by default; greetd is configured by the sway role.
+    sway_enable_wayland_in_gdm: false
+    sway_deploy_custom_xkb_keymap: true
+    sway_fix_swayidle_monitor_wake: true
+    sway_configure_slack_wayland: true
+
+    # Desktop role: enable base + applications + laptop, skip the
+    # GNOME/Nemo bits since this is a Sway-only Arch host.
+    desktop_tweak_base: true
+    desktop_tweak_applications: true
+    desktop_tweak_laptop: true
+    desktop_tweak_gnome: false
+    desktop_tweak_nemo: false
+    desktop_tweak_smb: false
+    # Snap doesn't ship with Arch; Flatpak is fine and useful.
+    desktop_install_flatpak: true
+    desktop_snap_apps: []
+
+  pre_tasks:
+    - name: Bootstrap | Ensure python is installed (raw)
+      ansible.builtin.raw: |
+        if ! command -v python3 >/dev/null 2>&1 && ! command -v python >/dev/null 2>&1; then
+          pacman -Sy --noconfirm python python-cffi
+        fi
+      become: true
+      changed_when: false
+
+    - name: Bootstrap | Gather facts now that python exists
+      ansible.builtin.setup:
+
+    - name: Refresh pacman cache
+      community.general.pacman:
+        update_cache: true
+      become: true
+
+    - name: Display target system info
+      ansible.builtin.debug:
+        msg: |
+          Target system: {{ ansible_facts['hostname'] }}
+          OS: {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] | default('rolling') }}
+          User: {{ target_user }}
+
+  roles:
+    - role: desktop
+      tags: [desktop, applications]
+
+    - role: sway
+      tags: [sway, desktop]
+
+    - role: vscode
+      tags: [vscode, development]
+
+  post_tasks:
+    - name: Display post-installation instructions
+      ansible.builtin.debug:
+        msg: |
+          ============================================================
+          Arch / Legion 9 Sway setup complete.
+
+          NEXT STEPS:
+
+          1. (Optional) Enroll a fingerprint if hardware was detected:
+                sudo fprintd-enroll {{ target_user }}
+                fprintd-list {{ target_user }}
+
+          2. Reboot or log out — greetd should offer the Sway session.
+                sudo systemctl enable --now greetd
+
+          3. VS Code is installed (`code` from official repos).
+
+          4. To deploy waybartool2 (separately):
+                ansible-playbook -i inventory/legion9-arch/hosts.yml \
+                    playbooks/waybartool2.yml -K
+
+          NOTES:
+          - Configuration lives in ~/.config/i3-config/
+          - Sway config:   ~/.config/sway/config
+          - Waybar config: ~/.config/waybar/
+          - Foot config:   ~/.config/foot/foot.ini
+          ============================================================
