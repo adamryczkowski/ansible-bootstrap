@@ -1,0 +1,91 @@
+---
+# AUR helper role - bootstrap an AUR helper on Arch Linux.
+#
+# We need an AUR helper because some packages ship only via AUR (e.g.
+# liquidprompt, byobu, visual-studio-code-bin, swaylock-fprintd-git).
+# The official Arch path is to clone the helper's PKGBUILD from the AUR
+# and run makepkg -si. We use `paru-bin` (precompiled binary) to avoid
+# pulling the Rust toolchain just to bootstrap.
+#
+# This role is a no-op on non-Arch hosts.
+
+- name: AUR helper | Skip on non-Arch hosts
+  ansible.builtin.meta: end_play
+  when: ansible_facts['os_family'] != "Archlinux"
+
+- name: AUR helper | Ensure base build deps for makepkg
+  community.general.pacman:
+    name:
+      - base-devel
+      - git
+    state: present
+  become: true
+
+- name: AUR helper | Stat helper binary
+  ansible.builtin.stat:
+    path: "/usr/bin/{{ aur_helper_command }}"
+  register: aur_helper_stat
+
+- name: AUR helper | Build and install AUR helper
+  when: not aur_helper_stat.stat.exists
+  block:
+    # Remove any pre-existing -bin variant of the helper that would
+    # conflict on file ownership (e.g. paru-bin/paru-bin-debug ship the
+    # same /usr/bin/paru and /usr/lib/debug/usr/bin/paru.debug paths as
+    # the source-built paru/paru-debug). pacman refuses to overwrite a
+    # file owned by another package, so the makepkg -si install step
+    # fails late in the build with "exists in filesystem" unless we
+    # uninstall the bin variant first.
+    - name: AUR helper | Query conflicting -bin variant packages
+      ansible.builtin.command:
+        cmd: "pacman -Qq {{ aur_helper_aur_pkg }}-bin {{ aur_helper_aur_pkg }}-bin-debug"
+      register: aur_helper_bin_query
+      changed_when: false
+      failed_when: false
+
+    - name: AUR helper | Remove conflicting -bin variant packages
+      community.general.pacman:
+        name: "{{ aur_helper_bin_query.stdout_lines }}"
+        state: absent
+      become: true
+      when: aur_helper_bin_query.stdout_lines | length > 0
+
+    - name: AUR helper | Create build workdir
+      ansible.builtin.file:
+        path: "/tmp/aur-build-{{ aur_helper_aur_pkg }}"
+        state: directory
+        mode: "0755"
+        owner: "{{ aur_helper_username }}"
+        group: "{{ aur_helper_username }}"
+      become: true
+
+    - name: AUR helper | Clone PKGBUILD
+      ansible.builtin.git:
+        repo: "https://aur.archlinux.org/{{ aur_helper_aur_pkg }}.git"
+        dest: "/tmp/aur-build-{{ aur_helper_aur_pkg }}/{{ aur_helper_aur_pkg }}"
+        version: master
+        depth: 1
+      become: true
+      become_user: "{{ aur_helper_username }}"
+
+    - name: AUR helper | Build and install via makepkg
+      ansible.builtin.command:
+        cmd: makepkg -si --noconfirm --needed
+        chdir: "/tmp/aur-build-{{ aur_helper_aur_pkg }}/{{ aur_helper_aur_pkg }}"
+        creates: "/usr/bin/{{ aur_helper_command }}"
+      become: true
+      become_user: "{{ aur_helper_username }}"
+
+    - name: AUR helper | Clean up build workdir
+      ansible.builtin.file:
+        path: "/tmp/aur-build-{{ aur_helper_aur_pkg }}"
+        state: absent
+      become: true
+
+- name: AUR helper | Verify helper runs
+  ansible.builtin.command:
+    cmd: "{{ aur_helper_command }} --version"
+  register: aur_helper_verify
+  changed_when: false
+  become: true
+  become_user: "{{ aur_helper_username }}"

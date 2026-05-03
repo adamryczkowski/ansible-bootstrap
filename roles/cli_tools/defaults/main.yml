@@ -85,8 +85,8 @@ cli_tools_pacman_base:
 
 # Additional pacman packages for 'full' profile.
 # liquidprompt, prettyping, byobu, dtrx live in AUR only or have no Arch
-# counterpart; skip here. Install via AUR (yay/paru) if specifically needed.
-# aptitude is Debian-specific (apt frontend) and intentionally omitted.
+# counterpart; pulled in via cli_tools_aur_full below. aptitude is
+# Debian-specific (apt frontend) and intentionally omitted.
 cli_tools_pacman_full:
   - btop
   - ncdu
@@ -94,6 +94,21 @@ cli_tools_pacman_full:
   - entr
   - neovim
   - magic-wormhole
+
+# AUR packages installed via the aur_helper role's helper (paru by default).
+# Empty for the minimal profile; populated for full so users get the same
+# CLI experience as on Debian/Ubuntu hosts.
+cli_tools_aur_base: []
+
+cli_tools_aur_full:
+  - liquidprompt
+  - byobu
+
+cli_tools_aur: >-
+  {{
+    cli_tools_aur_base +
+    (cli_tools_aur_full if cli_tools_profile == 'full' else [])
+  }}
 
 # Combined pacman packages based on profile
 cli_tools_pacman: >-
@@ -112,10 +127,12 @@ cli_tools_install_mise: true
 # fzf (fuzzy finder) - both profiles
 cli_tools_install_fzf: true
 
-# liquidprompt - full profile only, Debian/Ubuntu only.
-# Liquidprompt isn't in Arch's official repos (AUR only) and the activation
-# script `liquidprompt_activate` is provided by the Debian package.
-cli_tools_install_liquidprompt: "{{ cli_tools_profile == 'full' and ansible_facts['os_family'] == 'Debian' }}"
+# liquidprompt activation - full profile.
+# On Debian/Ubuntu this comes from the apt liquidprompt package via
+# cli_tools_apt_full; on Arch it comes from AUR via cli_tools_aur_full
+# (installed by the aur_helper task chain). The bashrc.d snippet sources
+# /usr/share/liquidprompt/liquidprompt either way.
+cli_tools_install_liquidprompt: "{{ cli_tools_profile == 'full' }}"
 
 # zoxide (smarter cd) - full profile only (requires rust role)
 cli_tools_install_zoxide: "{{ cli_tools_profile == 'full' }}"

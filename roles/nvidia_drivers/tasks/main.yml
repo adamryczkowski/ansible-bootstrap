@@ -1,0 +1,416 @@
+---
+# nvidia_drivers role - install proprietary NVIDIA kernel modules + userspace
+# on Arch Linux. Skipped on non-Arch hosts (handle Debian/Ubuntu separately).
+#
+# Required because nouveau lacks working OpenGL/Vulkan for Ada Lovelace
+# (RTX 40 series) — wlroots-based compositors fall back to a software
+# rasterizer and fail with VK_ERROR_INCOMPATIBLE_DRIVER. Even on hosts
+# where Sway can run on the Intel iGPU (Hybrid Graphics), this role
+# lets PRIME-offload Vulkan and CUDA workloads to the dGPU.
+#
+# IMPORTANT: a reboot is required after this role runs for the modules
+# to actually load. The role does not reboot for you.
+
+- name: NVIDIA | Skip on non-Arch hosts
+  ansible.builtin.meta: end_play
+  when: ansible_facts['os_family'] != "Archlinux"
+
+- name: NVIDIA | Detect kernel headers package
+  ansible.builtin.shell: |
+    set -e
+    krel=$(uname -r)
+    case "$krel" in
+      *-lts) echo linux-lts-headers ;;
+      *-zen) echo linux-zen-headers ;;
+      *-hardened) echo linux-hardened-headers ;;
+      *) echo linux-headers ;;
+    esac
+  register: nvidia_kernel_headers_pkg
+  changed_when: false
+
+- name: NVIDIA | Install kernel headers (DKMS dependency)
+  community.general.pacman:
+    name: "{{ nvidia_kernel_headers_pkg.stdout }}"
+    state: present
+  become: true
+
+- name: NVIDIA | Install driver packages
+  community.general.pacman:
+    name: "{{ nvidia_userspace_packages }}"
+    state: present
+  become: true
+  register: nvidia_pacman_install
+
+# `nvidia-prime` provides `prime-run`, the canonical way to offload a
+# single application to the dGPU on a hybrid-graphics laptop:
+#     prime-run blender
+#     prime-run __NV_PRIME_RENDER_OFFLOAD=1 glxgears
+- name: NVIDIA | Install nvidia-prime (prime-run helper)
+  community.general.pacman:
+    name: "{{ nvidia_prime_package }}"
+    state: present
+  become: true
+  when: nvidia_install_prime | bool
+
+# Dynamic Power Management. Three module-option groups, each gated on
+# its own knob so non-hybrid hosts get only what they need:
+#   1. modprobe options that turn DPM on at module-load time
+#   2. udev rules that mark the GPU + audio function as runtime-PM-capable
+# After these land + a reboot, `cat /sys/bus/pci/devices/0000:01:00.0/power/runtime_status`
+# should read `suspended` when the GPU is idle.
+#
+# IMPORTANT: do NOT quote any param=value pair. modprobe parses
+# `options <module> NAME=VAL [NAME=VAL ...]` token-by-token; if NAME=VAL
+# is wrapped in quotes the whole thing becomes one literal token and
+# modprobe silently ignores it.
+- name: NVIDIA | Build modprobe.d content
+  ansible.builtin.set_fact:
+    nvidia_modprobe_lines: >-
+      {{
+        ([
+          'options nvidia NVreg_DynamicPowerManagement=' +
+          {'coarse': '0x01', 'fine': '0x02', 'default': '0x03', 'disabled': '0x00'}[nvidia_dpm_mode]
+        ] if nvidia_dynamic_power_management | bool else [])
+        +
+        (['options nvidia NVreg_EnableGpuFirmware=0']
+          if nvidia_disable_gsp_firmware | bool else [])
+        +
+        (['options nvidia_drm modeset=0 fbdev=0']
+          if nvidia_disable_drm_modeset | bool else [])
+      }}
+
+- name: NVIDIA | Write modprobe.d for nvidia power options
+  ansible.builtin.copy:
+    dest: /etc/modprobe.d/nvidia-pm.conf
+    content: |
+      # Managed by Ansible (nvidia_drivers role).
+      # See defaults/main.yml docstrings for what each line does and why.
+      {% for line in nvidia_modprobe_lines %}
+      {{ line }}
+      {% endfor %}
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  when: nvidia_modprobe_lines | length > 0
+  register: nvidia_pm_modprobe
+
+- name: NVIDIA | Remove modprobe.d when nothing to write
+  ansible.builtin.file:
+    path: /etc/modprobe.d/nvidia-pm.conf
+    state: absent
+  become: true
+  when: nvidia_modprobe_lines | length == 0
+
+- name: NVIDIA | Deploy runtime-PM udev rules
+  ansible.builtin.copy:
+    dest: /etc/udev/rules.d/80-nvidia-pm.rules
+    content: |
+      # Managed by Ansible (nvidia_drivers role).
+      # Mark the NVIDIA VGA controller and its audio companion as
+      # runtime-PM-capable so the kernel autosuspends them when idle.
+      # Vendor 0x10de = NVIDIA. Class 0x030000 = VGA, 0x030200 = 3D.
+      ACTION=="add", SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x030000", TEST=="power/control", ATTR{power/control}="auto"
+      ACTION=="add", SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x030200", TEST=="power/control", ATTR{power/control}="auto"
+      # PCI Audio Device (HDMI audio over the dGPU) — same handling.
+      ACTION=="add", SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x040300", TEST=="power/control", ATTR{power/control}="auto"
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  when: nvidia_dynamic_power_management | bool
+  register: nvidia_pm_udev
+
+# nvidia-utils ships nvidia-{suspend,hibernate,resume}.service. Without
+# them the dGPU loses VRAM contents across suspend, breaking any open
+# CUDA / Wayland session.
+- name: NVIDIA | Enable suspend/resume helper services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: true
+  become: true
+  loop:
+    - nvidia-suspend.service
+    - nvidia-hibernate.service
+    - nvidia-resume.service
+  when: nvidia_suspend_services | bool
+  failed_when: false  # service files are pulled in by nvidia-utils;
+                      # they're inert until reboot
+
+- name: NVIDIA | Add modules to mkinitcpio MODULES=()
+  ansible.builtin.lineinfile:
+    path: /etc/mkinitcpio.conf
+    regexp: '^MODULES=\(.*\)$'
+    line: "MODULES=({{ nvidia_modules | join(' ') }})"
+    backup: true
+  become: true
+  register: nvidia_mkinitcpio_changed
+  when: nvidia_mkinitcpio_modules | bool
+
+- name: NVIDIA | Regenerate initramfs
+  ansible.builtin.command:
+    cmd: mkinitcpio -P
+  become: true
+  when:
+    - nvidia_regenerate_initramfs | bool
+    - nvidia_pacman_install.changed | default(false)
+      or nvidia_mkinitcpio_changed.changed | default(false)
+  changed_when: true
+
+# Adding the kernel cmdline option is bootloader-specific and intentionally
+# manual. Detect the user's bootloader and emit instructions rather than
+# silently rewriting their boot config.
+- name: NVIDIA | Detect bootloader
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: nvidia_bootloader_stat
+  loop:
+    - /boot/loader/loader.conf      # systemd-boot
+    - /boot/grub/grub.cfg            # GRUB
+    - /etc/default/grub              # GRUB (config)
+    - /boot/refind_linux.conf        # rEFInd
+
+- name: NVIDIA | Emit kernel cmdline reminder
+  ansible.builtin.debug:
+    msg: |
+      To enable nvidia DRM modesetting, add `nvidia_drm.modeset=1` to
+      your kernel cmdline. Detected possible bootloader configs:
+      {% for r in nvidia_bootloader_stat.results %}
+      {%   if r.stat.exists %}  - {{ r.item }}{% endif %}
+      {% endfor %}
+      Then reboot.
+  when: nvidia_kernel_cmdline_modeset | bool
+
+# Force PCIe ASPM via kernel cmdline. Currently only systemd-boot
+# entries are auto-edited; for GRUB / rEFInd, add `pcie_aspm=force`
+# manually and rerun. See nvidia_pcie_aspm_force in defaults/main.yml
+# for the rationale.
+- name: NVIDIA | PCIe ASPM force — list systemd-boot entries
+  ansible.builtin.find:
+    paths: "{{ nvidia_systemd_boot_entries_dir }}"
+    patterns: "*.conf"
+  register: nvidia_aspm_entries
+  when: nvidia_pcie_aspm_force | bool
+
+- name: NVIDIA | PCIe ASPM force — append pcie_aspm=force to systemd-boot options
+  ansible.builtin.lineinfile:
+    path: "{{ entry.path }}"
+    regexp: '^(options(?:(?!\bpcie_aspm=force\b).)*)$'
+    line: '\1 pcie_aspm=force'
+    backrefs: true
+  become: true
+  loop: "{{ nvidia_aspm_entries.files | default([]) }}"
+  loop_control:
+    loop_var: entry
+    label: "{{ entry.path }}"
+  when: nvidia_pcie_aspm_force | bool
+  register: nvidia_aspm_cmdline
+
+# pcie_aspm=force only permits the OS to manage ASPM; the kernel still
+# uses the "default" policy (BIOS-driven, often disabled) unless told
+# otherwise. powersupersave is the most aggressive built-in policy: it
+# enables L1 substates on every device that advertises support, which
+# lets devices with passive _OSC support (like the dGPU on Lenovo
+# Legion 9) actually drop to a low-power P-state at idle.
+- name: NVIDIA | PCIe ASPM force — append pcie_aspm.policy=powersupersave
+  ansible.builtin.lineinfile:
+    path: "{{ entry.path }}"
+    regexp: '^(options(?:(?!\bpcie_aspm\.policy=powersupersave\b).)*)$'
+    line: '\1 pcie_aspm.policy=powersupersave'
+    backrefs: true
+  become: true
+  loop: "{{ nvidia_aspm_entries.files | default([]) }}"
+  loop_control:
+    loop_var: entry
+    label: "{{ entry.path }}"
+  when: nvidia_pcie_aspm_force | bool
+
+- name: NVIDIA | Wayland environment overrides (/etc/environment)
+  ansible.builtin.blockinfile:
+    path: /etc/environment
+    create: true
+    mode: "0644"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK (nvidia_drivers wayland)"
+    block: |-
+      # NVIDIA + Wayland recommended environment.
+      LIBVA_DRIVER_NAME=nvidia
+      __GLX_VENDOR_LIBRARY_NAME=nvidia
+      GBM_BACKEND=nvidia-drm
+  become: true
+  when: nvidia_environment_tweaks | bool
+
+# Hybrid graphics: install a udev rule that creates /dev/dri/igpu as a
+# stable symlink to the iGPU's DRM card (matched by kernel driver), then
+# point WLR_DRM_DEVICES at that symlink. See the docstring on
+# nvidia_hybrid_igpu_driver in defaults/main.yml for the rationale.
+- name: NVIDIA | Hybrid graphics — install udev rule for /dev/dri/igpu* symlinks
+  ansible.builtin.copy:
+    dest: /etc/udev/rules.d/81-nvidia-hybrid-igpu.rules
+    content: |
+      # Managed by Ansible (nvidia_drivers role).
+      # Stable colon-free symlinks to the iGPU's DRM card AND render node
+      # so wlroots / libseat can use them via WLR_DRM_DEVICES and
+      # WLR_RENDER_DRM_DEVICE (both treat colons as separators, so they
+      # can't carry a /dev/dri/by-path/pci-… string directly).
+      # DRIVERS== matches the GPU's PCI device by its kernel driver,
+      # which is unique per GPU (i915 only matches the Intel iGPU).
+      SUBSYSTEM=="drm", KERNEL=="card[0-9]*",    DRIVERS=="{{ nvidia_hybrid_igpu_driver }}", SYMLINK+="dri/igpu"
+      SUBSYSTEM=="drm", KERNEL=="renderD[0-9]*", DRIVERS=="{{ nvidia_hybrid_igpu_driver }}", SYMLINK+="dri/igpu-render"
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  when: nvidia_hybrid_igpu_driver | length > 0
+  register: nvidia_hybrid_udev
+
+- name: NVIDIA | Hybrid graphics — reload udev rules and trigger
+  ansible.builtin.command:
+    cmd: "{{ item }}"
+  become: true
+  loop:
+    - udevadm control --reload-rules
+    - udevadm trigger --subsystem-match=drm
+  when: nvidia_hybrid_udev.changed | default(false)
+  changed_when: true
+
+- name: NVIDIA | Hybrid graphics — pin wlroots to iGPU (/etc/environment)
+  ansible.builtin.blockinfile:
+    path: /etc/environment
+    create: true
+    mode: "0644"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK (nvidia_drivers hybrid wlroots)"
+    block: |-
+      # Hybrid graphics: wlroots compositors (sway, hyprland) on the iGPU.
+      # Both symlinks are udev-created (see 81-nvidia-hybrid-igpu.rules).
+      # WLR_DRM_DEVICES picks the scanout card; WLR_RENDER_DRM_DEVICE
+      # picks the render node — without the latter, wlroots may grab
+      # the nvidia render node anyway and keep the dGPU awake (~20W idle).
+      WLR_DRM_DEVICES=/dev/dri/igpu
+      WLR_RENDER_DRM_DEVICE=/dev/dri/igpu-render
+  become: true
+  when: nvidia_hybrid_igpu_driver | length > 0
+
+- name: NVIDIA | Hybrid graphics — remove old wlroots block when disabled
+  ansible.builtin.blockinfile:
+    path: /etc/environment
+    marker: "# {mark} ANSIBLE MANAGED BLOCK (nvidia_drivers hybrid wlroots)"
+    state: absent
+  become: true
+  when: nvidia_hybrid_igpu_driver | length == 0
+
+# Hybrid graphics on Wayland needs an Intel Vulkan ICD installed —
+# without it, sway/wlroots only sees the nvidia Vulkan driver and
+# opens /dev/nvidia0 + /dev/dri/renderD129 during renderer init,
+# waking the dGPU out of D3cold.
+- name: NVIDIA | Hybrid graphics — install Intel Vulkan ICD
+  community.general.pacman:
+    name:
+      - vulkan-intel
+    state: present
+  become: true
+  when:
+    - nvidia_install_intel_vulkan | bool
+    - ansible_facts['os_family'] == "Archlinux"
+
+# Locate the installed Intel Vulkan ICD JSON files. Path differs across
+# distros and kernel ages (intel_icd.json on modern, intel_hasvk_icd.json
+# for older Gen9 fallback). The wrapper points VK_DRIVER_FILES at the
+# colon-joined list of whatever's there.
+- name: NVIDIA | Hybrid graphics — find Intel Vulkan ICD files
+  ansible.builtin.find:
+    paths: /usr/share/vulkan/icd.d
+    patterns: "intel_*.json"
+  register: nvidia_intel_vk_icd
+  when: nvidia_deploy_sway_wrapper | bool
+
+# The wrapper sets EGL/Vulkan ICD env vars before exec'ing sway so the
+# compositor's renderer enumeration only sees Intel/Mesa devices. With
+# nvidia hidden from the renderer, sway never opens /dev/nvidia0 and
+# the dGPU stays in D3cold throughout the session.
+- name: NVIDIA | Hybrid graphics — deploy sway-igpu-only wrapper
+  ansible.builtin.copy:
+    dest: /usr/local/bin/sway-igpu-only
+    owner: root
+    group: root
+    mode: "0755"
+    content: |
+      #!/bin/bash
+      # Managed by Ansible (nvidia_drivers role).
+      # Pin sway's EGL and Vulkan device enumeration to Intel/Mesa only.
+      # Without this, sway's renderer opens /dev/nvidia0 + /dev/dri/renderD129
+      # during init (probing every available ICD), which wakes the dGPU
+      # out of D3cold and burns ~15 W extra at idle.
+      # prime-run is unaffected because /usr/local/bin/prime-run resets
+      # these env vars per-app (see nvidia_deploy_prime_run_override).
+      exec env \
+        __EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/50_mesa.json \
+        VK_DRIVER_FILES={{ nvidia_intel_vk_icd.files | default([]) | map(attribute='path') | join(':') }} \
+        sway "$@"
+  become: true
+  when: nvidia_deploy_sway_wrapper | bool
+
+# tuigreet (and other login managers) read /usr/share/wayland-sessions/
+# *.desktop files and use the Exec= line as the session command. Patch
+# sway.desktop in place so the wrapper is the one that gets launched.
+# Idempotent (won't double-replace once already pointing at the wrapper).
+- name: NVIDIA | Hybrid graphics — point sway.desktop at the wrapper
+  ansible.builtin.replace:
+    path: /usr/share/wayland-sessions/sway.desktop
+    regexp: "{{ item.regexp }}"
+    replace: "{{ item.replace }}"
+  become: true
+  loop:
+    - { regexp: '^Exec=sway$', replace: 'Exec=/usr/local/bin/sway-igpu-only' }
+    - { regexp: '^TryExec=/usr/bin/sway$', replace: 'TryExec=/usr/local/bin/sway-igpu-only' }
+  when: nvidia_deploy_sway_wrapper | bool
+
+# Children of sway-igpu-only inherit __EGL_VENDOR_LIBRARY_FILENAMES and
+# VK_DRIVER_FILES, so plain prime-run would only see the Mesa/Intel
+# ICDs and fail to offload to the dGPU. This override unsets both
+# before invoking nvidia's prime-run, restoring proper dGPU access.
+- name: NVIDIA | Hybrid graphics — deploy prime-run override
+  ansible.builtin.copy:
+    dest: /usr/local/bin/prime-run
+    owner: root
+    group: root
+    mode: "0755"
+    content: |
+      #!/bin/bash
+      # Managed by Ansible (nvidia_drivers role).
+      # Drop the iGPU-only ICD selection inherited from sway-igpu-only,
+      # then run the offload exactly like /usr/bin/prime-run does.
+      exec env -u __EGL_VENDOR_LIBRARY_FILENAMES -u VK_DRIVER_FILES \
+        __NV_PRIME_RENDER_OFFLOAD=1 \
+        __VK_LAYER_NV_optimus=NVIDIA_only \
+        __GLX_VENDOR_LIBRARY_NAME=nvidia \
+        "$@"
+  become: true
+  when: nvidia_deploy_prime_run_override | bool
+
+- name: NVIDIA | Final reminder
+  ansible.builtin.debug:
+    msg: |
+      ============================================================
+      NVIDIA driver installation complete.
+      Driver: {{ nvidia_userspace_packages | join(', ') }}
+      DPM mode: {{ nvidia_dpm_mode if nvidia_dynamic_power_management else 'disabled' }}
+      GSP firmware: {{ 'disabled' if nvidia_disable_gsp_firmware else 'enabled (default)' }}
+      DRM modeset: {{ 'disabled (hybrid setup)' if nvidia_disable_drm_modeset else 'enabled (default)' }}
+      PRIME render offload: {{ 'enabled (prime-run available)' if nvidia_install_prime else 'disabled' }}
+      Sway iGPU wrapper: {{ 'deployed' if nvidia_deploy_sway_wrapper else 'not deployed' }}
+
+      Reboot required for kernel modules to load.
+
+      Verify after reboot:
+        lsmod | grep nvidia
+        nvidia-smi
+        cat /sys/bus/pci/devices/0000:01:00.0/power/runtime_status
+          (should read 'suspended' a few seconds after login when
+          nothing is using the dGPU)
+
+      Run a single application on the dGPU:
+        prime-run <command>
+
+      Compositor/desktop runs on the iGPU as before — the dGPU only
+      wakes up for prime-run apps and goes back to D3cold on idle.
+      ============================================================

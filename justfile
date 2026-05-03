@@ -168,6 +168,12 @@ legion9-arch-setup:
 	ansible-playbook playbooks/legion9-arch-setup.yml \
 		-i inventory/legion9-arch/hosts.yml -K
 
+# Install NVIDIA proprietary drivers (open kernel modules + prime-run +
+# dynamic power management) on a single Arch host. Reboot afterwards.
+nvidia-drivers inventory hostname:
+	ansible-playbook playbooks/nvidia-drivers.yml -i {{inventory}} \
+		--limit {{hostname}} -K
+
 # Show Ansible configuration
 config:
 	ansible-config dump --only-changed

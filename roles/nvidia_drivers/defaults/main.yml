@@ -1,0 +1,163 @@
+---
+# Default variables for nvidia_drivers role.
+
+# Userspace packages installed alongside the kernel modules.
+# As of Arch 2025+, the closed-source `nvidia-dkms` package was removed
+# from the official repos; `nvidia-open-dkms` is the only DKMS package
+# available and provides `nvidia-dkms` for backwards-compat. The role
+# therefore installs nvidia-open-dkms regardless of "flavor". For the
+# closed driver, use an AUR variant and override this list per-host.
+# libva-nvidia-driver gives VAAPI hardware video decode acceleration in
+# browsers and media players. nvidia-prime provides /usr/bin/prime-run.
+nvidia_userspace_packages:
+  - nvidia-open-dkms
+  - nvidia-utils
+  - libva-nvidia-driver
+  - nvidia-settings
+
+# Add Wayland-friendly environment overrides (PRIME / EGL hints) to
+# /etc/environment so DEs and compositors pick up the NVIDIA stack.
+# Off by default — Sway works without these on Hybrid Graphics where
+# the iGPU is the primary card.
+nvidia_environment_tweaks: false
+
+# Hybrid graphics: pin wlroots-based compositors (sway, hyprland) to the
+# iGPU. Set to the iGPU's PCI vendor ID; the role installs a udev rule
+# that symlinks the matching /dev/dri/cardN to /dev/dri/igpu, then writes
+# WLR_DRM_DEVICES=/dev/dri/igpu to /etc/environment.
+#
+# We can't put /dev/dri/by-path/pci-0000:00:02.0-card directly into
+# WLR_DRM_DEVICES — wlroots treats that variable as colon-separated, so
+# the colons inside the by-path string break it. The udev symlink avoids
+# the issue with a stable, colon-free path.
+#
+# Without this, wlroots probes /dev/dri/card0 first; on hybrid laptops
+# the nvidia dGPU often enumerates as card0 with no connected outputs
+# (the laptop panel is wired to the iGPU), so the compositor exits
+# immediately and greetd bounces the user back to the login screen.
+#
+# Common values:
+#   i915   — Intel iGPU (legacy/current)
+#   xe     — Intel iGPU (Xe, newer kernels)
+#   amdgpu — AMD iGPU (modern Radeon)
+#   radeon — AMD iGPU (legacy)
+# We match by kernel driver rather than PCI vendor ID because vendor
+# matching with udev's ATTRS{vendor} walks the entire ancestor chain
+# and matches PCI bridges too — on Intel platforms with NVIDIA dGPUs
+# both cards end up with an Intel-vendor PCI ancestor (the chipset),
+# so a vendor-only rule symlinks both. DRIVERS== matches uniquely.
+# Empty string disables this behaviour (no udev rule, no env write).
+nvidia_hybrid_igpu_driver: ""
+
+# Add `nvidia_drm.modeset=1` to the kernel cmdline. Required for KMS,
+# Wayland, and clean console resolution. Touches the bootloader, so
+# off by default — turn it on per-host once you know which bootloader
+# is in use.
+nvidia_kernel_cmdline_modeset: false
+
+# Force PCIe ASPM enabled on the dGPU's link via `pcie_aspm=force` on the
+# kernel cmdline. Required on many gaming laptops (Lenovo Legion, etc.)
+# where the BIOS keeps ASPM disabled and refuses to hand over control to
+# the OS via ACPI _OSC. Without ASPM, the dGPU's PCIe link can't enter
+# L1/L1 substates, the card can't drop to D3cold, and idle power draw
+# stays ~15-20 W higher than it should.
+#
+# WARNING: this is a global PCIe setting, not nvidia-specific. On rare
+# hardware (cheap NICs, certain NVMe drives) forced ASPM has caused
+# stability issues. Off by default; enable per-host after confirming
+# the laptop is a known-bad nvidia-DPM platform.
+nvidia_pcie_aspm_force: false
+
+# systemd-boot loader entries directory. Used only when
+# nvidia_pcie_aspm_force is true to inject pcie_aspm=force into all
+# entries. Override per-host if your entries live elsewhere.
+nvidia_systemd_boot_entries_dir: "/boot/loader/entries"
+
+# When true, regenerate the initramfs after installing the modules
+# (mkinitcpio -P). Required if you also add nvidia_modules to
+# mkinitcpio MODULES.
+nvidia_regenerate_initramfs: true
+
+# Add nvidia* modules to mkinitcpio MODULES=() so they load early
+# enough for plymouth / clean KMS handover. Off by default to avoid
+# rewriting the user's mkinitcpio.conf without permission.
+nvidia_mkinitcpio_modules: false
+
+nvidia_modules:
+  - nvidia
+  - nvidia_modeset
+  - nvidia_uvm
+  - nvidia_drm
+
+# Install PRIME render-offload tooling (`prime-run` script). Required to
+# selectively run a single application on the dGPU on a hybrid-graphics
+# laptop, e.g. `prime-run blender` or `prime-run glxgears`.
+nvidia_install_prime: true
+
+# Enable NVIDIA Dynamic Power Management (driver >= 470). Lets the
+# dGPU auto-power-down when idle, dropping idle wattage from ~10-15 W
+# to <0.5 W on a RTX 40-series laptop. Requires a hybrid-graphics
+# setup with the iGPU as the primary card.
+nvidia_dynamic_power_management: true
+
+# RTD3 power management mode (NVreg_DynamicPowerManagement value):
+#   "coarse"   — 0x01 — GPU powers off (D3cold) when no nvidia apps are
+#                       running. VRAM is dropped. Best for hybrid laptops
+#                       where the dGPU is only used via prime-run.
+#   "fine"     — 0x02 — GPU stays on but actively monitors usage and
+#                       reduces power. VRAM preserved. Allows applications
+#                       to keep using the dGPU while it idles.
+#   "default"  — 0x03 — Driver default (fine on Ampere+ notebooks).
+#   "disabled" — 0x00 — Disable RTD3 entirely. GPU stays in D0.
+# For hybrid laptops with the iGPU primary, "coarse" is the right choice;
+# anything else leaves the dGPU pinned in a low-power-but-active state
+# drawing ~5 W idle on top of the platform overhead.
+nvidia_dpm_mode: "fine"
+
+# When true, add `options nvidia NVreg_EnableGpuFirmware=0` to disable the
+# GPU System Processor (GSP) firmware. GSP is mandatory for nvidia-open
+# (the open kernel modules) and cannot be disabled there. With the closed
+# nvidia-dkms driver, GSP is optional, and disabling it is the documented
+# fix for "GPU cycles between D0 and D3cold every second" on Lenovo Legion
+# laptops with RTX 40-series. Has no effect on the open driver.
+nvidia_disable_gsp_firmware: false
+
+# When true, add `options nvidia_drm modeset=0 fbdev=0` to disable DRM
+# kernel modesetting on the nvidia card. Required for D3cold on hybrid
+# laptops: with modeset=1 the kernel keeps the dGPU powered up to back
+# its DRM master role even when the laptop panel is wired to the iGPU.
+# Side effect: the nvidia card cannot be used directly as a Wayland
+# scanout — fine on hybrid setups where the iGPU drives all displays.
+# prime-run is unaffected (uses render nodes + offload, not modeset).
+nvidia_disable_drm_modeset: false
+
+# When true, install vulkan-intel so wlroots/sway can find a non-nvidia
+# Vulkan ICD. Without an Intel Vulkan ICD, sway's renderer enumerates
+# nvidia's Vulkan driver and opens /dev/nvidia0 + /dev/dri/renderD129
+# during init, waking the dGPU from D3cold and burning ~15 W.
+# Only useful in hybrid setups; ignored on systems without an Intel iGPU.
+nvidia_install_intel_vulkan: false
+
+# When true, deploy /usr/local/bin/sway-igpu-only — a wrapper that
+# launches sway with __EGL_VENDOR_LIBRARY_FILENAMES and VK_DRIVER_FILES
+# pinned to Intel/Mesa ICDs. Also rewrites the Exec line in
+# /usr/share/wayland-sessions/sway.desktop so greetd/tuigreet uses the
+# wrapper. Requires nvidia_install_intel_vulkan=true.
+# Without this, sway opens nvidia EGL/Vulkan ICDs at startup and the
+# dGPU never reaches D3cold while sway is running.
+nvidia_deploy_sway_wrapper: false
+
+# When true, ship a /usr/local/bin/prime-run override that unsets
+# __EGL_VENDOR_LIBRARY_FILENAMES and VK_DRIVER_FILES before invoking
+# the offload — necessary because children of sway-igpu-only inherit
+# those env vars and would otherwise fail to load the nvidia ICDs that
+# prime-run needs. Pairs with nvidia_deploy_sway_wrapper.
+nvidia_deploy_prime_run_override: false
+
+# Enable suspend/resume helper services so the dGPU survives system
+# suspend/hibernate without losing GPU state. These ship with the
+# nvidia-utils package.
+nvidia_suspend_services: true
+
+# nvidia-prime is a tiny package providing the prime-run wrapper.
+nvidia_prime_package: nvidia-prime

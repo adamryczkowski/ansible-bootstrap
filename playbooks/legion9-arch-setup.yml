@@ -63,6 +63,9 @@
     desktop_snap_apps: []
 
   pre_tasks:
+    # tags: always — the role tasks below all branch on
+    # ansible_facts['os_family'], so even tag-filtered runs
+    # (--tags sway) need facts gathered first.
     - name: Bootstrap | Ensure python is installed (raw)
       ansible.builtin.raw: |
         if ! command -v python3 >/dev/null 2>&1 && ! command -v python >/dev/null 2>&1; then
@@ -70,14 +73,17 @@
         fi
       become: true
       changed_when: false
+      tags: always
 
     - name: Bootstrap | Gather facts now that python exists
       ansible.builtin.setup:
+      tags: always
 
     - name: Refresh pacman cache
       community.general.pacman:
         update_cache: true
       become: true
+      tags: always
 
     - name: Display target system info
       ansible.builtin.debug:

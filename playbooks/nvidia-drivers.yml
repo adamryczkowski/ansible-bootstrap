@@ -1,0 +1,38 @@
+---
+# NVIDIA drivers playbook — installs the proprietary NVIDIA stack on
+# Arch Linux hosts that have an NVIDIA GPU. Opt-in: run only against
+# hosts you actually want to install drivers on. The role is a no-op
+# on non-Arch hosts.
+#
+# Usage:
+#   ansible-playbook -i inventory/legion9-arch/hosts.yml \
+#       playbooks/nvidia-drivers.yml --limit legion9-arch
+#
+# Defaults install nvidia-open-dkms (RTX 20+), nvidia-prime (prime-run),
+# and Dynamic Power Management. Reboot afterwards.
+#
+# To use the closed driver instead:
+#   -e nvidia_driver_flavor=closed
+#
+# To skip prime / power management for desktops:
+#   -e nvidia_install_prime=false -e nvidia_dynamic_power_management=false
+
+- name: Install NVIDIA proprietary drivers (Arch)
+  hosts: all
+  become: true
+  gather_facts: false
+
+  pre_tasks:
+    - name: Bootstrap | Ensure python is installed (raw)
+      ansible.builtin.raw: |
+        if ! command -v python3 >/dev/null 2>&1 && ! command -v python >/dev/null 2>&1; then
+          pacman -Sy --noconfirm python python-cffi
+        fi
+      changed_when: false
+
+    - name: Bootstrap | Gather facts
+      ansible.builtin.setup:
+
+  roles:
+    - role: nvidia_drivers
+      tags: [nvidia, gpu]

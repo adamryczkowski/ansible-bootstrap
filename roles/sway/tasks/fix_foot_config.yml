@@ -1,0 +1,48 @@
+---
+# Sway role - migrate i3-config's foot.ini to current foot syntax.
+#
+# Modern foot (>= 1.16) emits a deprecation warning at every shell startup
+# when the config uses the old `[colors]` / `[colors2]` syntax with
+# `initial-color-theme=N`:
+#     deprecated: foot: [colors]: use [colors-dark] instead
+# The new syntax uses `[colors-dark]` and `[colors-light]` and lets foot
+# pick automatically based on the desktop portal's color-scheme preference,
+# so `initial-color-theme` is no longer needed.
+#
+# This task patches the file in place; it's idempotent (replace module
+# is a no-op once the section names are already migrated).
+
+- name: Sway | Stat i3-config foot.ini
+  ansible.builtin.stat:
+    path: "{{ sway_config_dest }}/foot/foot.ini"
+  register: sway_foot_ini_stat
+
+- name: Sway | Migrate foot [colors] → [colors-dark]
+  ansible.builtin.replace:
+    path: "{{ sway_config_dest }}/foot/foot.ini"
+    regexp: '^\[colors\]\s*$'
+    replace: '[colors-dark]'
+  become: true
+  become_user: "{{ sway_username }}"
+  when: sway_foot_ini_stat.stat.exists
+
+- name: Sway | Migrate foot [colors2] → [colors-light]
+  ansible.builtin.replace:
+    path: "{{ sway_config_dest }}/foot/foot.ini"
+    regexp: '^\[colors2\]\s*$'
+    replace: '[colors-light]'
+  become: true
+  become_user: "{{ sway_username }}"
+  when: sway_foot_ini_stat.stat.exists
+
+# initial-color-theme is no longer a recognized option in newer foot;
+# leaving it in the file is harmless but produces a warning on every
+# shell launch. Comment it out so the original intent stays visible.
+- name: Sway | Comment out deprecated initial-color-theme line
+  ansible.builtin.replace:
+    path: "{{ sway_config_dest }}/foot/foot.ini"
+    regexp: '^(initial-color-theme=.*)$'
+    replace: '# \1  # deprecated; portal color-scheme drives [colors-dark]/[colors-light]'
+  become: true
+  become_user: "{{ sway_username }}"
+  when: sway_foot_ini_stat.stat.exists

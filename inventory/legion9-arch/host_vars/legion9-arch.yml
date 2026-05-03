@@ -11,3 +11,43 @@ claude_code_ai_prompts:
   source_remote: "adam@192.168.42.206:/home/adam/.local/share/AI_prompts"
   github_remote: "git@github.com:adamryczkowski/AI-prompts.git"
   dest_dir: "~/.local/share/AI_prompts"
+
+# ── NVIDIA hybrid graphics ──────────────────────────────────────────────
+# Lenovo Legion 9 has Intel iGPU (PCI 00:02.0) + NVIDIA RTX 4090 dGPU
+# (PCI 01:00.0). The eDP-1 laptop panel is wired to the iGPU; the dGPU
+# has no connected outputs in the default Hybrid Graphics BIOS mode.
+# Without WLR_DRM_DEVICES, wlroots tries the nvidia card first (card0)
+# and exits — greetd then bounces the user back to tuigreet.
+# i915 = Intel iGPU driver; the role installs a udev rule and points
+# wlroots at the resulting /dev/dri/igpu symlink.
+nvidia_hybrid_igpu_driver: "i915"
+
+# Lenovo's BIOS keeps PCIe ASPM disabled and refuses to hand control
+# to the OS via ACPI _OSC. Without ASPM, the dGPU can't drop its PCIe
+# link into L1 substates and stays in P4 / ~20 W idle. pcie_aspm=force
+# overrides _OSC and lets the kernel manage ASPM itself, allowing the
+# RTX 4090 to fall to D3cold (<1 W).
+nvidia_pcie_aspm_force: true
+
+# Coarse-grained DPM = 0x01: dGPU enters D3cold when no nvidia apps run.
+# Required (with the items below) for true idle power on hybrid laptops.
+nvidia_dpm_mode: "coarse"
+
+# Disable GSP firmware. The closed driver supports running without GSP
+# and Lenovo Legion needs this to stop the D0↔D3cold ping-pong.
+nvidia_disable_gsp_firmware: true
+
+# Disable DRM modesetting on the nvidia card so the kernel stops keeping
+# it powered as a DRM master. Compositor still runs on the iGPU.
+nvidia_disable_drm_modeset: true
+
+# Install vulkan-intel and ship the sway-igpu-only wrapper so wlroots'
+# renderer enumeration only sees Mesa/Intel ICDs at startup. Without
+# this, sway opens nvidia EGL/Vulkan and the dGPU never reaches D3cold.
+nvidia_install_intel_vulkan: true
+nvidia_deploy_sway_wrapper: true
+
+# /usr/local/bin/prime-run override that resets EGL/VK env vars before
+# offloading — needed because children of sway-igpu-only inherit the
+# Mesa-only ICD selection and would otherwise fail to use nvidia.
+nvidia_deploy_prime_run_override: true

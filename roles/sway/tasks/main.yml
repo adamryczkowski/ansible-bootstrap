@@ -56,6 +56,10 @@
   ansible.builtin.include_tasks: fix_hardcoded_paths.yml
   when: sway_fix_hardcoded_paths | bool
 
+- name: Sway | Include foot.ini deprecation fix
+  ansible.builtin.include_tasks: fix_foot_config.yml
+  when: sway_fix_foot_config | bool
+
 - name: Sway | Include waybar duplication fix
   ansible.builtin.include_tasks: fix_waybar_duplication.yml
   when: sway_fix_waybar_duplication | bool

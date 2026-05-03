@@ -1,0 +1,17 @@
+---
+# Default variables for aur_helper role.
+
+# User who builds the AUR package (must NOT be root — makepkg refuses
+# to run as root). Falls back to target_user / ansible_user.
+aur_helper_username: "{{ target_user | default(ansible_user) | default('adam') }}"
+
+# AUR helper to install.
+#
+# `paru` (source-built) is more reliable on Arch rolling than `paru-bin`
+# because the binary package is linked against a frozen libalpm.so.N and
+# breaks the moment pacman/libalpm gets bumped — leaving you unable to
+# install AUR packages until paru is rebuilt. Source builds are recompiled
+# against the current libalpm by makepkg, so they survive rolling updates.
+# Cost: pulls in `rust` as a build dep on bootstrap.
+aur_helper_aur_pkg: "paru"
+aur_helper_command: "paru"

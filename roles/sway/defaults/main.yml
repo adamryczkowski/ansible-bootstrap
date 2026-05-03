@@ -225,6 +225,12 @@ sway_bright_configure_udev: true
 # Add user to video group for backlight control
 sway_bright_add_to_video_group: true
 
+# Migrate the foot.ini in the i3-config repo from the deprecated
+# `[colors]`/`[colors2]` syntax to `[colors-dark]`/`[colors-light]`. Foot
+# >= 1.16 prints a deprecation warning on every shell startup until the
+# old section names are renamed.
+sway_fix_foot_config: true
+
 # Fix hardcoded paths in i3-config repository
 # The i3-config repository contains hardcoded /home/adam/ paths that need to be
 # replaced with the actual user's home directory for brightness controls to work

@@ -57,6 +57,24 @@
     - ansible_facts['os_family'] == "Archlinux"
     - cli_tools_pacman | length > 0
 
+# AUR packages — only valid on Arch and only if the aur_helper role has
+# already run and put paru on PATH. We invoke paru as the unprivileged
+# user since it refuses to run as root; --noconfirm makes it
+# non-interactive, --needed skips packages already at the right version.
+- name: CLI Tools | Install AUR-based CLI tools (Arch)
+  ansible.builtin.command:
+    cmd: "paru -S --noconfirm --needed {{ cli_tools_aur | join(' ') }}"
+  become: true
+  become_user: "{{ cli_tools_username }}"
+  register: cli_tools_aur_install
+  changed_when: >-
+    'installing' in cli_tools_aur_install.stdout
+    or 'building' in cli_tools_aur_install.stdout
+    or 'upgrading' in cli_tools_aur_install.stdout
+  when:
+    - ansible_facts['os_family'] == "Archlinux"
+    - cli_tools_aur | length > 0
+
 # =============================================================================
 # Nerd Fonts Installation (full profile)
 # =============================================================================
@@ -250,8 +268,16 @@
       ansible.builtin.copy:
         content: |
           # Liquidprompt - adaptive prompt
-          # Only load in interactive shells, not from a script or from scp
-          echo $- | grep -q i 2>/dev/null && . /usr/share/liquidprompt/liquidprompt
+          # Only load in interactive shells, not from a script or from scp.
+          # The library path differs per distro: Debian/Ubuntu ships it at
+          # /usr/share/liquidprompt/liquidprompt; Arch (AUR liquidprompt)
+          # ships only /usr/bin/liquidprompt, which is itself sourceable.
+          if echo $- | grep -q i 2>/dev/null; then
+              for _lp in /usr/share/liquidprompt/liquidprompt /usr/bin/liquidprompt; do
+                  [ -r "$_lp" ] && . "$_lp" && break
+              done
+              unset _lp
+          fi
         dest: "/home/{{ cli_tools_username }}/.bashrc.d/99_liquidprompt.sh"
         mode: "0644"
         owner: "{{ cli_tools_username }}"
@@ -271,17 +297,29 @@
 - name: CLI Tools | Configure zoxide
   when: cli_tools_install_zoxide | bool
   block:
+    # Filename prefix 91_ deliberately sorts AFTER 90_mise.sh so zoxide's
+    # cd() definition wins. mise's `activate bash` redefines cd/popd/pushd
+    # with a wrapper that calls plain `builtin cd` (no fuzzy lookup), so
+    # any zoxide snippet sourced earlier gets clobbered.
     - name: CLI Tools | Add zoxide to bashrc.d
       ansible.builtin.copy:
         content: |
-          # Zoxide (smarter cd) - replaces cd command
+          # Zoxide (smarter cd) - replaces cd command.
+          # MUST be sourced after mise (90_mise.sh): mise redefines cd()
+          # with a builtin-cd wrapper that would otherwise clobber zoxide.
           if command -v zoxide &> /dev/null; then
               eval "$(zoxide init bash --cmd cd)"
           fi
-        dest: "/home/{{ cli_tools_username }}/.bashrc.d/86_zoxide.sh"
+        dest: "/home/{{ cli_tools_username }}/.bashrc.d/91_zoxide.sh"
         mode: "0644"
         owner: "{{ cli_tools_username }}"
         group: "{{ cli_tools_username }}"
+      become: true
+
+    - name: CLI Tools | Remove old zoxide bashrc.d snippet (pre-mise-order fix)
+      ansible.builtin.file:
+        path: "/home/{{ cli_tools_username }}/.bashrc.d/86_zoxide.sh"
+        state: absent
       become: true
 
 # =============================================================================
@@ -372,11 +410,6 @@
           # fzf preview with bat
           if command -v fzf &> /dev/null && command -v bat &> /dev/null; then
               alias preview="fzf --preview 'bat --color \"always\" {}'"
-          fi
-
-          # btop replaces htop
-          if command -v btop &> /dev/null; then
-              alias htop="btop"
           fi
         dest: "/home/{{ cli_tools_username }}/.bashrc.d/21_cli_aliases.sh"
         mode: "0644"

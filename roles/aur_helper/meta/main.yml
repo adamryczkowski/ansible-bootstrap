@@ -1,0 +1,10 @@
+---
+galaxy_info:
+  author: Adam Ryczkowski
+  description: Bootstrap an AUR helper (paru-bin by default) on Arch Linux.
+  license: MIT
+  min_ansible_version: "2.14"
+  platforms:
+    - name: ArchLinux
+
+dependencies: []

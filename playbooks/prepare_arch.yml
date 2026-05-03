@@ -26,6 +26,9 @@
     cli_tools_profile: minimal
 
   pre_tasks:
+    # tags: always — role tasks downstream branch on
+    # ansible_facts['os_family'], so even tag-filtered runs
+    # (--tags cli, etc.) need facts gathered first.
     # Fresh Arch installs often have no python at all, which means Ansible
     # cannot run any module other than `raw`. Bootstrap python first.
     - name: Bootstrap | Ensure python is installed (raw)
@@ -34,9 +37,11 @@
           pacman -Sy --noconfirm python python-cffi
         fi
       changed_when: false
+      tags: always
 
     - name: Bootstrap | Gather facts now that python exists
       ansible.builtin.setup:
+      tags: always
 
     - name: Display configuration
       ansible.builtin.debug:
@@ -45,11 +50,13 @@
           - Target user: {{ target_user }}
           - CLI profile: {{ cli_tools_profile }}
           - OS: {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] | default('rolling') }}
+      tags: always
 
     - name: Refresh pacman package database
       community.general.pacman:
         update_cache: true
       when: ansible_facts['os_family'] == "Archlinux"
+      tags: always
 
   roles:
     # Base system configuration (locale, timezone, sysctl, VPN reconnect script)
@@ -69,6 +76,13 @@
       vars:
         bashrc_username: "{{ target_user }}"
       tags: [bashrc, base]
+
+    # Bootstrap an AUR helper (paru) so cli_tools can install AUR-only
+    # packages like liquidprompt and byobu. No-op on non-Arch.
+    - role: aur_helper
+      vars:
+        aur_helper_username: "{{ target_user }}"
+      tags: [aur, base]
 
     # Rust toolchain (required for full profile)
     - role: rust
