@@ -24,6 +24,32 @@
   become: true
   when: ansible_facts['os_family'] == "Archlinux"
 
+# bright drives software gamma correction (the dim range below the
+# hardware backlight minimum) by spawning wl-gammarelay-rs as a daemon.
+# Without this binary, `bright +`/`bright -` crashes with
+# FileNotFoundError("wl-gammarelay-rs") the first time it tries to
+# dim below level 9. wl-gammarelay-rs is AUR-only on Arch, so install
+# it via the paru bootstrapped by the aur_helper role.
+- name: Sway | Ensure wl-gammarelay-rs is installed (Arch Linux, AUR)
+  ansible.builtin.command:
+    cmd: "paru -S --noconfirm --needed wl-gammarelay-rs"
+  become: true
+  become_user: "{{ sway_username }}"
+  register: sway_bright_wlgammarelay_install
+  changed_when: >-
+    'installing' in sway_bright_wlgammarelay_install.stdout
+    or 'building' in sway_bright_wlgammarelay_install.stdout
+    or 'upgrading' in sway_bright_wlgammarelay_install.stdout
+  when: ansible_facts['os_family'] == "Archlinux"
+
+- name: Sway | Ensure wl-gammarelay-rs is installed (Debian/Ubuntu)
+  ansible.builtin.apt:
+    name: wl-gammarelay-rs
+    state: present
+  become: true
+  failed_when: false  # not packaged on all releases; build from source if missing
+  when: ansible_facts['os_family'] == "Debian"
+
 - name: Sway | Ensure pipx path is configured for user
   ansible.builtin.command:
     cmd: pipx ensurepath
