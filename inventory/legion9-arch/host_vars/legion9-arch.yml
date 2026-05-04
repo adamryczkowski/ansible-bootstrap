@@ -51,3 +51,11 @@ nvidia_deploy_sway_wrapper: true
 # offloading — needed because children of sway-igpu-only inherit the
 # Mesa-only ICD selection and would otherwise fail to use nvidia.
 nvidia_deploy_prime_run_override: true
+
+# tuigreet's `--cmd` is the fallback launched when the greeter falls
+# through without a session pick (e.g. user just hits Enter, or
+# --remember-session has nothing cached yet). The default in the sway
+# role is plain `sway`, which bypasses sway.desktop and the wrapper —
+# resulting in sway opening /dev/nvidia0 and the dGPU pinned at D0
+# (~35 W extra at idle). Pin the fallback to the iGPU-only wrapper.
+sway_greetd_command: "tuigreet --time --remember --remember-session --asterisks --cmd /usr/local/bin/sway-igpu-only"

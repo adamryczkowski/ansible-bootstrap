@@ -364,6 +364,51 @@
     - { regexp: '^TryExec=/usr/bin/sway$', replace: 'TryExec=/usr/local/bin/sway-igpu-only' }
   when: nvidia_deploy_sway_wrapper | bool
 
+# pacman ships /usr/share/wayland-sessions/sway.desktop with the `sway`
+# package and overwrites it on every upgrade. Without this hook, a
+# routine `pacman -Syu` silently reverts the Exec=/TryExec= patch above
+# and the next login goes through plain `sway` again — opening
+# /dev/nvidia0 and pinning the dGPU at D0 (we hit this in production).
+# The hook re-applies the same sed substitutions immediately after any
+# sway transaction so the regression window is zero.
+- name: NVIDIA | Hybrid graphics — ensure pacman hooks directory exists
+  ansible.builtin.file:
+    path: /etc/pacman.d/hooks
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+  when:
+    - nvidia_deploy_sway_wrapper | bool
+    - ansible_facts['os_family'] == 'Archlinux'
+
+- name: NVIDIA | Hybrid graphics — pacman hook to re-patch sway.desktop on upgrade
+  ansible.builtin.copy:
+    dest: /etc/pacman.d/hooks/sway-igpu-only.hook
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by Ansible (nvidia_drivers role).
+      # Re-applies the sway.desktop Exec/TryExec patch after the `sway`
+      # package is installed or upgraded, so tuigreet keeps launching
+      # the iGPU-only wrapper.
+      [Trigger]
+      Operation = Install
+      Operation = Upgrade
+      Type = Package
+      Target = sway
+
+      [Action]
+      Description = Re-pointing sway.desktop at /usr/local/bin/sway-igpu-only
+      When = PostTransaction
+      Exec = /usr/bin/sed -i -e 's|^Exec=sway$|Exec=/usr/local/bin/sway-igpu-only|' -e 's|^TryExec=/usr/bin/sway$|TryExec=/usr/local/bin/sway-igpu-only|' /usr/share/wayland-sessions/sway.desktop
+  become: true
+  when:
+    - nvidia_deploy_sway_wrapper | bool
+    - ansible_facts['os_family'] == 'Archlinux'
+
 # Children of sway-igpu-only inherit __EGL_VENDOR_LIBRARY_FILENAMES and
 # VK_DRIVER_FILES, so plain prime-run would only see the Mesa/Intel
 # ICDs and fail to offload to the dGPU. This override unsets both
