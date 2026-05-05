@@ -54,6 +54,21 @@
       - net-tools
     state: present
     update_cache: true
+    # Trust the cache for up to 24h. Two reasons:
+    # 1. Speed — skip the slow apt-update on hot caches.
+    # 2. Robustness against flaky networks. On wifi networks that
+    #    selectively filter individual launchpad-hosted PPAs (e.g. some
+    #    public hotspots blocking ppa.launchpadcontent.net), python-apt's
+    #    FetchFailedException makes ansible's apt module fail with an
+    #    empty error message even though apt itself exits 0 (the failures
+    #    are treated as warnings). Because Ubuntu's apt only refreshes
+    #    /var/lib/apt/periodic/update-success-stamp on full success, that
+    #    stamp can fall hours behind even with daily `apt update` calls;
+    #    a 24h validity window keeps the role moving through the install
+    #    phase using the still-valid cached package indexes.
+    # The user can force a fresh refresh via `sudo apt update` ahead of
+    # the playbook run.
+    cache_valid_time: 86400
   become: true
   when: ansible_facts['os_family'] == "Debian"
 
@@ -69,7 +84,10 @@
       - libsodium
       - readline
       - zlib
-      - dhcp
+      # Arch split the ISC dhcp suite: the `dhcp` package now ships only
+      # the server (dhcpd/dhcrelay/omshell), so we need the standalone
+      # `dhclient` package to get /usr/bin/dhclient for the VPN's DHCP step.
+      - dhclient
       - git
       - net-tools
     state: present

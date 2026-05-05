@@ -47,6 +47,10 @@ softether_reconnect_helper:
   nicname: dom_vpn                # softether_nicname above (interface vpn_dom_vpn)
   home_check_ip: 192.168.10.10    # home gateway — reachable means we're already home
   tunnel_check_ip: 192.168.42.1   # VPN gateway — reachable means tunnel is up
-  home_subnet: 192.168.10.0/24    # network to route through the tunnel
+  # All subnets reachable through the SoftEther "VPN" hub. Common to every
+  # host in this hub — keep these two in sync across host_vars files.
+  home_subnets:
+    - 192.168.10.0/24
+    - 192.168.11.0/24
   tunnel_gateway: 192.168.42.10   # next-hop on the VPN side
   internet_probe: 8.8.8.8

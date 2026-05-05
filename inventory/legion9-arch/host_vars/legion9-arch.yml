@@ -59,3 +59,34 @@ nvidia_deploy_prime_run_override: true
 # resulting in sway opening /dev/nvidia0 and the dGPU pinned at D0
 # (~35 W extra at idle). Pin the fallback to the iGPU-only wrapper.
 sway_greetd_command: "tuigreet --time --remember --remember-session --asterisks --cmd /usr/local/bin/sway-igpu-only"
+
+# ── SoftEther client ─────────────────────────────────────────────────────────
+# Same server / hub as mikolaj-framework — just a different account.
+# Password is in group_vars/all/legion9.vault.yml as `softether_password`.
+softether_server_address: n2n.statystyka.net
+softether_port: 992
+softether_vpn_hub: VPN
+softether_vpn_username: legion9i
+# Local label for the connection (drives the systemd unit name and the
+# helper script filename).
+softether_connection_name: dom
+# Virtual NIC name → kernel interface becomes vpn_dom_vpn.
+softether_nicname: dom_vpn
+
+# ── SoftEther reconnect-vpn orchestrator ─────────────────────────────────────
+# Mirrors mikolaj-framework: on boot, NetworkManager dispatcher events, and
+# resume from suspend, run /usr/local/bin/reconnect_vpn to (re-)establish
+# the tunnel and add the static route to the home subnet.
+softether_reconnect_helper:
+  enabled: true
+  connection_name: dom            # softether_connection_name above
+  nicname: dom_vpn                # softether_nicname above (interface vpn_dom_vpn)
+  home_check_ip: 192.168.10.10    # home gateway — reachable means we're already home
+  tunnel_check_ip: 192.168.42.1   # VPN gateway — reachable means tunnel is up
+  # All subnets reachable through the SoftEther "VPN" hub. Common to every
+  # host in this hub — keep these two in sync across host_vars files.
+  home_subnets:
+    - 192.168.10.0/24
+    - 192.168.11.0/24
+  tunnel_gateway: 192.168.42.10   # next-hop on the VPN side
+  internet_probe: 8.8.8.8

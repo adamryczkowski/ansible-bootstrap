@@ -38,4 +38,6 @@ fi
 
 # Tunnel is up — now ask for a DHCP lease on vpn_{{ softether_nicname }} (bounded).
 # -1 = one-shot mode; timeout bounds the DISCOVER wait.
-exec /usr/bin/timeout 15 /usr/sbin/dhclient -1 vpn_{{ softether_nicname }}
+# Path differs per distro: Debian/Ubuntu ship /usr/sbin/dhclient (isc-dhcp-client);
+# Arch ships /usr/bin/dhclient (the standalone `dhclient` package).
+exec /usr/bin/timeout 15 {{ '/usr/bin/dhclient' if ansible_facts['os_family'] == 'Archlinux' else '/usr/sbin/dhclient' }} -1 vpn_{{ softether_nicname }}

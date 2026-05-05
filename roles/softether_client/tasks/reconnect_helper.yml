@@ -12,7 +12,13 @@
 #   - softether_reconnect_helper.nicname          (e.g. "dom" → vpn_dom)
 #   - softether_reconnect_helper.home_check_ip    (e.g. 192.168.10.10)
 #   - softether_reconnect_helper.tunnel_check_ip  (e.g. 192.168.42.1)
-#   - softether_reconnect_helper.home_subnet      (e.g. 192.168.10.0/24)
+#   - softether_reconnect_helper.home_subnets     (list, e.g.
+#                                                  [192.168.10.0/24,
+#                                                   192.168.11.0/24])
+#                                                 OR
+#     softether_reconnect_helper.home_subnet      (single string, kept for
+#                                                  back-compat with hosts
+#                                                  routing only one subnet)
 #   - softether_reconnect_helper.tunnel_gateway   (e.g. 192.168.42.10)
 # Optional:
 #   - softether_reconnect_helper.internet_probe   (default 8.8.8.8)
@@ -25,11 +31,15 @@
       - softether_reconnect_helper.nicname | default('') | length > 0
       - softether_reconnect_helper.home_check_ip | default('') | length > 0
       - softether_reconnect_helper.tunnel_check_ip | default('') | length > 0
-      - softether_reconnect_helper.home_subnet | default('') | length > 0
+      - >-
+        (softether_reconnect_helper.home_subnets | default([]) | length > 0)
+        or
+        (softether_reconnect_helper.home_subnet | default('') | length > 0)
       - softether_reconnect_helper.tunnel_gateway | default('') | length > 0
     fail_msg: >-
       softether_reconnect_helper.{connection_name,nicname,home_check_ip,
-      tunnel_check_ip,home_subnet,tunnel_gateway} must all be set when
+      tunnel_check_ip,tunnel_gateway} plus at least one of {home_subnets
+      (list), home_subnet (string)} must all be set when
       softether_reconnect_helper.enabled is true
 
 - name: SoftEther | Reconnect | Install sshfs (when sshfs_mount is configured)
@@ -59,9 +69,15 @@
   notify:
     - Reload systemd
 
-- name: SoftEther | Reconnect | Enable reconnect-vpn.service
+- name: SoftEther | Reconnect | Enable and trigger reconnect-vpn.service
   ansible.builtin.systemd:
     name: reconnect-vpn.service
+    # Type=oneshot without RemainAfterExit, so once it has run it goes
+    # back to inactive — `state: started` is therefore equivalent to
+    # "trigger now" and runs the helper at install time, populating the
+    # home-subnet routes without requiring a reboot or NM event. The
+    # helper is idempotent (route adds are guarded with `|| true`).
+    state: started
     enabled: true
     daemon_reload: true
   become: true

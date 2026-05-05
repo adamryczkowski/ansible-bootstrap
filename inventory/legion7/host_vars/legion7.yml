@@ -1,0 +1,41 @@
+---
+# Host-specific overrides for legion7 (local notebook).
+
+# ── SoftEther client ─────────────────────────────────────────────────────────
+# Same server / hub as legion9-arch and mikolaj-framework — just a different
+# account. Password is in group_vars/all/legion7.vault.yml as
+# `softether_password`.
+softether_server_address: n2n.statystyka.net
+softether_port: 992
+softether_vpn_hub: VPN
+softether_vpn_username: xps15
+# Local label for the connection (drives the systemd unit name and the
+# helper script filename).
+softether_connection_name: dom
+# Virtual NIC name → kernel interface becomes vpn_dom.
+# Note: legion7 was originally provisioned with a softether adapter named
+# `dom` (kernel interface `vpn_dom`) bound to account `dom`. The role's
+# account-creation step is skip-if-exists, so a fresh attempt with
+# `dom_vpn` left a new orphan adapter while the account kept using
+# adapter `dom`. Matching host_vars to the live binding here. legion9-arch
+# and mikolaj-framework keep the `dom_vpn` convention because they were
+# fresh installs.
+softether_nicname: dom
+
+# ── SoftEther reconnect-vpn orchestrator ─────────────────────────────────────
+# Mirrors the other VPN hosts: on boot, NetworkManager dispatcher events,
+# and resume from suspend, run /usr/local/bin/reconnect_vpn to
+# (re-)establish the tunnel and add the static routes to the home subnets.
+softether_reconnect_helper:
+  enabled: true
+  connection_name: dom            # softether_connection_name above
+  nicname: dom                    # softether_nicname above (interface vpn_dom)
+  home_check_ip: 192.168.10.10    # home gateway — reachable means we're already home
+  tunnel_check_ip: 192.168.42.1   # VPN gateway — reachable means tunnel is up
+  # All subnets reachable through the SoftEther "VPN" hub. Common to every
+  # host in this hub — keep these two in sync across host_vars files.
+  home_subnets:
+    - 192.168.10.0/24
+    - 192.168.11.0/24
+  tunnel_gateway: 192.168.42.10   # next-hop on the VPN side
+  internet_probe: 8.8.8.8

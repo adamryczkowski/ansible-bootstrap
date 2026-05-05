@@ -12,7 +12,7 @@ set -euo pipefail
 # 2. Home gateway already reachable?                  exit (already there)
 # 3. SoftEther {{ softether_reconnect_helper.connection_name }} session not established?  restart tunnel
 # 4. No DHCP lease on vpn_{{ softether_reconnect_helper.nicname }}?            run dhclient
-# 5. Add static route to home subnet via tunnel.
+# 5. Add static routes to home subnets via tunnel.
 # 6. Verify by pinging home gateway.
 {% if softether_reconnect_helper.sshfs_mount is defined %}
 # 7. Mount {{ softether_reconnect_helper.sshfs_mount.remote }} at {{ softether_reconnect_helper.sshfs_mount.local }} via sshfs.
@@ -22,7 +22,9 @@ CONN="{{ softether_reconnect_helper.connection_name }}"
 NIC="vpn_{{ softether_reconnect_helper.nicname }}"
 HOME_CHECK_IP="{{ softether_reconnect_helper.home_check_ip }}"
 TUNNEL_CHECK_IP="{{ softether_reconnect_helper.tunnel_check_ip }}"
-HOME_SUBNET="{{ softether_reconnect_helper.home_subnet }}"
+{# Prefer the new list-shaped `home_subnets`. Fall back to the older single-string `home_subnet` for hosts that haven't been migrated. -#}
+{% set _subnets = softether_reconnect_helper.home_subnets | default([softether_reconnect_helper.home_subnet]) %}
+HOME_SUBNETS=( {% for s in _subnets %}"{{ s }}" {% endfor %})
 TUNNEL_GATEWAY="{{ softether_reconnect_helper.tunnel_gateway }}"
 INTERNET_PROBE="{{ softether_reconnect_helper.internet_probe | default('8.8.8.8') }}"
 
@@ -52,8 +54,10 @@ if ! ping -c 1 -W 0.5 "$HOME_CHECK_IP" &>/dev/null; then
         dhclient "$NIC"
     fi
 
-    echo "VPN is connected. Adding route to home network..."
-    ip route add "$HOME_SUBNET" via "$TUNNEL_GATEWAY" 2>/dev/null || true
+    echo "VPN is connected. Adding routes to home networks..."
+    for subnet in "${HOME_SUBNETS[@]}"; do
+        ip route add "$subnet" via "$TUNNEL_GATEWAY" 2>/dev/null || true
+    done
     if ! ping -c 1 -W 0.5 "$HOME_CHECK_IP" &>/dev/null; then
         echo "ERROR! No connection to the home network. Is the VPN server running?"
         exit 0
