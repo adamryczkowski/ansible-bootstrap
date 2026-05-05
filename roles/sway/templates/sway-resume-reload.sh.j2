@@ -1,0 +1,25 @@
+#!/bin/bash
+# Managed by Ansible (sway role).
+# Installed at /etc/systemd/system-sleep/sway-resume-reload — invoked by
+# systemd-sleep with $1=pre|post and $2=action. On post-resume, ask each
+# running sway compositor to reload, which kicks wlroots' renderer out
+# of the post-resume hang on hybrid Intel+NVIDIA laptops.
+
+set -u
+
+[ "${1:-}" = "post" ] || exit 0
+case "${2:-}" in
+    suspend|hibernate|hybrid-sleep|suspend-then-hibernate) ;;
+    *) exit 0 ;;
+esac
+
+shopt -s nullglob
+for sock in /run/user/*/sway-ipc.*.sock; do
+    [ -S "$sock" ] || continue
+    uid=$(stat -c %u "$sock")
+    user=$(getent passwd "$uid" | cut -d: -f1)
+    [ -n "$user" ] || continue
+    runuser -u "$user" -- /usr/bin/swaymsg -s "$sock" reload >/dev/null 2>&1 &
+done
+wait
+exit 0

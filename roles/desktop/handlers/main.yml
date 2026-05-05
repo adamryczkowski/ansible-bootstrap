@@ -1,0 +1,6 @@
+---
+- name: Desktop | Restart TLP
+  ansible.builtin.systemd:
+    name: tlp
+    state: restarted
+  become: true

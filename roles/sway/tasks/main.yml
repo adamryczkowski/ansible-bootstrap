@@ -96,6 +96,10 @@
   ansible.builtin.include_tasks: lock_before_sleep.yml
   when: sway_configure_lock_before_sleep | bool
 
+- name: Sway | Include post-resume swaymsg reload hook
+  ansible.builtin.include_tasks: recover_after_resume.yml
+  when: sway_recover_after_resume | bool
+
 - name: Sway | Include session setup
   ansible.builtin.include_tasks: session.yml
   when: sway_create_desktop_entry | bool

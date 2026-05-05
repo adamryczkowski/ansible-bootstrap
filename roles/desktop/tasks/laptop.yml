@@ -30,6 +30,29 @@
     state: started
   become: true
 
+- name: Desktop Laptop | Deploy TLP overrides drop-in
+  ansible.builtin.copy:
+    dest: /etc/tlp.d/99-ansible.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by Ansible (desktop role). Driven by `desktop_tlp_extra_config`.
+      # Settings here override TLP defaults and the kernel cmdline; TLP
+      # reapplies them on every AC/BAT/resume event.
+      {{ desktop_tlp_extra_config }}
+  become: true
+  notify: Desktop | Restart TLP
+  when: desktop_tlp_extra_config | length > 0
+
+- name: Desktop Laptop | Remove TLP overrides drop-in if disabled
+  ansible.builtin.file:
+    path: /etc/tlp.d/99-ansible.conf
+    state: absent
+  become: true
+  notify: Desktop | Restart TLP
+  when: desktop_tlp_extra_config | length == 0
+
 - name: Desktop Laptop | Configure GNOME power settings
   community.general.dconf:
     key: "{{ item.key }}"

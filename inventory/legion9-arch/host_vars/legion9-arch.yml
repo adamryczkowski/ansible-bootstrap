@@ -60,6 +60,34 @@ nvidia_deploy_prime_run_override: true
 # (~35 W extra at idle). Pin the fallback to the iGPU-only wrapper.
 sway_greetd_command: "tuigreet --time --remember --remember-session --asterisks --cmd /usr/local/bin/sway-igpu-only"
 
+# Use the dotfiles `conditional-lock` script as the lock command so the
+# role's lock-before-sleep systemd unit honours the WiFi whitelist
+# (don't lock at home). This also avoids a duplicate-swaylock race that
+# blackholed keyboard input on resume — previously the systemd unit
+# fired plain swaylock while the user's swayidle config also fired
+# `before-sleep conditional-lock`. With the unit now running
+# conditional-lock, the swayidle `before-sleep` clause should be
+# dropped from the user's sway dotfiles to leave a single source of
+# truth for the suspend-time lock.
+sway_lock_command: "/home/{{ sway_username }}/.config/i3-config/sway/scripts/conditional-lock -f -c 000000"
+
+# Recover from the wlroots/i915 renderer hang that bites this hybrid Intel
+# iGPU + NVIDIA dGPU laptop on every suspend/resume cycle. The role deploys
+# /etc/systemd/system-sleep/sway-resume-reload which runs `swaymsg reload`
+# automatically post-resume — sidesteps the bug without restarting sway.
+sway_recover_after_resume: true
+
+# TLP overrides the kernel cmdline `pcie_aspm.policy=…` and resets the
+# policy to its own default after every AC/BAT transition and every
+# resume from suspend. Without these explicit settings, the dGPU's PCIe
+# link comes out of resume with ASPM Disabled even though the kernel
+# cmdline asked for powersupersave — costing ~30 W extra at idle (52 W
+# vs 22 W). powersupersave engages L1 substates and brings idle back
+# to the expected ~22 W on this laptop.
+desktop_tlp_extra_config: |
+  PCIE_ASPM_ON_AC=powersupersave
+  PCIE_ASPM_ON_BAT=powersupersave
+
 # ── SoftEther client ─────────────────────────────────────────────────────────
 # Same server / hub as mikolaj-framework — just a different account.
 # Password is in group_vars/all/legion9.vault.yml as `softether_password`.

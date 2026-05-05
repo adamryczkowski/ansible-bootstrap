@@ -1,0 +1,29 @@
+---
+# Deploy a systemd-sleep post-resume hook that asks every running sway
+# compositor to reload its renderer state. Sidesteps a wlroots/i915
+# renderer hang seen on some hybrid Intel + NVIDIA laptops where the
+# panel returns red/frozen after suspend even though sway's IPC still
+# reports the output as active.
+#
+# systemd-sleep iterates scripts under /etc/systemd/system-sleep/ on
+# every suspend/hibernate cycle, calling them with $1=pre|post and
+# $2=action. The deployed script no-ops on `pre` and runs `swaymsg
+# reload` for each user's IPC socket on `post`.
+
+- name: Sway | Ensure systemd-sleep hook directory exists
+  ansible.builtin.file:
+    path: /etc/systemd/system-sleep
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+
+- name: Sway | Deploy post-resume swaymsg reload hook
+  ansible.builtin.template:
+    src: sway-resume-reload.sh.j2
+    dest: /etc/systemd/system-sleep/sway-resume-reload
+    owner: root
+    group: root
+    mode: "0755"
+  become: true

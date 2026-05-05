@@ -12,6 +12,12 @@ desktop_tweak_smb: false
 desktop_tweak_laptop: false
 desktop_tweak_applications: true
 
+# Extra TLP configuration injected as /etc/tlp.d/99-ansible.conf when non-empty.
+# TLP overrides the kernel cmdline `pcie_aspm.policy=…` setting at boot and on
+# every AC/BAT/resume event, so settings like PCIE_ASPM_ON_AC must live here
+# rather than on the bootloader cmdline. Multi-line string, KEY=value per line.
+desktop_tlp_extra_config: ""
+
 # Base packages. gdebi-core is Debian-only and added in tasks/base.yml.
 desktop_base_packages:
   - git

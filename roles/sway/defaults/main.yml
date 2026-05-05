@@ -186,6 +186,15 @@ sway_lock_command: "/usr/bin/swaylock -f -c 000000"
 # This is typically wayland-1 for the first Wayland session
 sway_lock_wayland_display: "wayland-1"
 
+# Recover sway after suspend/resume.
+# Some hybrid Intel + NVIDIA laptops hit a wlroots/i915 renderer hang on
+# every resume — sway's IPC reports the output as active/power=true, but
+# the framebuffer never repaints (red/frozen screen). Sending the running
+# sway a `swaymsg reload` is enough to kick the renderer back into shape.
+# When this is true, the role deploys /etc/systemd/system-sleep/sway-resume-reload
+# which iterates over every user's sway IPC socket post-resume and runs reload.
+sway_recover_after_resume: false
+
 # Slack Wayland compatibility
 # Deploy desktop entry override to fix GPU/EGL issues on Sway
 # See docs/slack-sway-compatibility-report.md for details
